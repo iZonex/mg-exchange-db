@@ -1,0 +1,412 @@
+# =============================================================================
+# ExchangeDB Reference Configuration
+# =============================================================================
+#
+# Copy this file to exchange-db.toml and customize as needed.
+# All values shown are the defaults.
+#
+# Configuration priority (highest wins):
+#   1. CLI flags (--bind, --data-dir)
+#   2. Environment variables (EXCHANGEDB_*)
+#   3. This config file
+#   4. Built-in defaults
+#
+# Size units:   B, KB, MB, GB, TB (1024-based)
+# Duration units: s, m, h, d, w
+#
+# Hot reload:   kill -HUP $(pidof exchange-db)
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Server
+# ---------------------------------------------------------------------------
+[server]
+# Root directory for all table data, WAL segments, and metadata.
+data_dir = "./data"
+
+# Log level: trace, debug, info, warn, error.
+log_level = "info"
+
+# Log format: "text" (human-readable) or "json" (structured).
+log_format = "text"
+
+# ---------------------------------------------------------------------------
+# HTTP REST API & Web Console
+# ---------------------------------------------------------------------------
+[http]
+# Bind address for HTTP server (REST API, Web Console, Prometheus metrics).
+bind = "0.0.0.0:9000"
+
+# Set to false to disable the HTTP server entirely.
+enabled = true
+
+# ---------------------------------------------------------------------------
+# PostgreSQL Wire Protocol
+# ---------------------------------------------------------------------------
+[pgwire]
+# Bind address for PostgreSQL wire protocol (psql, DBeaver, Grafana, etc).
+bind = "0.0.0.0:8812"
+
+# Set to false to disable the pgwire server.
+enabled = true
+
+# ---------------------------------------------------------------------------
+# InfluxDB Line Protocol (ILP) Ingestion
+# ---------------------------------------------------------------------------
+[ilp]
+# Bind address for ILP TCP ingestion.
+bind = "0.0.0.0:9009"
+
+# Set to false to disable ILP ingestion.
+enabled = true
+
+# Number of rows to buffer before flushing to the WAL.
+batch_size = 1000
+
+# ---------------------------------------------------------------------------
+# Storage Engine
+# ---------------------------------------------------------------------------
+[storage]
+# Enable write-ahead log for crash recovery.
+wal_enabled = true
+
+# Maximum size of a single WAL segment before rotation.
+wal_max_segment_size = "64MB"
+
+# Default partitioning strategy for new tables: none, hour, day, week, month, year.
+default_partition_by = "day"
+
+# Memory map page size. Use "2MB" for huge pages on Linux.
+mmap_page_size = "4KB"
+
+# ---------------------------------------------------------------------------
+# Data Retention
+# ---------------------------------------------------------------------------
+[retention]
+# Enable automatic data retention (drops old partitions).
+enabled = false
+
+# Maximum age of data before automatic deletion.
+max_age = "30d"
+
+# How often to check for expired partitions.
+check_interval = "1h"
+
+# ---------------------------------------------------------------------------
+# Performance Tuning
+# ---------------------------------------------------------------------------
+[performance]
+# Number of threads for parallel query execution.
+# 0 = auto (uses all available CPU cores).
+query_parallelism = 0
+
+# WAL commit mode:
+#   "async"  — write returns before fsync (faster, data may be lost on crash)
+#   "sync"   — write waits for fsync (slower, durable)
+writer_commit_mode = "async"
+
+# ---------------------------------------------------------------------------
+# TLS / SSL
+# ---------------------------------------------------------------------------
+[tls]
+# Enable TLS for all protocols (HTTP, pgwire, ILP).
+enabled = false
+
+# Path to PEM-encoded certificate file.
+cert_path = "cert.pem"
+
+# Path to PEM-encoded private key file.
+key_path = "key.pem"
+
+# Minimum TLS version: "1.2" or "1.3".
+min_version = "1.2"
+
+# ---------------------------------------------------------------------------
+# Replication
+# ---------------------------------------------------------------------------
+[replication]
+# Role: "standalone" (no replication), "primary", or "replica".
+role = "standalone"
+
+# For replicas: address of the primary to follow.
+primary_addr = ""
+
+# For primaries: list of replica addresses to push WAL to.
+replica_addrs = []
+
+# Replication sync mode:
+#   "async"     — primary doesn't wait for replica acknowledgment
+#   "semi-sync" — primary waits for at least one replica
+#   "sync"      — primary waits for all replicas
+sync_mode = "async"
+
+# TCP port for replication protocol (WAL streaming, health checks).
+replication_port = 19100
+
+# Enable automatic failover (replica promotes itself if primary is down).
+failover_enabled = false
+
+# How often a replica pings the primary to check health.
+health_check_interval = "2s"
+
+# Number of consecutive health check failures before triggering failover.
+failure_threshold = 3
+
+# ---------------------------------------------------------------------------
+# Cairo (Storage Engine Internals)
+# ---------------------------------------------------------------------------
+[cairo]
+# Maximum uncommitted rows in WAL before forcing a commit.
+max_uncommitted_rows = 500000
+
+# Time lag before uncommitted data is force-committed.
+commit_lag = "10s"
+
+# Maximum lag for out-of-order (O3) data before forcing merge.
+o3_max_lag = "600s"
+
+# Page size for appending data to column files.
+writer_data_append_page_size = "16MB"
+
+# Maximum number of reader pool segments.
+reader_pool_max_segments = 5
+
+# Timeout for spin locks on shared resources.
+spin_lock_timeout = "5s"
+
+# Initial capacity of the character store.
+character_store_capacity = 1024
+
+# Sequence pool capacity for the character store.
+character_store_sequence_pool_capacity = 64
+
+# Initial capacity of the column pool.
+column_pool_capacity = 4096
+
+# Load factor for compact hash maps.
+compact_map_load_factor = 0.7
+
+# Default hash map implementation: "fast" or "compact".
+default_map_type = "fast"
+
+# Cache symbol column lookups by default.
+default_symbol_cache_flag = true
+
+# Default initial capacity for symbol columns.
+default_symbol_capacity = 256
+
+# Number of retries for failed file operations.
+file_operation_retry_count = 30
+
+# Time before idle readers are evicted from the pool.
+inactive_reader_ttl = "120s"
+
+# Time before idle writers are evicted from the pool.
+inactive_writer_ttl = "120s"
+
+# Block size for bitmap index values.
+index_value_block_size = 256
+
+# Maximum number of swap files for O3 merges.
+max_swap_file_count = 30
+
+# Directory creation mode (octal).
+mkdir_mode = 511
+
+# Row count threshold for parallel index creation.
+parallel_index_threshold = 100000
+
+# Snapshot instance identifier (for point-in-time recovery).
+snapshot_instance_id = ""
+
+# Buffer size for COPY operations.
+sql_copy_buffer_size = "4MB"
+
+# Prefix for system tables.
+system_table_prefix = "sys."
+
+# Additional volumes for data storage.
+volumes = []
+
+# ---------------------------------------------------------------------------
+# WAL (Write-Ahead Log) Tuning
+# ---------------------------------------------------------------------------
+[wal]
+# Enable WAL (same as storage.wal_enabled, but more specific).
+enabled = true
+
+# Maximum segment size before rotation.
+max_segment_size = "64MB"
+
+# Time quota for applying WAL events to a single table per cycle.
+apply_table_time_quota = "30s"
+
+# Interval between WAL purge scans (removing merged segments).
+purge_interval = "30s"
+
+# Row count trigger for segment rollover.
+segment_rollover_row_count = 200000
+
+# Multiplier for squashing uncommitted rows during merge.
+squash_uncommitted_rows_multiplier = 20.0
+
+# ---------------------------------------------------------------------------
+# Out-of-Order (O3) Ingestion
+# ---------------------------------------------------------------------------
+[o3]
+# Minimum partition size before O3 merge will split it.
+partition_split_min_size = "50MB"
+
+# Maximum number of splits for the last (active) partition.
+last_partition_max_splits = 20
+
+# Memory allocation per column during O3 merge.
+column_memory_size = "8MB"
+
+# ---------------------------------------------------------------------------
+# Memory Limits
+# ---------------------------------------------------------------------------
+[memory]
+# Maximum memory per query. Queries exceeding this will spill to disk.
+max_per_query = "256MB"
+
+# Maximum total memory for all queries. 0 = unlimited.
+max_total = "0"
+
+# Maximum size of sort keys before spilling.
+sort_key_max_size = "2MB"
+
+# ---------------------------------------------------------------------------
+# Telemetry
+# ---------------------------------------------------------------------------
+[telemetry]
+# Enable internal telemetry collection (used by /metrics endpoint).
+enabled = true
+
+# Internal event queue capacity.
+queue_capacity = 512
+
+# Hide table names in telemetry output.
+hide_tables = false
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+[security]
+# Enable authentication (token or user/password).
+auth_enabled = false
+
+# Enable role-based access control (requires auth_enabled).
+rbac_enabled = false
+
+# Enable audit logging for DDL operations.
+audit_enabled = false
+
+# Minimum password length for CREATE USER.
+password_min_length = 8
+
+# Session timeout for authenticated connections.
+session_timeout = "1h"
+
+# Maximum failed login attempts before account lockout.
+max_failed_login_attempts = 5
+
+# Lockout duration after max_failed_login_attempts.
+lockout_duration = "15m"
+
+# Enable encryption at rest (ChaCha20-Poly1305).
+encryption_enabled = false
+
+# Base64-encoded 32-byte encryption key.
+# Generate with: openssl rand -base64 32
+encryption_key = ""
+
+# ---------------------------------------------------------------------------
+# Cluster
+# ---------------------------------------------------------------------------
+[cluster]
+# Enable cluster mode (multi-node coordination via Raft).
+enabled = false
+
+# Unique identifier for this node.
+node_id = ""
+
+# Addresses of seed nodes for cluster discovery.
+seed_nodes = []
+
+# Heartbeat interval between cluster nodes.
+heartbeat_interval = "5s"
+
+# Number of missed heartbeats before a node is marked as failed.
+failure_threshold = 3
+
+# ---------------------------------------------------------------------------
+# Backup
+# ---------------------------------------------------------------------------
+[backup]
+# Enable automated backups.
+enabled = false
+
+# Cron schedule for backups (default: 2:00 AM daily).
+schedule = "0 2 * * *"
+
+# Backup destination directory.
+destination = ""
+
+# Number of backup snapshots to retain.
+retention_count = 7
+
+# ---------------------------------------------------------------------------
+# Tiered Storage
+# ---------------------------------------------------------------------------
+[tiering]
+# Enable automatic data tiering (hot → warm → cold).
+enabled = false
+
+# Data newer than this stays on the hot tier (fast SSD).
+hot_retention = "7d"
+
+# Data older than hot but newer than this goes to warm tier.
+warm_retention = "30d"
+
+# Path for cold storage (can be a different mount, NFS, or S3-fuse).
+cold_storage_path = ""
+
+# How often to check for data that needs to be moved between tiers.
+check_interval = "30m"
+
+# ---------------------------------------------------------------------------
+# Point-in-Time Recovery (PITR)
+# ---------------------------------------------------------------------------
+[pitr]
+# Enable PITR snapshots.
+enabled = false
+
+# How long to keep PITR snapshots.
+retention_window = "7d"
+
+# How often to create new PITR snapshots.
+snapshot_interval = "6h"
+
+# ---------------------------------------------------------------------------
+# TTL (Time-to-Live)
+# ---------------------------------------------------------------------------
+[ttl]
+# Enable automatic data expiration based on age.
+enabled = false
+
+# Default TTL for tables without explicit TTL settings.
+default_max_age = "90d"
+
+# How often to check for expired data.
+check_interval = "1h"
+
+# ---------------------------------------------------------------------------
+# Downsampling
+# ---------------------------------------------------------------------------
+[downsampling]
+# Enable automatic downsampling of high-resolution data.
+enabled = false
+
+# How often to check for downsampling rules to apply.
+check_interval = "10m"

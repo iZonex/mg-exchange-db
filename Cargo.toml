@@ -1,0 +1,83 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/common",
+    "crates/core",
+    "crates/query",
+    "crates/net",
+    "crates/exchange",
+    "crates/server",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Dmytro Chystiakov"]
+license = "Apache-2.0"
+rust-version = "1.85"
+
+[workspace.dependencies]
+# Storage
+memmap2 = "0.9"
+lz4_flex = "0.11"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+# Concurrency
+crossbeam = "0.8"
+rayon = "1.10"
+dashmap = "6"
+fs2 = "0.4"
+
+# Async
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Network
+axum = { version = "0.8", features = ["ws"] }
+axum-server = { version = "0.7", features = ["tls-rustls"] }
+rustls = { version = "0.23", features = ["ring"] }
+rustls-pemfile = "2"
+tokio-util = { version = "0.7", features = ["codec"] }
+pgwire = "0.28"
+tower-http = { version = "0.6", features = ["cors"] }
+
+# Query
+sqlparser = { version = "0.55", features = ["visitor"] }
+regex = "1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+sha2 = "0.10"
+hmac = "0.12"
+argon2 = "0.5"
+subtle = "2"
+rand = "0.8"
+ureq = { version = "2", features = ["json"] }
+uuid = { version = "1", features = ["v4"] }
+toml = "0.8"
+rkyv = "0.8"
+byteorder = "1"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Testing
+criterion = { version = "0.5", features = ["html_reports"] }
+
+# Internal crates
+exchange-common = { path = "crates/common" }
+exchange-core = { path = "crates/core" }
+exchange-query = { path = "crates/query" }
+exchange-net = { path = "crates/net" }
+exchange-exchange = { path = "crates/exchange" }

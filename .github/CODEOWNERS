@@ -1,0 +1,15 @@
+# Default owner for everything
+* @iZonex
+
+# Storage engine — critical path
+crates/core/ @iZonex
+
+# Query engine
+crates/query/ @iZonex
+
+# Network protocols
+crates/net/ @iZonex
+
+# Security-sensitive code
+crates/net/src/auth/ @iZonex
+crates/core/src/security/ @iZonex

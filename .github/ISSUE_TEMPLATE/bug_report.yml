@@ -1,0 +1,95 @@
+name: Bug Report
+description: Report a bug in ExchangeDB
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please fill in as much detail as possible.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the system is affected?
+      options:
+        - Storage engine (WAL, partitions, mmap, columns)
+        - Query engine (SQL parser, planner, executor)
+        - HTTP REST API
+        - PostgreSQL wire protocol
+        - ILP ingestion (TCP/UDP)
+        - WebSocket streaming
+        - Web console
+        - Security (auth, encryption, RLS)
+        - Replication / clustering
+        - Configuration / startup
+        - Docker
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Critical (data loss / corruption)
+        - High (crash / can't start / wrong results)
+        - Medium (degraded performance / incorrect metadata)
+        - Low (cosmetic / minor inconvenience)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
+      placeholder: Clear description of the bug
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Create table with ...
+        2. Insert data ...
+        3. Run query ...
+        4. See error
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Error output
+      description: Relevant log output or error messages
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `exchange-db --version` or git commit
+      placeholder: v0.1.0
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux (x86_64)
+        - Linux (aarch64)
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Docker
+        - Other

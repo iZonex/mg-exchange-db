@@ -1,0 +1,11 @@
+[package]
+name = "exchange-common"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossbeam = { workspace = true }
+xxhash-rust = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+byteorder = { workspace = true }

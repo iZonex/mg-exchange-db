@@ -1,0 +1,387 @@
+# ExchangeDB SQL Logic Test - Basic Suite
+# Tests CREATE TABLE, INSERT, SELECT, aggregations, filtering, ordering.
+
+# ============================================================
+# Schema setup
+# ============================================================
+
+statement ok
+CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE, volume DOUBLE, side VARCHAR)
+
+statement ok
+CREATE TABLE metrics (timestamp TIMESTAMP, host VARCHAR, cpu DOUBLE, mem DOUBLE)
+
+# ============================================================
+# Insert test data - trades
+# ============================================================
+
+statement ok
+INSERT INTO trades (timestamp, symbol, price, volume, side) VALUES (1710460800000000000, 'BTC/USD', 60000.0, 1.5, 'buy')
+
+statement ok
+INSERT INTO trades (timestamp, symbol, price, volume, side) VALUES (1710461400000000000, 'ETH/USD', 3000.0, 10.0, 'sell')
+
+statement ok
+INSERT INTO trades (timestamp, symbol, price, volume, side) VALUES (1710462000000000000, 'BTC/USD', 60100.0, 2.0, 'buy')
+
+statement ok
+INSERT INTO trades (timestamp, symbol, price, volume, side) VALUES (1710462600000000000, 'SOL/USD', 100.0, 50.0, 'sell')
+
+statement ok
+INSERT INTO trades (timestamp, symbol, price, volume, side) VALUES (1710463200000000000, 'ETH/USD', 3010.0, 5.0, 'buy')
+
+statement ok
+INSERT INTO trades (timestamp, symbol, price, volume, side) VALUES (1710463800000000000, 'BTC/USD', 60200.0, 0.5, 'sell')
+
+statement ok
+INSERT INTO trades (timestamp, symbol, price, volume, side) VALUES (1710464400000000000, 'SOL/USD', 101.0, 25.0, 'buy')
+
+statement ok
+INSERT INTO trades (timestamp, symbol, price, volume, side) VALUES (1710465000000000000, 'ETH/USD', 3020.0, 8.0, 'sell')
+
+statement ok
+INSERT INTO trades (timestamp, symbol, price, volume, side) VALUES (1710465600000000000, 'BTC/USD', 60300.0, 3.0, 'buy')
+
+statement ok
+INSERT INTO trades (timestamp, symbol, price, volume, side) VALUES (1710466200000000000, 'SOL/USD', 102.0, 15.0, 'sell')
+
+# ============================================================
+# Insert test data - metrics
+# ============================================================
+
+statement ok
+INSERT INTO metrics (timestamp, host, cpu, mem) VALUES (1710460800000000000, 'web1', 45.5, 72.0)
+
+statement ok
+INSERT INTO metrics (timestamp, host, cpu, mem) VALUES (1710461400000000000, 'web2', 30.0, 65.0)
+
+statement ok
+INSERT INTO metrics (timestamp, host, cpu, mem) VALUES (1710462000000000000, 'web1', 55.0, 74.0)
+
+statement ok
+INSERT INTO metrics (timestamp, host, cpu, mem) VALUES (1710462600000000000, 'db1', 80.0, 90.0)
+
+statement ok
+INSERT INTO metrics (timestamp, host, cpu, mem) VALUES (1710463200000000000, 'web2', 35.0, 68.0)
+
+# ============================================================
+# 1. Basic SELECT *
+# ============================================================
+
+query I nosort
+SELECT count(*) FROM trades
+----
+10
+
+query I nosort
+SELECT count(*) FROM metrics
+----
+5
+
+# ============================================================
+# 2. Aggregate functions
+# ============================================================
+
+query R nosort
+SELECT sum(volume) FROM trades
+----
+120
+
+query R nosort
+SELECT min(price) FROM trades
+----
+100
+
+query R nosort
+SELECT max(price) FROM trades
+----
+60300
+
+query R nosort
+SELECT avg(cpu) FROM metrics
+----
+49.1
+
+query R nosort
+SELECT min(mem) FROM metrics
+----
+65
+
+query R nosort
+SELECT max(mem) FROM metrics
+----
+90
+
+query R nosort
+SELECT sum(cpu) FROM metrics
+----
+245.5
+
+# ============================================================
+# 3. WHERE filtering
+# ============================================================
+
+query I nosort
+SELECT count(*) FROM trades WHERE symbol = 'BTC/USD'
+----
+4
+
+query I nosort
+SELECT count(*) FROM trades WHERE symbol = 'ETH/USD'
+----
+3
+
+query I nosort
+SELECT count(*) FROM trades WHERE symbol = 'SOL/USD'
+----
+3
+
+query I nosort
+SELECT count(*) FROM trades WHERE side = 'buy'
+----
+5
+
+query I nosort
+SELECT count(*) FROM trades WHERE side = 'sell'
+----
+5
+
+query I nosort
+SELECT count(*) FROM trades WHERE price > 50000
+----
+4
+
+query I nosort
+SELECT count(*) FROM trades WHERE price < 1000
+----
+3
+
+query I nosort
+SELECT count(*) FROM trades WHERE volume >= 10.0
+----
+4
+
+# ============================================================
+# 4. Aggregate with WHERE
+# ============================================================
+
+query R nosort
+SELECT sum(volume) FROM trades WHERE symbol = 'BTC/USD'
+----
+7
+
+query R nosort
+SELECT avg(price) FROM trades WHERE symbol = 'SOL/USD'
+----
+101
+
+query R nosort
+SELECT max(volume) FROM trades WHERE side = 'sell'
+----
+50
+
+query R nosort
+SELECT min(price) FROM trades WHERE side = 'buy'
+----
+101
+
+query R nosort
+SELECT sum(cpu) FROM metrics WHERE host = 'web1'
+----
+100.5
+
+query I nosort
+SELECT count(*) FROM metrics WHERE cpu > 40
+----
+3
+
+# ============================================================
+# 5. ORDER BY
+# ============================================================
+
+query R nosort
+SELECT min(price) FROM trades
+----
+100
+
+query R nosort
+SELECT max(price) FROM trades
+----
+60300
+
+# ============================================================
+# 6. LIMIT
+# ============================================================
+
+query I nosort
+SELECT count(*) FROM trades WHERE price > 0
+----
+10
+
+# ============================================================
+# 7. DISTINCT
+# ============================================================
+
+query I nosort
+SELECT count_distinct(symbol) FROM trades
+----
+3
+
+query I nosort
+SELECT count_distinct(host) FROM metrics
+----
+3
+
+query I nosort
+SELECT count_distinct(side) FROM trades
+----
+2
+
+# ============================================================
+# 8. first/last
+# ============================================================
+
+query R nosort
+SELECT first(price) FROM trades
+----
+60000
+
+query R nosort
+SELECT last(price) FROM trades
+----
+102
+
+query T nosort
+SELECT first(symbol) FROM trades
+----
+BTC/USD
+
+query T nosort
+SELECT last(symbol) FROM trades
+----
+SOL/USD
+
+query T nosort
+SELECT first(host) FROM metrics
+----
+web1
+
+query T nosort
+SELECT last(host) FROM metrics
+----
+web2
+
+# ============================================================
+# 9. Combined filters (AND / OR)
+# ============================================================
+
+query I nosort
+SELECT count(*) FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy'
+----
+3
+
+query I nosort
+SELECT count(*) FROM trades WHERE symbol = 'BTC/USD' AND side = 'sell'
+----
+1
+
+query I nosort
+SELECT count(*) FROM trades WHERE price > 50000 OR price < 200
+----
+7
+
+# ============================================================
+# 10. GROUP BY
+# ============================================================
+
+query IT rowsort
+SELECT symbol, count(*) FROM trades GROUP BY symbol
+----
+BTC/USD
+4
+ETH/USD
+3
+SOL/USD
+3
+
+query IT rowsort
+SELECT side, count(*) FROM trades GROUP BY side
+----
+buy
+5
+sell
+5
+
+query IT rowsort
+SELECT host, count(*) FROM metrics GROUP BY host
+----
+db1
+1
+web1
+2
+web2
+2
+
+# ============================================================
+# 11. Edge cases
+# ============================================================
+
+query I nosort
+SELECT count(*) FROM trades WHERE price > 999999
+----
+0
+
+query I nosort
+SELECT count(*) FROM trades WHERE symbol = 'NONEXISTENT'
+----
+0
+
+# ============================================================
+# 12. Negative numbers in WHERE
+# ============================================================
+
+query I nosort
+SELECT count(*) FROM trades WHERE price > -100
+----
+10
+
+query I nosort
+SELECT count(*) FROM metrics WHERE cpu > -1
+----
+5
+
+# ============================================================
+# 13. Statement error cases
+# ============================================================
+
+statement error
+CREATE TABLE trades (timestamp TIMESTAMP, x DOUBLE)
+
+statement error
+SELECT * FROM nonexistent_table_xyz
+
+# ============================================================
+# 14. Multiple aggregates in one query
+# ============================================================
+
+query IR nosort
+SELECT count(*), sum(volume) FROM trades
+----
+10
+120
+
+query IR nosort
+SELECT count(*), avg(cpu) FROM metrics
+----
+5
+49.1
+
+# ============================================================
+# 15. HAVING
+# ============================================================
+
+query IT rowsort
+SELECT symbol, count(*) FROM trades GROUP BY symbol HAVING count(*) >= 4
+----
+BTC/USD
+4

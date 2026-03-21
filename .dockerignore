@@ -1,0 +1,10 @@
+target/
+.git/
+.gitignore
+questdb-reference/
+*.md
+.idea/
+.vscode/
+.DS_Store
+**/*.swp
+**/*.swo

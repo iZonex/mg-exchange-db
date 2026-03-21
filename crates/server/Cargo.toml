@@ -1,0 +1,43 @@
+[package]
+name = "exchange-db"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "exchange-db"
+path = "src/main.rs"
+
+[[bin]]
+name = "exchangedb-bench"
+path = "src/bench.rs"
+
+[dependencies]
+exchange-common = { workspace = true }
+exchange-core = { workspace = true }
+exchange-query = { workspace = true }
+exchange-net = { workspace = true }
+exchange-exchange = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+serde_json = { workspace = true }
+ureq = { workspace = true }
+tempfile = "3"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "e2e"
+harness = false
+
+[[bench]]
+name = "tsbs"
+harness = false

@@ -1,0 +1,173 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Query Rate",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "ExchangeDB Metrics" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(exchangedb_queries_total[5m])",
+          "legendFormat": "queries/sec"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Query Latency (p50/p95/p99)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "ExchangeDB Metrics" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(exchangedb_query_duration_seconds_bucket[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(exchangedb_query_duration_seconds_bucket[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(exchangedb_query_duration_seconds_bucket[5m]))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Active Connections",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "ExchangeDB Metrics" },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "exchangedb_connections_active", "legendFormat": "active" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [
+          { "color": "green", "value": null },
+          { "color": "yellow", "value": 100 },
+          { "color": "red", "value": 500 }
+        ]}},
+        "overrides": []
+      }
+    },
+    {
+      "title": "Active Queries",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "ExchangeDB Metrics" },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 8 },
+      "targets": [
+        { "expr": "exchangedb_active_queries", "legendFormat": "active" }
+      ]
+    },
+    {
+      "title": "Rows Written/sec",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "ExchangeDB Metrics" },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 8 },
+      "targets": [
+        { "expr": "rate(exchangedb_rows_written_total[5m])", "legendFormat": "writes/sec" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "rowsps" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Uptime",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "ExchangeDB Metrics" },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "exchangedb_uptime_seconds", "legendFormat": "uptime" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Memory Usage",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "ExchangeDB Metrics" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        { "expr": "exchangedb_memory_used_bytes", "legendFormat": "used" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "WAL Segments",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "ExchangeDB Metrics" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        { "expr": "rate(exchangedb_wal_segments_total[5m])", "legendFormat": "segments/sec" },
+        { "expr": "rate(exchangedb_wal_bytes_total[5m])", "legendFormat": "bytes/sec" }
+      ]
+    },
+    {
+      "title": "Failed Queries",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "ExchangeDB Metrics" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        { "expr": "rate(exchangedb_queries_failed_total[5m])", "legendFormat": "failed/sec" },
+        { "expr": "rate(exchangedb_slow_queries_total[5m])", "legendFormat": "slow/sec" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Plan Cache Hit Rate",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "ExchangeDB Metrics" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "expr": "rate(exchangedb_plan_cache_hits_total[5m]) / (rate(exchangedb_plan_cache_hits_total[5m]) + rate(exchangedb_plan_cache_misses_total[5m]))",
+          "legendFormat": "hit rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null },
+            { "color": "yellow", "value": 0.5 },
+            { "color": "green", "value": 0.8 }
+          ]}
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["exchangedb", "database", "monitoring"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "ExchangeDB Overview",
+  "uid": "exchangedb-overview",
+  "version": 1
+}

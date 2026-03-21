@@ -1,0 +1,62 @@
+services:
+  exchangedb:
+    build: .
+    container_name: exchangedb
+    ports:
+      - "9000:9000"   # HTTP REST API
+      - "8812:8812"   # PostgreSQL wire protocol
+      - "9009:9009"   # InfluxDB Line Protocol
+    volumes:
+      - exchangedb-data:/data
+    environment:
+      - EXCHANGEDB_DATA_DIR=/data
+      - EXCHANGEDB_LOG_LEVEL=info
+      - EXCHANGEDB_HTTP_BIND=0.0.0.0:9000
+      - EXCHANGEDB_PGWIRE_BIND=0.0.0.0:8812
+      - EXCHANGEDB_ILP_BIND=0.0.0.0:9009
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/api/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  # ── Monitoring stack ──────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: exchangedb-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docs/grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      exchangedb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: exchangedb-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=exchangedb
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - ./docs/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docs/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      exchangedb:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  exchangedb-data:
+    driver: local
+  grafana-data:
+    driver: local
