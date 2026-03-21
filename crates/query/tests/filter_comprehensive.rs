@@ -6,7 +6,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -658,7 +658,7 @@ mod and_tests {
         let db = db_filter();
         let (_, rows) = db.query("SELECT * FROM t WHERE s LIKE '%a' AND i < 5");
         // alpha(i=1), gamma(i=3), delta(i=4) — filter for suffix 'a': alpha, gamma, delta
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 }
 
@@ -804,7 +804,7 @@ mod nested_filter_tests {
     fn filter_with_group_by() {
         let db = db_filter();
         let (_, rows) = db.query("SELECT s, count(*) FROM t WHERE d > 50 GROUP BY s ORDER BY s");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -914,7 +914,7 @@ mod filter_trades_integration {
         let db = TestDb::with_trades(10);
         let (_, rows) = db.query("SELECT * FROM trades WHERE volume IS NULL");
         // row 0 has NULL volume
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -930,7 +930,7 @@ mod filter_trades_integration {
         let (_, rows) = db.query(
             "SELECT * FROM trades WHERE symbol = 'BTC/USD' AND (side = 'buy' OR price > 60200)",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -973,9 +973,8 @@ mod filter_trades_integration {
             .query("SELECT price FROM trades WHERE symbol = 'BTC/USD' ORDER BY price DESC LIMIT 3");
         assert_eq!(rows.len(), 3);
         // Should be in descending order
-        match (&rows[0][0], &rows[1][0]) {
-            (Value::F64(a), Value::F64(b)) => assert!(a >= b),
-            _ => {}
+        if let (Value::F64(a), Value::F64(b)) = (&rows[0][0], &rows[1][0]) {
+            assert!(a >= b)
         }
     }
 

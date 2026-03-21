@@ -7,7 +7,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000; // 2024-03-15 00:00:00 UTC in nanos
+const BASE_TS: i64 = 1_710_460_800_000_000_000; // 2024-03-15 00:00:00 UTC in nanos
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -652,7 +652,7 @@ mod order_by {
             "SELECT timestamp FROM t WHERE timestamp > {} ORDER BY timestamp ASC",
             ts(2400)
         ));
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
         assert_eq!(rows[0][0], Value::Timestamp(ts(3000)));
     }
 
@@ -907,7 +907,7 @@ mod having {
     fn having_sum() {
         let db = db_ts_partitioned();
         let (_, rows) = db.query("SELECT sym, sum(v) AS s FROM t GROUP BY sym HAVING s > 100");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -929,7 +929,7 @@ mod having {
         let db = db_ts_partitioned();
         let (_, rows) =
             db.query("SELECT sym, sum(v) AS s FROM t GROUP BY sym HAVING s > 100 ORDER BY sym");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 }
 
@@ -1006,7 +1006,7 @@ mod sample_by {
     fn sample_by_1m() {
         let db = db_ts();
         let (_, rows) = db.query("SELECT count(*) FROM t SAMPLE BY 1m");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -1655,7 +1655,7 @@ mod complex {
         let (_, rows) = db.query(
             "SELECT sym, sum(v) AS s FROM t GROUP BY sym HAVING s > 100 ORDER BY s DESC LIMIT 2",
         );
-        assert!(rows.len() >= 1 && rows.len() <= 2);
+        assert!(!rows.is_empty() && rows.len() <= 2);
     }
 
     #[test]
@@ -1697,7 +1697,7 @@ mod complex {
         let (_, rows) = db.query(
             "SELECT * FROM trades WHERE side = 'buy' LATEST ON timestamp PARTITION BY symbol",
         );
-        assert!(rows.len() <= 3 && rows.len() >= 1);
+        assert!(rows.len() <= 3 && !rows.is_empty());
     }
 
     #[test]
@@ -1719,7 +1719,7 @@ mod complex {
     fn order_and_limit_and_offset() {
         let db = db_ts();
         let (_, rows) = db.query("SELECT v FROM t ORDER BY timestamp DESC LIMIT 3 OFFSET 2");
-        assert!(rows.len() >= 1 && rows.len() <= 3);
+        assert!(!rows.is_empty() && rows.len() <= 3);
     }
 
     #[test]
@@ -2562,7 +2562,7 @@ mod many_rows {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i * 60), i));
         }
         let (_, r) = db.query(&format!("SELECT v FROM t WHERE timestamp > {}", ts(2400)));
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
 
     #[test]
@@ -2707,21 +2707,21 @@ mod group_having_extra {
         let db = db_ts_partitioned();
         let (_, r) =
             db.query("SELECT sym, avg(v) AS a FROM t GROUP BY sym HAVING a > 40 ORDER BY sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn having_min() {
         let db = db_ts_partitioned();
         let (_, r) =
             db.query("SELECT sym, min(v) AS m FROM t GROUP BY sym HAVING m >= 10 ORDER BY sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn having_max() {
         let db = db_ts_partitioned();
         let (_, r) =
             db.query("SELECT sym, max(v) AS m FROM t GROUP BY sym HAVING m > 50 ORDER BY sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn group_order_desc() {
@@ -2769,11 +2769,11 @@ mod wide_table {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, d DOUBLE, i BIGINT, s VARCHAR)");
         db.exec_ok(&format!(
-            "INSERT INTO t VALUES ({}, 3.14, 42, 'hello')",
+            "INSERT INTO t VALUES ({}, 3.15, 42, 'hello')",
             ts(0)
         ));
         let (_, r) = db.query("SELECT d, i, s FROM t");
-        assert_eq!(r[0][0], Value::F64(3.14));
+        assert_eq!(r[0][0], Value::F64(3.15));
         assert_eq!(r[0][1], Value::I64(42));
         assert_eq!(r[0][2], Value::Str("hello".into()));
     }
@@ -3754,7 +3754,7 @@ mod per_sym_tests {
     #[test]
     fn grp_having_sum() {
         let (_, r) = mk().query("SELECT sym, sum(price) AS s FROM t GROUP BY sym HAVING s > 3000");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn grp_limit() {

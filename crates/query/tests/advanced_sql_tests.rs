@@ -9,7 +9,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -83,7 +83,7 @@ mod filter_clause {
     #[test]
     fn filter_with_group_by() {
         let db = setup_trades_db();
-        let (cols, rows) = db.query(
+        let (_cols, rows) = db.query(
             "SELECT symbol, count(*) FILTER (WHERE price > 50) AS high_count FROM trades GROUP BY symbol"
         );
         // BTC: 100, 150, 200 all > 50 => 3
@@ -111,7 +111,7 @@ mod window_frames {
     #[test]
     fn rows_between_n_preceding_and_current() {
         let db = setup_trades_db();
-        let (cols, rows) = db.query(
+        let (_cols, rows) = db.query(
             "SELECT symbol, price, \
              avg(price) OVER (PARTITION BY symbol ORDER BY timestamp \
                ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS moving_avg \
@@ -217,7 +217,6 @@ mod within_group {
 // Plan-level tests for GROUPING SETS / CUBE / ROLLUP
 // ===================================================================
 mod grouping_sets {
-    use super::*;
     use exchange_query::plan::{GroupByMode, QueryPlan};
     use exchange_query::planner::plan_query;
 
@@ -278,7 +277,6 @@ mod grouping_sets {
 // Feature 3: LATERAL JOIN (planner tests)
 // ===================================================================
 mod lateral_join {
-    use super::*;
     use exchange_query::plan::QueryPlan;
     use exchange_query::planner::plan_query;
 
@@ -344,7 +342,6 @@ mod integration {
     #[test]
     fn expand_rollup_helper() {
         // Test the rollup expansion logic by checking planner output.
-        use exchange_query::plan::{GroupByMode, QueryPlan};
         use exchange_query::planner::plan_query;
 
         // Direct unit test of the expansion.
@@ -357,7 +354,6 @@ mod integration {
     fn expand_cube_logic() {
         // CUBE(a, b) should produce 4 grouping sets: (a,b), (a), (b), ()
         // This is validated by the plan structure.
-        use exchange_query::plan::{GroupByMode, QueryPlan};
         use exchange_query::planner::plan_query;
 
         let _ = plan_query("SELECT symbol FROM trades GROUP BY symbol");

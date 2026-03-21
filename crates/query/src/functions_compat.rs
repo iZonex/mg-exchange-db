@@ -1756,8 +1756,8 @@ mod tests {
     fn test_sum_int_passthrough() {
         assert_eq!(eval("sum_int", &[Value::I64(42)]).unwrap(), Value::I64(42));
         assert_eq!(
-            eval("sum_double", &[Value::F64(3.14)]).unwrap(),
-            Value::F64(3.14)
+            eval("sum_double", &[Value::F64(3.15)]).unwrap(),
+            Value::F64(3.15)
         );
     }
 

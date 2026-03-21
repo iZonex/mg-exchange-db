@@ -2,11 +2,8 @@
 //!
 //! ILP parsing every field type combo, version detection, batch parsing, auth, metrics.
 
-use exchange_net::ilp::{
-    IlpLine, IlpParseError, IlpValue, IlpVersion, parse_ilp_batch, parse_ilp_line,
-};
-use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use exchange_net::ilp::{IlpParseError, IlpValue, IlpVersion, parse_ilp_batch, parse_ilp_line};
+use std::sync::atomic::Ordering;
 
 // ===========================================================================
 // Basic parsing — 100 tests
@@ -81,8 +78,8 @@ mod basic_parsing {
     }
     #[test]
     fn neg_float() {
-        let p = parse_ilp_line("m val=-3.14 1000").unwrap();
-        assert_eq!(p.fields.get("val"), Some(&IlpValue::Float(-3.14)));
+        let p = parse_ilp_line("m val=-3.15 1000").unwrap();
+        assert_eq!(p.fields.get("val"), Some(&IlpValue::Float(-3.15)));
     }
     #[test]
     fn sci_float() {
@@ -245,9 +242,9 @@ mod multi_fields {
     }
     #[test]
     fn all_types() {
-        let p = parse_ilp_line(r#"m i=42i,f=3.14,s="str",b=true 1000"#).unwrap();
+        let p = parse_ilp_line(r#"m i=42i,f=3.15,s="str",b=true 1000"#).unwrap();
         assert_eq!(p.fields.get("i"), Some(&IlpValue::Integer(42)));
-        assert_eq!(p.fields.get("f"), Some(&IlpValue::Float(3.14)));
+        assert_eq!(p.fields.get("f"), Some(&IlpValue::Float(3.15)));
         assert_eq!(p.fields.get("s"), Some(&IlpValue::String("str".into())));
         assert_eq!(p.fields.get("b"), Some(&IlpValue::Boolean(true)));
     }
@@ -613,7 +610,7 @@ mod version_detect_extra {
     }
     #[test]
     fn v1_neg_float() {
-        assert_eq!(IlpVersion::detect("m val=-3.14 1000"), IlpVersion::V1);
+        assert_eq!(IlpVersion::detect("m val=-3.15 1000"), IlpVersion::V1);
     }
     #[test]
     fn v1_multi_fields() {

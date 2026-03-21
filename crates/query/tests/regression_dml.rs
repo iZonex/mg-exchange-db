@@ -7,7 +7,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -23,9 +23,9 @@ mod insert_types {
     fn insert_double() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14)", ts(0)));
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.15)", ts(0)));
         let val = db.query_scalar("SELECT v FROM t");
-        assert_eq!(val, Value::F64(3.14));
+        assert_eq!(val, Value::F64(3.15));
     }
     #[test]
     fn insert_int() {
@@ -165,7 +165,7 @@ mod insert_types {
     fn insert_timestamp_as_nanos() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let nano_ts = 1710460800_000_000_000i64;
+        let nano_ts = 1_710_460_800_000_000_000i64;
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", nano_ts));
         let (_, rows) = db.query("SELECT * FROM t");
         assert_eq!(rows.len(), 1);
@@ -235,7 +235,7 @@ mod insert_types {
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", ts(0)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 2.0)", ts(0)));
         let (_, rows) = db.query("SELECT * FROM t");
-        assert!(rows.len() >= 1); // may deduplicate or keep both
+        assert!(!rows.is_empty()); // may deduplicate or keep both
     }
     #[test]
     fn insert_mixed_null_and_values() {
@@ -259,7 +259,7 @@ mod insert_types {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!(
-            "INSERT INTO t VALUES ({}, 3.141592653589793)",
+            "INSERT INTO t VALUES ({}, 3.151592653589793)",
             ts(0)
         ));
         let val = db.query_scalar("SELECT v FROM t");
@@ -995,9 +995,8 @@ mod delete_ops {
         db.exec_ok("DELETE FROM t WHERE i > 5");
         let (_, rows) = db.query("SELECT i FROM t ORDER BY i");
         for row in &rows {
-            match &row[0] {
-                Value::I64(v) => assert!(*v <= 5),
-                _ => {}
+            if let Value::I64(v) = &row[0] {
+                assert!(*v <= 5)
             }
         }
     }

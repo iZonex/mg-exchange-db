@@ -10,7 +10,7 @@ use exchange_query::test_utils::TestDb;
 // Helpers
 // ---------------------------------------------------------------------------
 
-const BASE_TS: i64 = 1710460800_000_000_000; // 2024-03-15 00:00:00 UTC nanos
+const BASE_TS: i64 = 1_710_460_800_000_000_000; // 2024-03-15 00:00:00 UTC nanos
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -106,8 +106,8 @@ mod insert_basic {
             ));
         }
         let (_, rows) = db.query("SELECT v FROM t ORDER BY timestamp");
-        for i in 0..5 {
-            assert_eq!(rows[i][0], Value::F64(i as f64));
+        for (i, row) in rows.iter().enumerate().take(5) {
+            assert_eq!(row[0], Value::F64(i as f64));
         }
     }
 
@@ -162,7 +162,7 @@ mod insert_basic {
             ts(1)
         ));
         // affected rows should be 2 (or possibly returned as row count)
-        assert!(affected >= 0); // just ensure no error
+        let _ = affected; // just ensure no error
     }
 
     #[test]
@@ -379,7 +379,7 @@ mod insert_upsert {
             ts(0)
         ));
         let (_, rows) = db.query("SELECT * FROM t");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -395,7 +395,7 @@ mod insert_upsert {
             ts(0)
         ));
         let (_, rows) = db.query("SELECT * FROM t");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -458,12 +458,12 @@ mod insert_types {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!(
-            "INSERT INTO t (timestamp, v) VALUES ({}, 3.14)",
+            "INSERT INTO t (timestamp, v) VALUES ({}, 3.15)",
             ts(0)
         ));
         let val = db.query_scalar("SELECT v FROM t");
         match val {
-            Value::F64(v) => assert!((v - 3.14).abs() < 0.001),
+            Value::F64(v) => assert!((v - 3.15).abs() < 0.001),
             other => panic!("expected F64, got {other:?}"),
         }
     }
@@ -659,7 +659,7 @@ mod insert_types {
     fn insert_very_large_timestamp() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let big_ts = 2000000000_000_000_000i64; // ~year 2033
+        let big_ts = 2_000_000_000_000_000_000i64; // ~year 2033
         db.exec_ok(&format!(
             "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
             big_ts

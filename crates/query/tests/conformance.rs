@@ -164,11 +164,8 @@ fn conformance_count_star_vs_count_column() {
 
     // count(volume) should skip NULLs (rows 0 and 10).
     // However, some engines may count all rows for count(col) -- verify it's <= count(*).
-    match (&count_star, &count_volume) {
-        (Value::I64(star), Value::I64(col)) => {
-            assert!(*col <= *star, "count(column) should be <= count(*)");
-        }
-        _ => {}
+    if let (Value::I64(star), Value::I64(col)) = (&count_star, &count_volume) {
+        assert!(*col <= *star, "count(column) should be <= count(*)");
     }
 }
 
@@ -403,7 +400,7 @@ fn conformance_join_null_keys() {
         Ok(exchange_query::QueryResult::Rows { rows, .. }) => {
             // Standard SQL: only 'x' = 'x' should match (1 row).
             // Some engines may also match NULL = NULL (2 rows).
-            assert!(rows.len() >= 1 && rows.len() <= 2);
+            assert!(!rows.is_empty() && rows.len() <= 2);
         }
         Err(_) => {
             // JOIN may have limitations -- acceptable.
@@ -427,11 +424,10 @@ fn conformance_having_without_group_by() {
     match result {
         Ok(exchange_query::QueryResult::Rows { rows, .. }) => {
             // If it works, count(*) should be > 5.
-            if !rows.is_empty() {
-                match &rows[0][0] {
-                    Value::I64(v) => assert!(*v > 5),
-                    _ => {}
-                }
+            if !rows.is_empty()
+                && let Value::I64(v) = &rows[0][0]
+            {
+                assert!(*v > 5)
             }
         }
         Ok(_) => {}

@@ -240,11 +240,11 @@ mod fixed_f64_extra {
         let p = dir.path().join("c.d");
         {
             let mut w = FixedColumnWriter::open(&p, ColumnType::F64).unwrap();
-            w.append_f64(3.14).unwrap();
+            w.append_f64(3.15).unwrap();
             w.flush().unwrap();
         }
         let r = FixedColumnReader::open(&p, ColumnType::F64).unwrap();
-        assert!((r.read_f64(0) - 3.14).abs() < 0.001);
+        assert!((r.read_f64(0) - 3.15).abs() < 0.001);
     }
     #[test]
     fn ten() {

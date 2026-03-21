@@ -228,7 +228,7 @@ fn generate_random_sql(rng: &mut SimpleRng, count: usize) -> Vec<String> {
         "!=",
         "'hello'",
         "42",
-        "3.14",
+        "3.15",
         "timestamp",
         "TIMESTAMP",
         "DOUBLE",

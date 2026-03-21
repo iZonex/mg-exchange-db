@@ -500,7 +500,7 @@ mod tests {
         let mgr = PitrManager::new(db_root.clone(), config);
 
         // Checkpoint 1.
-        let cp1 = mgr.create_checkpoint().unwrap();
+        let _cp1 = mgr.create_checkpoint().unwrap();
 
         // Write more data.
         let ts2 = ts1 + 60_000_000_000;

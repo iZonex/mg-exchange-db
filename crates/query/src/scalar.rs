@@ -6135,16 +6135,16 @@ mod tests {
             Value::I64(42)
         );
         assert_eq!(
-            evaluate_scalar("abs", &[Value::F64(-3.14)]).unwrap(),
-            Value::F64(3.14)
+            evaluate_scalar("abs", &[Value::F64(-3.15)]).unwrap(),
+            Value::F64(3.15)
         );
     }
 
     #[test]
     fn test_round() {
         assert_eq!(
-            evaluate_scalar("round", &[Value::F64(3.14159), Value::I64(2)]).unwrap(),
-            Value::F64(3.14)
+            evaluate_scalar("round", &[Value::F64(3.16159), Value::I64(2)]).unwrap(),
+            Value::F64(3.16)
         );
         assert_eq!(
             evaluate_scalar("round", &[Value::F64(3.5)]).unwrap(),
@@ -6243,7 +6243,7 @@ mod tests {
     fn test_random() {
         let result = evaluate_scalar("random", &[]).unwrap();
         if let Value::F64(v) = result {
-            assert!(v >= 0.0 && v <= 1.0);
+            assert!((0.0..=1.0).contains(&v));
         } else {
             panic!("expected F64");
         }
@@ -6271,19 +6271,19 @@ mod tests {
         let ts = Value::Timestamp(ns);
 
         assert_eq!(
-            evaluate_scalar("extract_year", &[ts.clone()]).unwrap(),
+            evaluate_scalar("extract_year", std::slice::from_ref(&ts)).unwrap(),
             Value::I64(2024)
         );
         assert_eq!(
-            evaluate_scalar("extract_month", &[ts.clone()]).unwrap(),
+            evaluate_scalar("extract_month", std::slice::from_ref(&ts)).unwrap(),
             Value::I64(1)
         );
         assert_eq!(
-            evaluate_scalar("extract_day", &[ts.clone()]).unwrap(),
+            evaluate_scalar("extract_day", std::slice::from_ref(&ts)).unwrap(),
             Value::I64(15)
         );
         assert_eq!(
-            evaluate_scalar("extract_hour", &[ts]).unwrap(),
+            evaluate_scalar("extract_hour", std::slice::from_ref(&ts)).unwrap(),
             Value::I64(10)
         );
     }
@@ -6880,8 +6880,8 @@ mod tests {
     #[test]
     fn test_trunc() {
         assert_eq!(
-            evaluate_scalar("trunc", &[Value::F64(3.14159), Value::I64(2)]).unwrap(),
-            Value::F64(3.14)
+            evaluate_scalar("trunc", &[Value::F64(3.16159), Value::I64(2)]).unwrap(),
+            Value::F64(3.16)
         );
         assert_eq!(
             evaluate_scalar("trunc", &[Value::F64(-3.7)]).unwrap(),
@@ -6955,7 +6955,7 @@ mod tests {
             + 45 * NANOS_PER_SEC;
         let ts = Value::Timestamp(ns);
         assert_eq!(
-            evaluate_scalar("extract_minute", &[ts.clone()]).unwrap(),
+            evaluate_scalar("extract_minute", std::slice::from_ref(&ts)).unwrap(),
             Value::I64(30)
         );
         assert_eq!(
@@ -7106,8 +7106,8 @@ mod tests {
             Value::I64(42)
         );
         assert_eq!(
-            evaluate_scalar("to_number", &[Value::Str("3.14".into())]).unwrap(),
-            Value::F64(3.14)
+            evaluate_scalar("to_number", &[Value::Str("3.15".into())]).unwrap(),
+            Value::F64(3.15)
         );
     }
 
@@ -7124,7 +7124,7 @@ mod tests {
     #[test]
     fn test_cast_to_int() {
         assert_eq!(
-            evaluate_scalar("cast_to_int", &[Value::F64(3.14)]).unwrap(),
+            evaluate_scalar("cast_to_int", &[Value::F64(3.15)]).unwrap(),
             Value::I64(3)
         );
         assert_eq!(
@@ -7148,8 +7148,8 @@ mod tests {
             Value::F64(42.0)
         );
         assert_eq!(
-            evaluate_scalar("cast_to_float", &[Value::Str("3.14".into())]).unwrap(),
-            Value::F64(3.14)
+            evaluate_scalar("cast_to_float", &[Value::Str("3.15".into())]).unwrap(),
+            Value::F64(3.15)
         );
         assert_eq!(
             evaluate_scalar("cast_to_float", &[Value::F64(2.5)]).unwrap(),
@@ -7168,8 +7168,8 @@ mod tests {
             Value::Str("42".into())
         );
         assert_eq!(
-            evaluate_scalar("cast_to_str", &[Value::F64(3.14)]).unwrap(),
-            Value::Str("3.14".into())
+            evaluate_scalar("cast_to_str", &[Value::F64(3.15)]).unwrap(),
+            Value::Str("3.15".into())
         );
         assert_eq!(
             evaluate_scalar("cast_to_str", &[Value::Str("hello".into())]).unwrap(),
@@ -7207,7 +7207,7 @@ mod tests {
         for _ in 0..20 {
             let result = evaluate_scalar("rnd_int", &[Value::I64(0), Value::I64(100)]).unwrap();
             match result {
-                Value::I64(v) => assert!(v >= 0 && v <= 100, "rnd_int out of range: {v}"),
+                Value::I64(v) => assert!((0..=100).contains(&v), "rnd_int out of range: {v}"),
                 other => panic!("expected I64, got {other:?}"),
             }
         }
@@ -7218,7 +7218,7 @@ mod tests {
         for _ in 0..20 {
             let result = evaluate_scalar("rnd_double", &[]).unwrap();
             match result {
-                Value::F64(v) => assert!(v >= 0.0 && v <= 1.0, "rnd_double out of range: {v}"),
+                Value::F64(v) => assert!((0.0..=1.0).contains(&v), "rnd_double out of range: {v}"),
                 other => panic!("expected F64, got {other:?}"),
             }
         }
@@ -7261,11 +7261,11 @@ mod tests {
         let ns = 1_500_000_000_000_000_000_i64; // 1.5 billion seconds
         let ts = Value::Timestamp(ns);
         assert_eq!(
-            evaluate_scalar("epoch_seconds", &[ts.clone()]).unwrap(),
+            evaluate_scalar("epoch_seconds", std::slice::from_ref(&ts)).unwrap(),
             Value::I64(1_500_000_000)
         );
         assert_eq!(
-            evaluate_scalar("epoch_millis", &[ts.clone()]).unwrap(),
+            evaluate_scalar("epoch_millis", std::slice::from_ref(&ts)).unwrap(),
             Value::I64(1_500_000_000_000)
         );
         assert_eq!(
@@ -7822,8 +7822,8 @@ mod tests {
             evaluate_scalar("to_uppercase", &[Value::Str("hello".into())]).unwrap(),
             Value::Str("HELLO".into())
         );
-        assert_eq!(evaluate_scalar("systimestamp", &[]).is_ok(), true);
-        assert_eq!(evaluate_scalar("sysdate", &[]).is_ok(), true);
+        assert!(evaluate_scalar("systimestamp", &[]).is_ok());
+        assert!(evaluate_scalar("sysdate", &[]).is_ok());
         assert_eq!(
             evaluate_scalar("ceiling", &[Value::F64(3.2)]).unwrap(),
             Value::F64(4.0)

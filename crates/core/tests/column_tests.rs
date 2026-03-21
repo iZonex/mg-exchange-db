@@ -267,15 +267,15 @@ mod fixed_f64 {
         let path = dir.path().join("col.d");
         {
             let mut w = FixedColumnWriter::open(&path, ColumnType::F64).unwrap();
-            w.append_f64(3.14159265358979).unwrap();
-            w.append_f64(-2.71828).unwrap();
+            w.append_f64(3.15159265358979).unwrap();
+            w.append_f64(-2.72828).unwrap();
             w.append_f64(0.0).unwrap();
             w.flush().unwrap();
         }
         let r = FixedColumnReader::open(&path, ColumnType::F64).unwrap();
         assert_eq!(r.row_count(), 3);
-        assert_eq!(r.read_f64(0), 3.14159265358979);
-        assert_eq!(r.read_f64(1), -2.71828);
+        assert_eq!(r.read_f64(0), 3.15159265358979);
+        assert_eq!(r.read_f64(1), -2.72828);
         assert_eq!(r.read_f64(2), 0.0);
     }
 
@@ -375,7 +375,7 @@ mod fixed_f32 {
         let path = dir.path().join("col.d");
         {
             let mut w = FixedColumnWriter::open(&path, ColumnType::F32).unwrap();
-            w.append(&3.14f32.to_le_bytes()).unwrap();
+            w.append(&3.15f32.to_le_bytes()).unwrap();
             w.append(&(-1.0f32).to_le_bytes()).unwrap();
             w.flush().unwrap();
         }
@@ -383,7 +383,7 @@ mod fixed_f32 {
         assert_eq!(r.row_count(), 2);
         let v0 = f32::from_le_bytes(r.read_raw(0).try_into().unwrap());
         let v1 = f32::from_le_bytes(r.read_raw(1).try_into().unwrap());
-        assert!((v0 - 3.14).abs() < 0.01);
+        assert!((v0 - 3.15).abs() < 0.01);
         assert_eq!(v1, -1.0);
     }
 

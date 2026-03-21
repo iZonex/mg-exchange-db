@@ -267,7 +267,7 @@ fn questdb_5417_between_with_doubles() {
             other => panic!("expected numeric value, got: {other:?}"),
         };
         assert!(
-            val >= 3.0 && val <= 9.0,
+            (3.0..=9.0).contains(&val),
             "value {val} should be in range 3.0..=9.0"
         );
     }
@@ -475,7 +475,7 @@ fn questdb_5812_no_resource_leak_many_queries() {
     // this will eventually fail with "too many open files" or similar.
     for i in 0..200 {
         let (_, rows) = db.query("SELECT * FROM stress WHERE val > 50.0");
-        assert!(rows.len() > 0, "query iteration {i} should return rows");
+        assert!(!rows.is_empty(), "query iteration {i} should return rows");
     }
 
     // Run queries with different patterns to exercise more code paths.
@@ -550,7 +550,7 @@ fn questdb_4544_sample_by_across_day_boundary() {
     db.exec_ok("CREATE TABLE ticks (timestamp TIMESTAMP, price DOUBLE)");
 
     // Insert data across a day boundary (midnight UTC).
-    let base: i64 = 1710460800_000_000_000; // 2024-03-15 00:00:00 UTC
+    let base: i64 = 1_710_460_800_000_000_000; // 2024-03-15 00:00:00 UTC
     for i in 0..48 {
         // 48 hours of hourly data
         let ts = base + (i as i64) * 3_600_000_000_000;

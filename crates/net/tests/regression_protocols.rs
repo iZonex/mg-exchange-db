@@ -4,15 +4,11 @@
 //! Auth: every method. Rate limiting: boundary conditions.
 
 use exchange_common::types::ColumnType;
-use exchange_net::auth::{AuthConfig, AuthMethod, AuthResult};
-use exchange_net::ilp::auth::{IlpAuthConfig, IlpAuthenticator};
-use exchange_net::ilp::parser::{
-    IlpLine, IlpParseError, IlpValue, IlpVersion, parse_ilp_batch, parse_ilp_line,
-};
+use exchange_net::auth::{AuthConfig, AuthMethod};
+use exchange_net::ilp::parser::{IlpValue, parse_ilp_batch, parse_ilp_line};
 use exchange_net::metrics::Metrics;
-use exchange_net::pgwire::copy::{CopyInOptions, parse_csv_line};
+use exchange_net::pgwire::copy::parse_csv_line;
 use exchange_net::pgwire::handler::{infer_command_tag, pg_type_for_column};
-use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 
 // ============================================================================
@@ -28,8 +24,8 @@ mod ilp_fields {
     }
     #[test]
     fn float_negative() {
-        let p = parse_ilp_line("m v=-3.14 1000").unwrap();
-        assert_eq!(p.fields.get("v"), Some(&IlpValue::Float(-3.14)));
+        let p = parse_ilp_line("m v=-3.15 1000").unwrap();
+        assert_eq!(p.fields.get("v"), Some(&IlpValue::Float(-3.15)));
     }
     #[test]
     fn float_zero() {
@@ -116,7 +112,7 @@ mod ilp_fields {
     }
     #[test]
     fn five_fields() {
-        let p = parse_ilp_line(r#"m a=1.0,b=2i,c=true,d="x",e=3.14 1000"#).unwrap();
+        let p = parse_ilp_line(r#"m a=1.0,b=2i,c=true,d="x",e=3.15 1000"#).unwrap();
         assert_eq!(p.fields.len(), 5);
     }
     #[test]

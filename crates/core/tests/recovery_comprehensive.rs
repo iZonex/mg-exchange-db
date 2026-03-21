@@ -17,6 +17,7 @@ use tempfile::tempdir;
 /// Timestamp for 2024-03-15 in nanoseconds.
 const TS_DAY1: i64 = 1_710_513_000_000_000_000;
 /// Timestamp for 2024-03-16 in nanoseconds.
+#[allow(dead_code)]
 const TS_DAY2: i64 = TS_DAY1 + 86_400_000_000_000;
 
 /// Helper: create a test table with timestamp + price columns.

@@ -5,8 +5,6 @@ use std::sync::Arc;
 use exchange_common::error::{ExchangeDbError, Result};
 
 use super::ClusterManager;
-#[cfg(test)]
-use super::node::ClusterNode;
 use super::node::NodeRole;
 
 /// Routes queries to appropriate cluster nodes.

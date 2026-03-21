@@ -2027,7 +2027,7 @@ mod tests {
             Value::I64(1)
         );
         assert_eq!(
-            eval("is_numeric", &[Value::Str("3.14".into())]).unwrap(),
+            eval("is_numeric", &[Value::Str("3.15".into())]).unwrap(),
             Value::I64(1)
         );
         assert_eq!(

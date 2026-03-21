@@ -8,7 +8,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -32,9 +32,9 @@ mod double_type {
     fn insert_positive_double() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14)", ts(0)));
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.15)", ts(0)));
         let val = db.query_scalar("SELECT v FROM t");
-        assert_eq!(val, Value::F64(3.14));
+        assert_eq!(val, Value::F64(3.15));
     }
 
     #[test]
@@ -530,11 +530,11 @@ mod float_type {
     fn insert_float_positive() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v FLOAT)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14)", ts(0)));
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.15)", ts(0)));
         let val = db.query_scalar("SELECT v FROM t");
         // F32 read back as F64
         match val {
-            Value::F64(v) => assert!((v - 3.14).abs() < 0.01),
+            Value::F64(v) => assert!((v - 3.15).abs() < 0.01),
             other => panic!("expected F64, got {other:?}"),
         }
     }
@@ -968,7 +968,7 @@ mod mixed_types {
             "CREATE TABLE t (timestamp TIMESTAMP, i INT, l BIGINT, f FLOAT, d DOUBLE, s VARCHAR)",
         );
         db.exec_ok(&format!(
-            "INSERT INTO t VALUES ({}, 42, 1000, 3.14, 2.718, 'hello')",
+            "INSERT INTO t VALUES ({}, 42, 1000, 3.15, 2.718, 'hello')",
             ts(0)
         ));
         let (cols, rows) = db.query("SELECT * FROM t");
@@ -1044,10 +1044,10 @@ mod mixed_types {
     fn mixed_int_and_double() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, i BIGINT, d DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 42, 3.14)", ts(0)));
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 42, 3.15)", ts(0)));
         let (_, rows) = db.query("SELECT i, d FROM t");
         assert_eq!(rows[0][0], Value::I64(42));
-        assert_eq!(rows[0][1], Value::F64(3.14));
+        assert_eq!(rows[0][1], Value::F64(3.15));
     }
 
     #[test]
@@ -1152,9 +1152,9 @@ mod multi_table {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t1 (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok("CREATE TABLE t2 (timestamp TIMESTAMP, v BIGINT)");
-        db.exec_ok(&format!("INSERT INTO t1 VALUES ({}, 3.14)", ts(0)));
+        db.exec_ok(&format!("INSERT INTO t1 VALUES ({}, 3.15)", ts(0)));
         db.exec_ok(&format!("INSERT INTO t2 VALUES ({}, 42)", ts(0)));
-        assert_eq!(db.query_scalar("SELECT v FROM t1"), Value::F64(3.14));
+        assert_eq!(db.query_scalar("SELECT v FROM t1"), Value::F64(3.15));
         assert_eq!(db.query_scalar("SELECT v FROM t2"), Value::I64(42));
     }
 

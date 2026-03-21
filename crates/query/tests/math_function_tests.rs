@@ -56,11 +56,11 @@ mod abs_tests {
     }
     #[test]
     fn positive_float() {
-        assert_eq!(eval("abs", &[f(3.14)]), f(3.14));
+        assert_eq!(eval("abs", &[f(3.15)]), f(3.15));
     }
     #[test]
     fn negative_float() {
-        assert_eq!(eval("abs", &[f(-3.14)]), f(3.14));
+        assert_eq!(eval("abs", &[f(-3.15)]), f(3.15));
     }
     #[test]
     fn zero_float() {
@@ -124,7 +124,7 @@ mod round_tests {
     }
     #[test]
     fn with_decimals_2() {
-        assert_f64_close(&eval("round", &[f(3.14159), i(2)]), 3.14, 0.001);
+        assert_f64_close(&eval("round", &[f(3.15159), i(2)]), 3.15, 0.001);
     }
     #[test]
     fn with_decimals_0() {
@@ -132,7 +132,7 @@ mod round_tests {
     }
     #[test]
     fn with_decimals_3() {
-        assert_f64_close(&eval("round", &[f(3.14159), i(3)]), 3.142, 0.001);
+        assert_f64_close(&eval("round", &[f(3.15159), i(3)]), 3.152, 0.001);
     }
     #[test]
     fn integer_input() {
@@ -1210,7 +1210,7 @@ mod trunc_tests {
     }
     #[test]
     fn with_decimals() {
-        assert_f64_close(&eval("trunc", &[f(3.14159), i(2)]), 3.14, 0.001);
+        assert_f64_close(&eval("trunc", &[f(3.15159), i(2)]), 3.15, 0.001);
     }
     #[test]
     fn with_zero_decimals() {
@@ -1226,7 +1226,7 @@ mod trunc_tests {
     }
     #[test]
     fn neg_with_dec() {
-        assert_f64_close(&eval("trunc", &[f(-3.14159), i(2)]), -3.14, 0.001);
+        assert_f64_close(&eval("trunc", &[f(-3.15159), i(2)]), -3.15, 0.001);
     }
 }
 
@@ -1697,7 +1697,7 @@ mod square_negate_recip_tests {
     }
     #[test]
     fn negate_float() {
-        assert_eq!(eval("negate", &[f(3.14)]), f(-3.14));
+        assert_eq!(eval("negate", &[f(3.15)]), f(-3.15));
     }
     #[test]
     fn negate_null() {
@@ -1981,7 +1981,7 @@ mod random_tests {
     #[test]
     fn returns_float() {
         match eval("random", &[]) {
-            Value::F64(v) => assert!(v >= 0.0 && v < 1.1),
+            Value::F64(v) => assert!((0.0..1.1).contains(&v)),
             _ => panic!(),
         }
     }
@@ -2151,6 +2151,7 @@ mod round_extended_tests {
         assert_f64_close(&eval("round", &[f(0.00456), i(3)]), 0.005, 0.0001);
     }
     #[test]
+    #[allow(clippy::approx_constant)]
     fn pi_4_decimals() {
         assert_f64_close(
             &eval("round", &[f(std::f64::consts::PI), i(4)]),
@@ -2362,7 +2363,7 @@ mod hyperbolic_extended_tests {
             Value::F64(v) => v,
             _ => panic!(),
         };
-        assert!(v < -0.999 && v >= -1.0);
+        assert!((-1.0..-0.999).contains(&v));
     }
 }
 
@@ -2523,6 +2524,7 @@ mod trunc_extended_tests {
         assert_f64_close(&eval("trunc", &[f(std::f64::consts::PI), i(1)]), 3.1, 0.001);
     }
     #[test]
+    #[allow(clippy::approx_constant)]
     fn pi_4() {
         assert_f64_close(
             &eval("trunc", &[f(std::f64::consts::PI), i(4)]),

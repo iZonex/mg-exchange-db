@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn parallel_sort_matches_sequential() {
-        let mut rows_par: Vec<Vec<Value>> = (0..1000).rev().map(|i| make_row(i)).collect();
+        let mut rows_par: Vec<Vec<Value>> = (0..1000).rev().map(make_row).collect();
         let mut rows_seq = rows_par.clone();
 
         let order_by = vec![OrderBy {
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn parallel_sort_descending() {
-        let mut rows: Vec<Vec<Value>> = (0..500).map(|i| make_row(i)).collect();
+        let mut rows: Vec<Vec<Value>> = (0..500).map(make_row).collect();
         let order_by = vec![OrderBy {
             column: "0".to_string(),
             descending: true,
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn parallel_sort_already_sorted() {
-        let mut rows: Vec<Vec<Value>> = (0..2000).map(|i| make_row(i)).collect();
+        let mut rows: Vec<Vec<Value>> = (0..2000).map(make_row).collect();
         let expected = rows.clone();
         let order_by = vec![OrderBy {
             column: "0".to_string(),

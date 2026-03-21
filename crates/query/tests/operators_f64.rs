@@ -7,7 +7,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -126,9 +126,9 @@ mod eq {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..4 {
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14)", ts(i)));
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.15)", ts(i)));
         }
-        let (_, rows) = db.query("SELECT v FROM t WHERE v = 3.14");
+        let (_, rows) = db.query("SELECT v FROM t WHERE v = 3.15");
         assert_eq!(rows.len(), 4);
     }
 
@@ -667,7 +667,7 @@ mod null_ops {
     fn is_null() {
         let db = db_f64_nullable();
         let (_, rows) = db.query("SELECT v FROM t WHERE v IS NULL");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -714,7 +714,7 @@ mod null_ops {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, NULL)", ts(i)));
         }
         let (_, rows) = db.query("SELECT v FROM t WHERE v IS NULL");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -818,7 +818,7 @@ mod order_by {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..4 {
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14)", ts(i)));
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.15)", ts(i)));
         }
         let (_, rows) = db.query("SELECT v FROM t ORDER BY v");
         assert_eq!(rows.len(), 4);
@@ -909,8 +909,8 @@ mod aggregates {
     fn sum_single() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14)", ts(0)));
-        assert_f64_near(&db.query_scalar("SELECT sum(v) FROM t"), 3.14, 0.01);
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.15)", ts(0)));
+        assert_f64_near(&db.query_scalar("SELECT sum(v) FROM t"), 3.15, 0.01);
     }
 
     #[test]
@@ -1214,7 +1214,7 @@ mod distinct {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..5 {
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14)", ts(i)));
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.15)", ts(i)));
         }
         let (_, rows) = db.query("SELECT DISTINCT v FROM t");
         assert_eq!(rows.len(), 1);
@@ -1864,8 +1864,8 @@ mod edge_cases {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(9 - i), i));
         }
         let (_, rows) = db.query("SELECT v FROM t ORDER BY v ASC");
-        for i in 0..10 {
-            assert_eq!(rows[i][0], Value::F64(i as f64));
+        for (i, row) in rows.iter().enumerate().take(10) {
+            assert_eq!(row[0], Value::F64(i as f64));
         }
     }
 }
@@ -2378,21 +2378,21 @@ mod group_having_extra {
         let db = db_f64_grouped();
         let (_, r) =
             db.query("SELECT grp, avg(v) AS a FROM t GROUP BY grp HAVING a > 40 ORDER BY grp");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn having_min() {
         let db = db_f64_grouped();
         let (_, r) =
             db.query("SELECT grp, min(v) AS m FROM t GROUP BY grp HAVING m >= 20 ORDER BY grp");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn having_max() {
         let db = db_f64_grouped();
         let (_, r) =
             db.query("SELECT grp, max(v) AS m FROM t GROUP BY grp HAVING m > 60 ORDER BY grp");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn group_order_desc() {
@@ -2661,11 +2661,11 @@ mod wide_many {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, d DOUBLE, i BIGINT, s VARCHAR)");
         db.exec_ok(&format!(
-            "INSERT INTO t VALUES ({}, 3.14, 42, 'hello')",
+            "INSERT INTO t VALUES ({}, 3.15, 42, 'hello')",
             ts(0)
         ));
         let (_, r) = db.query("SELECT d, i, s FROM t");
-        assert_eq!(r[0][0], Value::F64(3.14));
+        assert_eq!(r[0][0], Value::F64(3.15));
         assert_eq!(r[0][1], Value::I64(42));
         assert_eq!(r[0][2], Value::Str("hello".into()));
     }

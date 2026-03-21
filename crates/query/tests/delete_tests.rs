@@ -6,7 +6,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -483,9 +483,9 @@ mod delete_edge {
     fn delete_by_exact_double_value() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14)", ts(0)));
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.15)", ts(0)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 2.71)", ts(1)));
-        db.exec_ok("DELETE FROM t WHERE v = 3.14");
+        db.exec_ok("DELETE FROM t WHERE v = 3.15");
         assert_eq!(db.query_scalar("SELECT count(*) FROM t"), Value::I64(1));
     }
 

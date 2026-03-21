@@ -915,7 +915,7 @@ mod tests {
     async fn test_vacuum_not_found() {
         let state = test_state();
         let app = admin_app(state);
-        let (status, _json) =
+        let (_status, _json) =
             post_json(&app, "/admin/vacuum/nonexistent", serde_json::json!({})).await;
         // vacuum sends empty body but we need to match the handler
         let resp = app

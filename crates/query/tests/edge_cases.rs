@@ -865,9 +865,8 @@ mod special_characters {
 
         // Try querying with same case
         let result = db.exec("SELECT v FROM MyTable");
-        match result {
-            Ok(QueryResult::Rows { rows, .. }) => assert_eq!(rows.len(), 1),
-            _ => {} // Case sensitivity varies
+        if let Ok(QueryResult::Rows { rows, .. }) = result {
+            assert_eq!(rows.len(), 1);
         }
     }
 }
@@ -1173,8 +1172,8 @@ mod concurrent {
         // Both tables should have data (exact count may vary due to concurrent writes)
         let (_, rows1) = db.query("SELECT * FROM t1");
         let (_, rows2) = db.query("SELECT * FROM t2");
-        assert!(rows1.len() > 0, "t1 should have rows");
-        assert!(rows2.len() > 0, "t2 should have rows");
+        assert!(!rows1.is_empty(), "t1 should have rows");
+        assert!(!rows2.is_empty(), "t2 should have rows");
     }
 }
 
@@ -1202,7 +1201,7 @@ mod complex_queries {
         let (_, rows) = db.query(
             "SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING c > 5 ORDER BY c DESC",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
         // Verify descending order of count
         for i in 1..rows.len() {
             assert!(rows[i - 1][1].cmp_coerce(&rows[i][1]) != Some(std::cmp::Ordering::Less));
@@ -1253,7 +1252,7 @@ mod complex_queries {
             Ok(QueryResult::Rows { rows, .. }) => {
                 // If supported, all 20 rows match; if not, may return 0
                 assert!(
-                    rows.len() == 20 || rows.len() == 0,
+                    rows.len() == 20 || rows.is_empty(),
                     "expected 20 or 0 rows, got {}",
                     rows.len()
                 );
@@ -1365,7 +1364,7 @@ mod complex_queries {
         let (_, rows) = db.query(
             "SELECT t.symbol, t.price, q.bid FROM trades t INNER JOIN quotes q ON t.symbol = q.symbol",
         );
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]

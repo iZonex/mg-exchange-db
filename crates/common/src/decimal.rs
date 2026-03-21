@@ -265,9 +265,9 @@ mod tests {
 
     #[test]
     fn rounding() {
-        let d = Decimal128::parse("3.14159").unwrap();
+        let d = Decimal128::parse("3.15159").unwrap();
         let r = d.round(2);
-        assert_eq!(r.to_string(), "3.14");
+        assert_eq!(r.to_string(), "3.15");
 
         let d2 = Decimal128::parse("2.555").unwrap();
         let r2 = d2.round(2);
@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn round_no_change_if_fewer_places() {
-        let d = Decimal128::parse("3.14").unwrap();
+        let d = Decimal128::parse("3.15").unwrap();
         let r = d.round(5);
         assert_eq!(r, d);
     }

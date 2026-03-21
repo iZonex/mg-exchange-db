@@ -466,10 +466,10 @@ fn concurrent_wal_read_write() {
         let read_count = read_count.clone();
         thread::spawn(move || {
             while !stop.load(Ordering::Relaxed) {
-                if let Ok(reader) = WalReader::open(&wal_dir) {
-                    if reader.read_all().is_ok() {
-                        read_count.fetch_add(1, Ordering::Relaxed);
-                    }
+                if let Ok(reader) = WalReader::open(&wal_dir)
+                    && reader.read_all().is_ok()
+                {
+                    read_count.fetch_add(1, Ordering::Relaxed);
                 }
             }
         })

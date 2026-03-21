@@ -7,7 +7,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -549,7 +549,7 @@ mod null_ops {
     fn is_null() {
         let db = db_str_nullable();
         let (_, rows) = db.query("SELECT v FROM t WHERE v IS NULL");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -587,7 +587,7 @@ mod null_ops {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, NULL)", ts(i)));
         }
         let (_, rows) = db.query("SELECT v FROM t WHERE v IS NULL");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -1581,10 +1581,10 @@ mod cast_ops {
     fn cast_double_to_varchar() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14)", ts(0)));
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.15)", ts(0)));
         let val = db.query_scalar("SELECT CAST(v AS VARCHAR) FROM t");
         match val {
-            Value::Str(s) => assert!(s.contains("3.14"), "got: {s}"),
+            Value::Str(s) => assert!(s.contains("3.15"), "got: {s}"),
             other => panic!("expected Str, got {other:?}"),
         }
     }
@@ -1668,7 +1668,7 @@ mod like_extra {
     fn like_single_char() {
         let db = db_like();
         let (_, r) = db.query("SELECT v FROM t WHERE v LIKE '_____'");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn like_two_underscores_prefix() {
@@ -1890,21 +1890,21 @@ mod group_having_extra {
         let db = db_str_grouped();
         let (_, r) =
             db.query("SELECT grp, avg(v) AS a FROM t GROUP BY grp HAVING a > 40 ORDER BY grp");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn having_min() {
         let db = db_str_grouped();
         let (_, r) =
             db.query("SELECT grp, min(v) AS m FROM t GROUP BY grp HAVING m >= 20 ORDER BY grp");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn having_max() {
         let db = db_str_grouped();
         let (_, r) =
             db.query("SELECT grp, max(v) AS m FROM t GROUP BY grp HAVING m > 60 ORDER BY grp");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn group_order_desc() {
@@ -2120,7 +2120,7 @@ mod many_rows_str {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'item_{}')", ts(i), i));
         }
         let (_, r) = db.query("SELECT v FROM t WHERE v LIKE 'item_1%'");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
 
     #[test]
@@ -2282,12 +2282,12 @@ mod func_combos {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, s VARCHAR, d DOUBLE, i BIGINT)");
         db.exec_ok(&format!(
-            "INSERT INTO t VALUES ({}, 'hello', 3.14, 42)",
+            "INSERT INTO t VALUES ({}, 'hello', 3.15, 42)",
             ts(0)
         ));
         let (_, r) = db.query("SELECT s, d, i FROM t");
         assert_eq!(r[0][0], Value::Str("hello".into()));
-        assert_eq!(r[0][1], Value::F64(3.14));
+        assert_eq!(r[0][1], Value::F64(3.15));
         assert_eq!(r[0][2], Value::I64(42));
     }
 }
@@ -2677,7 +2677,7 @@ mod bulk_string_ops {
     fn like_and_ne() {
         let db = db10();
         let (_, r) = db.query("SELECT v FROM t WHERE v LIKE '%eta' AND v != 'zeta'");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn or_eq_eq() {
@@ -2966,7 +2966,7 @@ mod where_agg_combos {
     #[test]
     fn distinct_like() {
         let (_, r) = mk().query("SELECT DISTINCT s FROM t WHERE s LIKE '%e'");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn min_s() {
@@ -3459,12 +3459,12 @@ mod per_name_tests {
     #[test]
     fn like_5_chars() {
         let (_, r) = mk().query("SELECT name FROM t WHERE name LIKE '_____'");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn ilike_pct_ia() {
         let (_, r) = mk().query("SELECT name FROM t WHERE name ILIKE '%IA'");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn age_eq_30() {
@@ -3481,7 +3481,7 @@ mod per_name_tests {
     #[test]
     fn name_distinct_like() {
         let (_, r) = mk().query("SELECT DISTINCT name FROM t WHERE name LIKE '%a%'");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn sample_1h() {

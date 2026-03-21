@@ -13,7 +13,7 @@ use exchange_core::encryption::{
     EncryptionAlgorithm, EncryptionConfig, decrypt_buffer, decrypt_file, encrypt_buffer,
     encrypt_file,
 };
-use exchange_core::metering::{CounterSnapshot, UsageMeter};
+use exchange_core::metering::UsageMeter;
 use exchange_core::rbac::{
     Permission, RbacStore, Role, SecurityContext, User, hash_password, verify_password,
 };
@@ -47,7 +47,7 @@ fn ctx_with(permissions: Vec<Permission>) -> SecurityContext {
     SecurityContext {
         user: "test".to_string(),
         roles: vec!["testrole".to_string()],
-        permissions: permissions,
+        permissions,
     }
 }
 
@@ -550,7 +550,7 @@ mod replication_extra {
             txn_range: (100, 200),
         };
         let enc = protocol::encode(&msg).unwrap();
-        let (dec, _) = protocol::decode(&enc).unwrap();
+        let (_dec, _) = protocol::decode(&enc).unwrap();
     }
     #[test]
     fn ack_large_txn() {

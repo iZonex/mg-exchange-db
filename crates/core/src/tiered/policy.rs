@@ -727,7 +727,7 @@ mod tests {
 
         // Write timestamp column (i64 = 8 bytes each)
         let ts_data: Vec<u8> = (0..num_rows as i64)
-            .flat_map(|i| (1710460800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
+            .flat_map(|i| (1_710_460_800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
             .collect();
         fs::write(dir.join("timestamp.d"), &ts_data).unwrap();
 

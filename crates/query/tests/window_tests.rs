@@ -6,7 +6,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -106,7 +106,7 @@ mod row_number {
                 Value::I64(n) => *n,
                 other => panic!("{other:?}"),
             };
-            assert!(rn >= 1 && rn <= 5);
+            assert!((1..=5).contains(&rn));
         }
     }
 

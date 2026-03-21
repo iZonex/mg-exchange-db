@@ -427,7 +427,7 @@ mod tests {
     fn test_value_to_csv_string() {
         assert_eq!(value_to_csv_string(&Value::Null), "");
         assert_eq!(value_to_csv_string(&Value::I64(42)), "42");
-        assert_eq!(value_to_csv_string(&Value::F64(3.14)), "3.14");
+        assert_eq!(value_to_csv_string(&Value::F64(3.15)), "3.15");
         assert_eq!(
             value_to_csv_string(&Value::Str("hello".to_string())),
             "hello"

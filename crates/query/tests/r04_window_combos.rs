@@ -4,7 +4,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 fn ts(s: i64) -> i64 {
     BASE_TS + s * 1_000_000_000
 }

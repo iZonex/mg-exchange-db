@@ -134,7 +134,7 @@ impl std::error::Error for IlpParseError {}
 ///
 /// Field value types:
 /// - Integer: `42i`
-/// - Float: `3.14` (no suffix)
+/// - Float: `3.15` (no suffix)
 /// - String: `"hello"`
 /// - Boolean: `true`, `false`, `t`, `f`, `TRUE`, `FALSE`, `T`, `F`
 pub fn parse_ilp_line(line: &str) -> Result<IlpLine, IlpParseError> {

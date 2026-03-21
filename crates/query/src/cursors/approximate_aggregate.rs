@@ -112,6 +112,6 @@ mod tests {
             _ => 0,
         };
         // HLL is approximate; should be roughly 10.
-        assert!(approx >= 5 && approx <= 20, "approx was {approx}");
+        assert!((5..=20).contains(&approx), "approx was {approx}");
     }
 }

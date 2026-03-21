@@ -1,10 +1,6 @@
 //! 500 ILP parsing, metrics, auth, catalog queries, type mapping tests.
 
-use exchange_net::ilp::{
-    IlpLine, IlpParseError, IlpValue, IlpVersion, parse_ilp_batch, parse_ilp_line,
-};
-use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use exchange_net::ilp::{IlpParseError, IlpValue, IlpVersion, parse_ilp_batch, parse_ilp_line};
 
 // ===========================================================================
 // ILP field types with different values — 100 tests
@@ -59,14 +55,14 @@ mod ilp_fields_f07 {
     fltf!(f1_5, 1.5);
     fltf!(f2_0, 2.0);
     fltf!(f2_5, 2.5);
-    fltf!(f3_14, 3.14);
+    fltf!(f3_14, 3.15);
     fltf!(f10_0, 10.0);
     fltf!(f42_0, 42.0);
     fltf!(f99_9, 99.9);
     fltf!(f100_0, 100.0);
     fltf!(fn1, -1.0);
     fltf!(fn1_5, -1.5);
-    fltf!(fn3_14, -3.14);
+    fltf!(fn3_14, -3.15);
     fltf!(fn10, -10.0);
     fltf!(fn100, -100.0);
     fltf!(f0_1, 0.1);
@@ -976,7 +972,7 @@ mod ilp_version_f07 {
     v1!(v1_17, "m val=False 1000");
     v1!(v1_18, "m val=42i 1000");
     v1!(v1_19, "m val=99i 1000");
-    v1!(v1_20, "m val=3.14 1000");
+    v1!(v1_20, "m val=3.15 1000");
 
     // v2 lines (with typed fields like timestamp 't')
     macro_rules! v2 {

@@ -7,7 +7,7 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
+use exchange_common::types::{ColumnType, PartitionBy};
 use exchange_core::engine::Engine;
 use exchange_core::partition_lock::PartitionLockManager;
 use exchange_core::table::TableBuilder;
@@ -476,7 +476,7 @@ mod engine_concurrency {
 
     #[test]
     fn engine_create_table() {
-        let (dir, engine) = create_test_engine();
+        let (_dir, engine) = create_test_engine();
         let tables = engine.list_tables().unwrap();
         assert!(tables.contains(&"trades".to_string()));
     }
@@ -751,7 +751,7 @@ mod engine_concurrency {
         let (_dir, engine) = create_test_engine();
         let reader = engine.get_reader("trades").unwrap();
         let version = reader.version();
-        assert!(version >= 0);
+        let _ = version;
     }
 
     #[test]

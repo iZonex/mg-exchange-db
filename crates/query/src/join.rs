@@ -967,7 +967,7 @@ mod tests {
                 }
             } else {
                 let mut combined = left_row.clone();
-                combined.extend(std::iter::repeat(Value::Null).take(right_col_count));
+                combined.extend(std::iter::repeat_n(Value::Null, right_col_count));
                 result.push(combined);
             }
         }
@@ -1050,9 +1050,8 @@ mod tests {
         // Emit unmatched right rows with NULLs on left side.
         for (i, matched) in right_matched.iter().enumerate() {
             if !matched {
-                let mut combined: Vec<Value> = std::iter::repeat(Value::Null)
-                    .take(left_col_count)
-                    .collect();
+                let mut combined: Vec<Value> =
+                    std::iter::repeat_n(Value::Null, left_col_count).collect();
                 combined.extend(right[i].iter().cloned());
                 result.push(combined);
             }
@@ -1093,15 +1092,14 @@ mod tests {
                 }
             } else {
                 let mut combined = left_row.clone();
-                combined.extend(std::iter::repeat(Value::Null).take(right_col_count));
+                combined.extend(std::iter::repeat_n(Value::Null, right_col_count));
                 result.push(combined);
             }
         }
         for (i, matched) in right_matched.iter().enumerate() {
             if !matched {
-                let mut combined: Vec<Value> = std::iter::repeat(Value::Null)
-                    .take(left_col_count)
-                    .collect();
+                let mut combined: Vec<Value> =
+                    std::iter::repeat_n(Value::Null, left_col_count).collect();
                 combined.extend(right[i].iter().cloned());
                 result.push(combined);
             }

@@ -13,10 +13,7 @@
 //! - v3 detection
 //! - ILP authentication (challenge, verify, expired, wrong sig)
 
-use exchange_net::ilp::{
-    IlpLine, IlpParseError, IlpValue, IlpVersion, parse_ilp_batch, parse_ilp_line,
-};
-use std::collections::BTreeMap;
+use exchange_net::ilp::{IlpParseError, IlpValue, IlpVersion, parse_ilp_batch, parse_ilp_line};
 
 // ---------------------------------------------------------------------------
 // mod ilp_parser — basic line parsing
@@ -69,8 +66,8 @@ mod ilp_parser {
 
     #[test]
     fn float_field_negative() {
-        let parsed = parse_ilp_line("sensor temp=-3.14 1000").unwrap();
-        assert_eq!(parsed.fields.get("temp"), Some(&IlpValue::Float(-3.14)));
+        let parsed = parse_ilp_line("sensor temp=-3.15 1000").unwrap();
+        assert_eq!(parsed.fields.get("temp"), Some(&IlpValue::Float(-3.15)));
     }
 
     #[test]
@@ -295,7 +292,7 @@ mod ilp_parser {
     #[test]
     fn very_long_line_1mb() {
         // Build a 1MB+ line with many fields
-        let mut parts = vec!["big".to_string()];
+        let parts = ["big".to_string()];
         let mut fields = Vec::new();
         for i in 0..10_000 {
             fields.push(format!("f{i}={i}i"));

@@ -53,11 +53,11 @@ mod abs_extra {
     }
     #[test]
     fn pos_float() {
-        assert_eq!(eval("abs", &[f(3.14)]), f(3.14));
+        assert_eq!(eval("abs", &[f(3.15)]), f(3.15));
     }
     #[test]
     fn neg_float() {
-        assert_eq!(eval("abs", &[f(-3.14)]), f(3.14));
+        assert_eq!(eval("abs", &[f(-3.15)]), f(3.15));
     }
     #[test]
     fn zero_float() {
@@ -89,7 +89,7 @@ mod abs_extra {
     }
     #[test]
     fn abs_double_alias() {
-        assert_eq!(eval("abs_double", &[f(-3.14)]), f(3.14));
+        assert_eq!(eval("abs_double", &[f(-3.15)]), f(3.15));
     }
 }
 
@@ -128,7 +128,7 @@ mod round_extra {
     }
     #[test]
     fn dec_2() {
-        assert_f64_close(&eval("round", &[f(3.14159), i(2)]), 3.14, 0.001);
+        assert_f64_close(&eval("round", &[f(3.15159), i(2)]), 3.15, 0.001);
     }
     #[test]
     fn dec_0() {
@@ -136,7 +136,7 @@ mod round_extra {
     }
     #[test]
     fn dec_3() {
-        assert_f64_close(&eval("round", &[f(3.14159), i(3)]), 3.142, 0.001);
+        assert_f64_close(&eval("round", &[f(3.15159), i(3)]), 3.152, 0.001);
     }
     #[test]
     fn int_in() {
@@ -568,7 +568,7 @@ mod inv_trig_extra {
     }
     #[test]
     fn asin_half() {
-        assert_f64_close(&eval("asin", &[f(0.5)]), 0.5236, 0.001);
+        assert_f64_close(&eval("asin", &[f(0.5)]), std::f64::consts::FRAC_PI_6, 0.001);
     }
 
     #[test]
@@ -736,11 +736,11 @@ mod mod_sign_extra {
     }
     #[test]
     fn sign_float_pos() {
-        assert_eq!(eval("sign", &[f(3.14)]), i(1));
+        assert_eq!(eval("sign", &[f(3.15)]), i(1));
     }
     #[test]
     fn sign_float_neg() {
-        assert_eq!(eval("sign", &[f(-3.14)]), i(-1));
+        assert_eq!(eval("sign", &[f(-3.15)]), i(-1));
     }
 }
 
@@ -1165,7 +1165,7 @@ mod width_bucket_extra {
     fn basic() {
         let r = eval("width_bucket", &[f(5.0), f(0.0), f(10.0), i(5)]);
         match r {
-            Value::I64(v) => assert!(v >= 1 && v <= 5, "got {v}"),
+            Value::I64(v) => assert!((1..=5).contains(&v), "got {v}"),
             _ => panic!(),
         }
     }
@@ -1563,14 +1563,14 @@ mod random_extra {
     #[test]
     fn random_returns_f64() {
         match eval("random", &[]) {
-            Value::F64(v) => assert!(v >= 0.0 && v < 1.0),
+            Value::F64(v) => assert!((0.0..1.0).contains(&v)),
             _ => panic!(),
         }
     }
     #[test]
     fn rand_alias() {
         match eval("rand", &[]) {
-            Value::F64(v) => assert!(v >= 0.0 && v < 1.0),
+            Value::F64(v) => assert!((0.0..1.0).contains(&v)),
             _ => panic!(),
         }
     }
@@ -1612,7 +1612,7 @@ mod random_extra {
     #[test]
     fn rnd_uuid4_returns_str() {
         match eval("rnd_uuid4", &[]) {
-            Value::Str(v) => assert!(v.len() > 0),
+            Value::Str(v) => assert!(!v.is_empty()),
             _ => panic!(),
         }
     }
@@ -1785,9 +1785,9 @@ mod to_number_date {
     }
     #[test]
     fn to_number_float() {
-        let r = eval("to_number", &[s("3.14")]);
+        let r = eval("to_number", &[s("3.15")]);
         match r {
-            Value::F64(v) => assert!((v - 3.14).abs() < 0.001),
+            Value::F64(v) => assert!((v - 3.15).abs() < 0.001),
             _ => panic!(),
         }
     }

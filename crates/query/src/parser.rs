@@ -1527,7 +1527,7 @@ fn rewrite_between_symmetric(sql: &str) -> String {
         let before = result[..bs_pos].trim_end();
         // Find the last whitespace before the column name (or WHERE/AND/OR keyword boundary).
         let col_start = before
-            .rfind(|c: char| c == ' ' || c == '(' || c == '\t' || c == '\n')
+            .rfind([' ', '(', '\t', '\n'])
             .map(|p| p + 1)
             .unwrap_or(0);
         let col = before[col_start..].trim().to_string();

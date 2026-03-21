@@ -7,7 +7,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -754,7 +754,7 @@ mod null_ops {
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, NULL)", ts(1)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 30.0)", ts(2)));
         let (_, rows) = db.query("SELECT v FROM t WHERE v IS NULL");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -826,7 +826,7 @@ mod null_ops {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, NULL)", ts(i)));
         }
         let (_, rows) = db.query("SELECT v FROM t WHERE v IS NULL");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 }
 
@@ -1975,8 +1975,8 @@ mod edge_cases {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {})", ts(9 - i), i));
         }
         let (_, rows) = db.query("SELECT v FROM t ORDER BY v ASC");
-        for i in 0..10 {
-            assert_eq!(rows[i][0], Value::I64(i as i64));
+        for (i, row) in rows.iter().enumerate().take(10) {
+            assert_eq!(row[0], Value::I64(i as i64));
         }
     }
 
@@ -2190,8 +2190,8 @@ mod boundary {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {})", ts(i), i));
         }
         let (_, rows) = db.query("SELECT v FROM t ORDER BY v ASC");
-        for i in 0..20 {
-            assert_eq!(rows[i][0], Value::I64(i as i64));
+        for (i, row) in rows.iter().enumerate().take(20) {
+            assert_eq!(row[0], Value::I64(i as i64));
         }
     }
 
@@ -2203,8 +2203,8 @@ mod boundary {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {})", ts(i), 19 - i));
         }
         let (_, rows) = db.query("SELECT v FROM t ORDER BY v DESC");
-        for i in 0..20 {
-            assert_eq!(rows[i][0], Value::I64(19 - i as i64));
+        for (i, row) in rows.iter().enumerate().take(20) {
+            assert_eq!(row[0], Value::I64(19 - i as i64));
         }
     }
 
@@ -2225,13 +2225,13 @@ mod boundary {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v BIGINT)");
         for i in 0..10 {
-            let val = if i % 2 == 0 { i as i64 } else { -(i as i64) };
+            let val = if i % 2 == 0 { i } else { -i };
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {})", ts(i), val));
         }
         let (_, pos) = db.query("SELECT v FROM t WHERE v > 0");
         let (_, neg) = db.query("SELECT v FROM t WHERE v < 0");
-        assert!(pos.len() >= 1);
-        assert!(neg.len() >= 1);
+        assert!(!pos.is_empty());
+        assert!(!neg.is_empty());
     }
 
     #[test]
@@ -2986,21 +2986,21 @@ mod group_having_extra {
         let db = db_i64_grouped();
         let (_, r) =
             db.query("SELECT grp, avg(v) AS a FROM t GROUP BY grp HAVING a > 40 ORDER BY grp");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn having_min() {
         let db = db_i64_grouped();
         let (_, r) =
             db.query("SELECT grp, min(v) AS m FROM t GROUP BY grp HAVING m >= 20 ORDER BY grp");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn having_max() {
         let db = db_i64_grouped();
         let (_, r) =
             db.query("SELECT grp, max(v) AS m FROM t GROUP BY grp HAVING m <= 50 ORDER BY grp");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn group_order_desc() {
@@ -3199,12 +3199,12 @@ mod wide_table {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, i BIGINT, d DOUBLE, s VARCHAR)");
         db.exec_ok(&format!(
-            "INSERT INTO t VALUES ({}, 42, 3.14, 'hello')",
+            "INSERT INTO t VALUES ({}, 42, 3.15, 'hello')",
             ts(0)
         ));
         let (_, rows) = db.query("SELECT i, d, s FROM t");
         assert_eq!(rows[0][0], Value::I64(42));
-        assert_eq!(rows[0][1], Value::F64(3.14));
+        assert_eq!(rows[0][1], Value::F64(3.15));
         assert_eq!(rows[0][2], Value::Str("hello".into()));
     }
 

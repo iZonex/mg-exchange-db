@@ -11522,7 +11522,7 @@ mod tests {
     #[test]
     fn test_cast_in_where_clause() {
         let dir = tempfile::tempdir().unwrap();
-        let db_root = setup_test_table(dir.path());
+        let _db_root = setup_test_table(dir.path());
         // Verify the plan is correctly formed with Expression filter.
         let plan =
             crate::planner::plan_query("SELECT * FROM trades WHERE CAST(volume AS INTEGER) > 5")
@@ -11710,7 +11710,7 @@ mod tests {
         .unwrap();
         execute(db_root, &create2).unwrap();
 
-        let base_ts = 1710460800_000_000_000i64;
+        let base_ts = 1_710_460_800_000_000_000_i64;
         for (i, (sym, price)) in [("BTC", 100.0), ("ETH", 200.0), ("SOL", 50.0)]
             .iter()
             .enumerate()

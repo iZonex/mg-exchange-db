@@ -667,7 +667,7 @@ mod tests {
         // Create 10 partitions.
         let mut partitions = Vec::new();
         for i in 0..10 {
-            let symbols: Vec<i32> = (0..100).map(|j| (j % 5) as i32).collect();
+            let symbols: Vec<i32> = (0..100).map(|j| j % 5).collect();
             let prices: Vec<f64> = (0..100).map(|j| (i * 100 + j) as f64 * 0.1).collect();
             let volumes: Vec<i64> = (0..100).map(|j| (i * 100 + j) as i64).collect();
             partitions.push(setup_partition(

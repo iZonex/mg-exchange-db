@@ -533,7 +533,7 @@ mod tests {
         let row = vec![
             Value::Null,
             Value::I64(42),
-            Value::F64(3.14),
+            Value::F64(3.15),
             Value::Str("hello world".to_string()),
             Value::Timestamp(1_000_000_000),
         ];

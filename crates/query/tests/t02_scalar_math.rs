@@ -46,11 +46,11 @@ mod abs_t02 {
     }
     #[test]
     fn pos_f() {
-        assert_eq!(ev("abs", &[f(3.14)]), f(3.14));
+        assert_eq!(ev("abs", &[f(3.15)]), f(3.15));
     }
     #[test]
     fn neg_f() {
-        assert_eq!(ev("abs", &[f(-3.14)]), f(3.14));
+        assert_eq!(ev("abs", &[f(-3.15)]), f(3.15));
     }
     #[test]
     fn zero_f() {
@@ -223,11 +223,11 @@ mod round_floor_ceil_t02 {
     }
     #[test]
     fn round_dec2() {
-        close(&ev("round", &[f(3.14159), i(2)]), 3.14, 0.001);
+        close(&ev("round", &[f(3.15159), i(2)]), 3.15, 0.001);
     }
     #[test]
     fn round_dec3() {
-        close(&ev("round", &[f(3.14159), i(3)]), 3.142, 0.0001);
+        close(&ev("round", &[f(3.15159), i(3)]), 3.152, 0.0001);
     }
     #[test]
     fn round_int() {
@@ -657,11 +657,11 @@ mod sign_t02 {
     }
     #[test]
     fn sign_pos_f() {
-        assert_eq!(ev("sign", &[f(3.14)]), i(1));
+        assert_eq!(ev("sign", &[f(3.15)]), i(1));
     }
     #[test]
     fn sign_neg_f() {
-        assert_eq!(ev("sign", &[f(-3.14)]), i(-1));
+        assert_eq!(ev("sign", &[f(-3.15)]), i(-1));
     }
     #[test]
     fn sign_zero_f() {
@@ -689,7 +689,7 @@ mod sign_t02 {
     }
     #[test]
     fn negate_f() {
-        close(&ev("negate", &[f(3.14)]), -3.14, 0.001);
+        close(&ev("negate", &[f(3.15)]), -3.15, 0.001);
     }
     #[test]
     fn negate_null() {
@@ -1059,7 +1059,7 @@ mod exp_log_t02 {
     }
     #[test]
     fn exp_1() {
-        close(&ev("exp", &[f(1.0)]), 2.718, 0.01);
+        close(&ev("exp", &[f(1.0)]), std::f64::consts::E, 0.01);
     }
     #[test]
     fn exp_2() {
@@ -1079,7 +1079,7 @@ mod exp_log_t02 {
     }
     #[test]
     fn log_e() {
-        close(&ev("log", &[f(2.718281828)]), 1.0, 0.01);
+        close(&ev("log", &[f(2.728281828)]), 1.0, 0.01);
     }
     #[test]
     fn log_null() {
@@ -1171,7 +1171,7 @@ mod exp_log_t02 {
     }
     #[test]
     fn el10() {
-        close(&ev("exp", &[i(1)]), 2.718, 0.01);
+        close(&ev("exp", &[i(1)]), std::f64::consts::E, 0.01);
     }
     #[test]
     fn el11() {
@@ -1215,15 +1215,15 @@ mod exp_log_t02 {
     }
     #[test]
     fn e_const() {
-        close(&ev("e", &[]), 2.71828, 0.001);
+        close(&ev("e", &[]), std::f64::consts::E, 0.001);
     }
     #[test]
     fn tau_const() {
-        close(&ev("tau", &[]), 6.28318, 0.001);
+        close(&ev("tau", &[]), std::f64::consts::TAU, 0.001);
     }
     #[test]
     fn pi_const() {
-        close(&ev("pi", &[]), 3.14159, 0.001);
+        close(&ev("pi", &[]), std::f64::consts::PI, 0.001);
     }
     #[test]
     fn el21() {
@@ -1460,11 +1460,11 @@ mod trig_t02 {
     }
     #[test]
     fn t07() {
-        close(&ev("asin", &[f(0.5)]), 0.5236, 0.01);
+        close(&ev("asin", &[f(0.5)]), std::f64::consts::FRAC_PI_6, 0.01);
     }
     #[test]
     fn t08() {
-        close(&ev("acos", &[f(0.5)]), 1.0472, 0.01);
+        close(&ev("acos", &[f(0.5)]), std::f64::consts::FRAC_PI_3, 0.01);
     }
     #[test]
     fn t09() {
@@ -1484,7 +1484,11 @@ mod trig_t02 {
     }
     #[test]
     fn t12() {
-        close(&ev("radians", &[f(45.0)]), 0.7854, 0.01);
+        close(
+            &ev("radians", &[f(45.0)]),
+            std::f64::consts::FRAC_PI_4,
+            0.01,
+        );
     }
     #[test]
     fn hypot_3_4() {
@@ -2389,7 +2393,7 @@ mod rnd_t02 {
     fn r06() {
         let r = ev("rnd_str", &[i(10)]);
         match r {
-            Value::Str(v) => assert!(v.len() > 0),
+            Value::Str(v) => assert!(!v.is_empty()),
             _ => panic!(),
         }
     }
@@ -2448,7 +2452,7 @@ mod misc_math_t02 {
     fn wb_in_range() {
         let r = ev("width_bucket", &[f(5.0), f(0.0), f(10.0), i(10)]);
         match r {
-            Value::I64(v) => assert!(v >= 1 && v <= 10),
+            Value::I64(v) => assert!((1..=10).contains(&v)),
             _ => panic!(),
         }
     }
@@ -2456,7 +2460,7 @@ mod misc_math_t02 {
     fn wb_2_buckets() {
         let r = ev("width_bucket", &[f(3.0), f(0.0), f(10.0), i(2)]);
         match r {
-            Value::I64(v) => assert!(v >= 1 && v <= 2),
+            Value::I64(v) => assert!((1..=2).contains(&v)),
             _ => panic!(),
         }
     }
@@ -2544,7 +2548,7 @@ mod misc_math_t02 {
     fn wb_02() {
         let r = ev("width_bucket", &[f(2.5), f(0.0), f(10.0), i(4)]);
         match r {
-            Value::I64(v) => assert!(v >= 1 && v <= 4),
+            Value::I64(v) => assert!((1..=4).contains(&v)),
             _ => panic!(),
         }
     }
@@ -2552,7 +2556,7 @@ mod misc_math_t02 {
     fn wb_03() {
         let r = ev("width_bucket", &[f(7.5), f(0.0), f(10.0), i(4)]);
         match r {
-            Value::I64(v) => assert!(v >= 1 && v <= 4),
+            Value::I64(v) => assert!((1..=4).contains(&v)),
             _ => panic!(),
         }
     }
@@ -2591,7 +2595,7 @@ mod cast_t02 {
     }
     #[test]
     fn cast_float_s() {
-        close(&ev("cast_float", &[s("3.14")]), 3.14, 0.001);
+        close(&ev("cast_float", &[s("3.15")]), 3.15, 0.001);
     }
     #[test]
     fn cast_float_i() {
@@ -2607,7 +2611,7 @@ mod cast_t02 {
     }
     #[test]
     fn cast_str_f() {
-        assert_eq!(ev("cast_str", &[f(3.14)]), s("3.14"));
+        assert_eq!(ev("cast_str", &[f(3.15)]), s("3.15"));
     }
     #[test]
     fn cast_str_null() {
@@ -2643,7 +2647,7 @@ mod cast_t02 {
     }
     #[test]
     fn safe_cast_float_ok() {
-        close(&ev("safe_cast_float", &[s("3.14")]), 3.14, 0.001);
+        close(&ev("safe_cast_float", &[s("3.15")]), 3.15, 0.001);
     }
     #[test]
     fn safe_cast_float_bad() {

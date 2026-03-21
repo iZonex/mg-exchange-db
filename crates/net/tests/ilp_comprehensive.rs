@@ -5,11 +5,10 @@ use base64::Engine as _;
 use exchange_common::types::Timestamp;
 use exchange_net::ilp::auth::{IlpAuthConfig, IlpAuthenticator};
 use exchange_net::ilp::parser::{
-    IlpLine, IlpParseError, IlpValue, IlpVersion, parse_ilp_batch, parse_ilp_line,
+    IlpParseError, IlpValue, IlpVersion, parse_ilp_batch, parse_ilp_line,
 };
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
-use std::collections::BTreeMap;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -120,8 +119,8 @@ fn field_integer_min() {
 
 #[test]
 fn field_float_positive() {
-    let p = parse_ilp_line("m v=3.14").unwrap();
-    assert_eq!(p.fields.get("v"), Some(&IlpValue::Float(3.14)));
+    let p = parse_ilp_line("m v=3.15").unwrap();
+    assert_eq!(p.fields.get("v"), Some(&IlpValue::Float(3.15)));
 }
 
 #[test]
@@ -351,7 +350,7 @@ fn combo_tags_and_all_field_types() {
 fn five_integer_fields() {
     let p = parse_ilp_line("m a=1i,b=2i,c=3i,d=4i,e=5i").unwrap();
     assert_eq!(p.fields.len(), 5);
-    for (_, v) in &p.fields {
+    for v in p.fields.values() {
         assert!(matches!(v, IlpValue::Integer(_)));
     }
 }
@@ -884,11 +883,11 @@ tag_field_test!(combo_1t_int, 1, "v=42i", IlpValue::Integer(42));
 tag_field_test!(combo_2t_int, 2, "v=42i", IlpValue::Integer(42));
 tag_field_test!(combo_3t_int, 3, "v=42i", IlpValue::Integer(42));
 tag_field_test!(combo_5t_int, 5, "v=42i", IlpValue::Integer(42));
-tag_field_test!(combo_0t_float, 0, "v=3.14", IlpValue::Float(3.14));
-tag_field_test!(combo_1t_float, 1, "v=3.14", IlpValue::Float(3.14));
-tag_field_test!(combo_2t_float, 2, "v=3.14", IlpValue::Float(3.14));
-tag_field_test!(combo_3t_float, 3, "v=3.14", IlpValue::Float(3.14));
-tag_field_test!(combo_5t_float, 5, "v=3.14", IlpValue::Float(3.14));
+tag_field_test!(combo_0t_float, 0, "v=3.15", IlpValue::Float(3.15));
+tag_field_test!(combo_1t_float, 1, "v=3.15", IlpValue::Float(3.15));
+tag_field_test!(combo_2t_float, 2, "v=3.15", IlpValue::Float(3.15));
+tag_field_test!(combo_3t_float, 3, "v=3.15", IlpValue::Float(3.15));
+tag_field_test!(combo_5t_float, 5, "v=3.15", IlpValue::Float(3.15));
 tag_field_test!(combo_0t_bool, 0, "v=true", IlpValue::Boolean(true));
 tag_field_test!(combo_1t_bool, 1, "v=true", IlpValue::Boolean(true));
 tag_field_test!(combo_2t_bool, 2, "v=true", IlpValue::Boolean(true));
@@ -1741,14 +1740,14 @@ full_combo_test!(fc_0t_int_nots, 0, "v=1i", false);
 full_combo_test!(fc_1t_int_nots, 1, "v=1i", false);
 full_combo_test!(fc_3t_int_nots, 3, "v=1i", false);
 full_combo_test!(fc_5t_int_nots, 5, "v=1i", false);
-full_combo_test!(fc_0t_flt_ts, 0, "v=3.14", true);
-full_combo_test!(fc_1t_flt_ts, 1, "v=3.14", true);
-full_combo_test!(fc_3t_flt_ts, 3, "v=3.14", true);
-full_combo_test!(fc_5t_flt_ts, 5, "v=3.14", true);
-full_combo_test!(fc_0t_flt_nots, 0, "v=3.14", false);
-full_combo_test!(fc_1t_flt_nots, 1, "v=3.14", false);
-full_combo_test!(fc_3t_flt_nots, 3, "v=3.14", false);
-full_combo_test!(fc_5t_flt_nots, 5, "v=3.14", false);
+full_combo_test!(fc_0t_flt_ts, 0, "v=3.15", true);
+full_combo_test!(fc_1t_flt_ts, 1, "v=3.15", true);
+full_combo_test!(fc_3t_flt_ts, 3, "v=3.15", true);
+full_combo_test!(fc_5t_flt_ts, 5, "v=3.15", true);
+full_combo_test!(fc_0t_flt_nots, 0, "v=3.15", false);
+full_combo_test!(fc_1t_flt_nots, 1, "v=3.15", false);
+full_combo_test!(fc_3t_flt_nots, 3, "v=3.15", false);
+full_combo_test!(fc_5t_flt_nots, 5, "v=3.15", false);
 full_combo_test!(fc_0t_bool_ts, 0, "v=true", true);
 full_combo_test!(fc_1t_bool_ts, 1, "v=true", true);
 full_combo_test!(fc_3t_bool_ts, 3, "v=true", true);
@@ -1908,8 +1907,8 @@ fn batch_10_different_measurements() {
     let input: String = (0..10).map(|i| format!("metric_{i} v={i}i\n")).collect();
     let lines = parse_ilp_batch(&input).unwrap();
     assert_eq!(lines.len(), 10);
-    for i in 0..10 {
-        assert_eq!(lines[i].measurement, format!("metric_{i}"));
+    for (i, line) in lines.iter().enumerate() {
+        assert_eq!(line.measurement, format!("metric_{i}"));
     }
 }
 

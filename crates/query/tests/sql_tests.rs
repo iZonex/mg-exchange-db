@@ -40,7 +40,7 @@ fn setup_test_db() -> (TempDir, PathBuf) {
 
     let mut row_id: usize = 0;
 
-    for (day_idx, &base) in [day1_base, day2_base, day3_base].iter().enumerate() {
+    for &base in [day1_base, day2_base, day3_base].iter() {
         // 34 rows per day = 102 total
         for i in 0..34 {
             let ts_nanos = (base + (i as i64) * 600) * 1_000_000_000i64; // every 10 min
@@ -55,7 +55,7 @@ fn setup_test_db() -> (TempDir, PathBuf) {
             };
 
             // Every 10th row gets NULL volume.
-            let volume_expr = if row_id % 10 == 0 {
+            let volume_expr = if row_id.is_multiple_of(10) {
                 "NULL".to_string()
             } else {
                 format!("{:.1}", 0.5 + (row_id as f64) * 0.1)
@@ -387,7 +387,7 @@ fn insert_and_select() {
         "CREATE TABLE orders (timestamp TIMESTAMP, product VARCHAR, qty DOUBLE)",
     );
 
-    let ts = 1710460800_000_000_000i64;
+    let ts = 1_710_460_800_000_000_000i64;
     run_sql(
         &db,
         &format!(
@@ -468,7 +468,7 @@ fn create_table_and_use() {
         "CREATE TABLE metrics (timestamp TIMESTAMP, name VARCHAR, value DOUBLE)",
     );
 
-    let ts = 1710460800_000_000_000i64;
+    let ts = 1_710_460_800_000_000_000i64;
     run_sql(
         &db,
         &format!(
@@ -495,7 +495,7 @@ fn drop_table() {
     );
 
     // Verify it exists.
-    let ts = 1710460800_000_000_000i64;
+    let ts = 1_710_460_800_000_000_000i64;
     run_sql(
         &db,
         &format!(
@@ -523,7 +523,7 @@ fn alter_table_add_column() {
         "CREATE TABLE events (timestamp TIMESTAMP, name VARCHAR)",
     );
 
-    let ts = 1710460800_000_000_000i64;
+    let ts = 1_710_460_800_000_000_000i64;
     run_sql(
         &db,
         &format!(
@@ -566,7 +566,7 @@ fn setup_join_db() -> (TempDir, PathBuf) {
         "CREATE TABLE markets (timestamp TIMESTAMP, symbol VARCHAR, name VARCHAR)",
     );
 
-    let base_ts = 1710460800_000_000_000i64;
+    let base_ts = 1_710_460_800_000_000_000i64;
 
     // Insert trades.
     for (i, (sym, price)) in [
@@ -644,7 +644,7 @@ fn asof_join() {
         "CREATE TABLE quote_events (timestamp TIMESTAMP, symbol VARCHAR, bid DOUBLE)",
     );
 
-    let base_ts = 1710460800_000_000_000i64;
+    let base_ts = 1_710_460_800_000_000_000i64;
 
     // Insert trades at t=0, t=10s, t=20s.
     for i in 0..3 {
@@ -750,7 +750,7 @@ fn unicode_data() {
         "CREATE TABLE notes (timestamp TIMESTAMP, text VARCHAR)",
     );
 
-    let ts = 1710460800_000_000_000i64;
+    let ts = 1_710_460_800_000_000_000i64;
     run_sql(
         &db,
         &format!(
@@ -775,7 +775,7 @@ fn large_result() {
     run_sql(&db, "CREATE TABLE big (timestamp TIMESTAMP, val DOUBLE)");
 
     // Insert 10000 rows in batches.
-    let base_ts = 1710460800_000_000_000i64;
+    let base_ts = 1_710_460_800_000_000_000i64;
     for batch in 0..100 {
         let mut values_parts = Vec::with_capacity(100);
         for i in 0..100 {

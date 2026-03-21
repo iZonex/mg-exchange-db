@@ -20,6 +20,7 @@ fn null() -> Value {
 fn eval(name: &str, args: &[Value]) -> Value {
     evaluate_scalar(name, args).unwrap()
 }
+#[allow(dead_code)]
 fn eval_err(name: &str, args: &[Value]) -> String {
     evaluate_scalar(name, args).unwrap_err()
 }
@@ -63,7 +64,7 @@ mod length_extra {
     }
     #[test]
     fn float_input() {
-        assert_eq!(eval("length", &[f(3.14)]), i(4));
+        assert_eq!(eval("length", &[f(3.15)]), i(4));
     }
     #[test]
     fn single_space() {
@@ -1310,7 +1311,7 @@ mod encoding_extra {
     fn hex_basic() {
         let r = eval("hex", &[s("AB")]);
         match r {
-            Value::Str(v) => assert!(v.len() > 0),
+            Value::Str(v) => assert!(!v.is_empty()),
             _ => panic!(),
         }
     }
@@ -1335,7 +1336,7 @@ mod encoding_extra {
     fn to_base64_basic() {
         let r = eval("to_base64", &[s("hello")]);
         match r {
-            Value::Str(v) => assert!(v.len() > 0),
+            Value::Str(v) => assert!(!v.is_empty()),
             _ => panic!(),
         }
     }
@@ -1695,7 +1696,7 @@ mod cast_extra {
     }
     #[test]
     fn cast_str_float() {
-        let r = eval("cast_str", &[f(3.14)]);
+        let r = eval("cast_str", &[f(3.15)]);
         match r {
             Value::Str(_) => {}
             _ => panic!(),
@@ -1737,9 +1738,9 @@ mod cast_extra {
 
     #[test]
     fn cast_float_from_str() {
-        let r = eval("cast_float", &[s("3.14")]);
+        let r = eval("cast_float", &[s("3.15")]);
         match r {
-            Value::F64(v) => assert!((v - 3.14).abs() < 0.001),
+            Value::F64(v) => assert!((v - 3.15).abs() < 0.001),
             _ => panic!(),
         }
     }
@@ -1749,7 +1750,7 @@ mod cast_extra {
     }
     #[test]
     fn cast_float_from_float() {
-        assert_eq!(eval("cast_float", &[f(3.14)]), f(3.14));
+        assert_eq!(eval("cast_float", &[f(3.15)]), f(3.15));
     }
     #[test]
     fn cast_float_null() {
@@ -1772,7 +1773,7 @@ mod type_checking {
     }
     #[test]
     fn typeof_float() {
-        assert_eq!(eval("typeof", &[f(3.14)]), s("f64"));
+        assert_eq!(eval("typeof", &[f(3.15)]), s("f64"));
     }
     #[test]
     fn typeof_str() {
@@ -1920,7 +1921,7 @@ mod encode_decode {
     fn encode_basic() {
         let r = eval("encode", &[s("hello"), s("base64")]);
         match r {
-            Value::Str(v) => assert!(v.len() > 0),
+            Value::Str(v) => assert!(!v.is_empty()),
             _ => panic!(),
         }
     }
@@ -2110,7 +2111,6 @@ mod hash_extra {
     }
     #[test]
     #[ignore]
-    #[ignore]
     fn hash_empty() {
         let r = eval("hash", &[s("")]);
         match r {
@@ -2276,7 +2276,7 @@ mod safe_casts {
     }
     #[test]
     fn safe_int_float_str() {
-        assert_eq!(eval("safe_cast_int", &[s("3.14")]), null());
+        assert_eq!(eval("safe_cast_int", &[s("3.15")]), null());
     }
     #[test]
     fn try_cast_int_alias() {
@@ -2285,9 +2285,9 @@ mod safe_casts {
 
     #[test]
     fn safe_float_valid() {
-        let r = eval("safe_cast_float", &[s("3.14")]);
+        let r = eval("safe_cast_float", &[s("3.15")]);
         match r {
-            Value::F64(v) => assert!((v - 3.14).abs() < 0.001),
+            Value::F64(v) => assert!((v - 3.15).abs() < 0.001),
             _ => panic!(),
         }
     }
@@ -2305,7 +2305,7 @@ mod safe_casts {
     }
     #[test]
     fn try_cast_float_alias() {
-        let r = eval("try_cast_float", &[s("3.14")]);
+        let r = eval("try_cast_float", &[s("3.15")]);
         match r {
             Value::F64(_) => {}
             _ => panic!(),
@@ -2336,7 +2336,7 @@ mod numeric_string {
     }
     #[test]
     fn negate_float() {
-        assert_eq!(eval("negate", &[f(3.14)]), f(-3.14));
+        assert_eq!(eval("negate", &[f(3.15)]), f(-3.15));
     }
 
     #[test]

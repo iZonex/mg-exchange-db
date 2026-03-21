@@ -459,7 +459,7 @@ mod extract_week_tests {
     fn jan_1_2024() {
         let r = eval("extract_week", &[ts(TS_2024_01_01)]);
         match r {
-            Value::I64(w) => assert!(w >= 1 && w <= 53),
+            Value::I64(w) => assert!((1..=53).contains(&w)),
             _ => panic!(),
         }
     }
@@ -471,7 +471,7 @@ mod extract_week_tests {
     fn mid_year() {
         let r = eval("extract_week", &[ts(TS_2024_06_15)]);
         match r {
-            Value::I64(w) => assert!(w >= 1 && w <= 53),
+            Value::I64(w) => assert!((1..=53).contains(&w)),
             _ => panic!(),
         }
     }
@@ -479,7 +479,7 @@ mod extract_week_tests {
     fn dec_31() {
         let r = eval("extract_week", &[ts(TS_2024_12_31_235959)]);
         match r {
-            Value::I64(w) => assert!(w >= 1 && w <= 53),
+            Value::I64(w) => assert!((1..=53).contains(&w)),
             _ => panic!(),
         }
     }
@@ -535,7 +535,7 @@ mod extract_day_of_week_tests {
     fn range() {
         let r = eval("extract_day_of_week", &[ts(TS_2024_03_15_123045)]);
         match r {
-            Value::I64(d) => assert!(d >= 0 && d <= 6),
+            Value::I64(d) => assert!((0..=6).contains(&d)),
             _ => panic!(),
         }
     }
@@ -651,25 +651,25 @@ mod date_trunc_tests {
     fn trunc_month() {
         let r = eval("date_trunc", &[s("month"), ts(TS_2024_03_15_123045)]);
         // First of March 2024
-        let first_mar = eval("extract_day", &[r.clone()]);
+        let first_mar = eval("extract_day", std::slice::from_ref(&r));
         assert_eq!(first_mar, i(1));
     }
     #[test]
     fn trunc_year() {
         let r = eval("date_trunc", &[s("year"), ts(TS_2024_06_15)]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(1));
-        assert_eq!(eval("extract_day", &[r.clone()]), i(1));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(1));
+        assert_eq!(eval("extract_day", std::slice::from_ref(&r)), i(1));
     }
     #[test]
     fn trunc_hour() {
         let r = eval("date_trunc", &[s("hour"), ts(TS_2024_03_15_123045)]);
-        assert_eq!(eval("extract_minute", &[r.clone()]), i(0));
-        assert_eq!(eval("extract_second", &[r.clone()]), i(0));
+        assert_eq!(eval("extract_minute", std::slice::from_ref(&r)), i(0));
+        assert_eq!(eval("extract_second", std::slice::from_ref(&r)), i(0));
     }
     #[test]
     fn trunc_minute() {
         let r = eval("date_trunc", &[s("minute"), ts(TS_2024_03_15_123045)]);
-        assert_eq!(eval("extract_second", &[r.clone()]), i(0));
+        assert_eq!(eval("extract_second", std::slice::from_ref(&r)), i(0));
     }
     #[test]
     fn trunc_second() {
@@ -845,7 +845,7 @@ mod timestamp_add_tests {
     #[test]
     fn add_months() {
         let r = eval("timestamp_add", &[s("month"), i(1), ts(TS_2024_01_01)]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(2));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(2));
         assert_eq!(eval("extract_day", &[r]), i(1));
     }
     #[test]
@@ -860,7 +860,7 @@ mod timestamp_add_tests {
     #[test]
     fn subtract_days() {
         let r = eval("timestamp_add", &[s("day"), i(-1), ts(TS_2024_01_01)]);
-        assert_eq!(eval("extract_day", &[r.clone()]), i(31));
+        assert_eq!(eval("extract_day", std::slice::from_ref(&r)), i(31));
         assert_eq!(eval("extract_month", &[r]), i(12));
     }
     #[test]
@@ -868,7 +868,7 @@ mod timestamp_add_tests {
         // Jan 31 + 1 month -> Feb 29 (2024 is leap year)
         let jan31 = TS_2024_01_01 + 30 * NANOS_PER_DAY;
         let r = eval("timestamp_add", &[s("month"), i(1), ts(jan31)]);
-        assert_eq!(eval("extract_day", &[r.clone()]), i(29));
+        assert_eq!(eval("extract_day", std::slice::from_ref(&r)), i(29));
         assert_eq!(eval("extract_month", &[r]), i(2));
     }
     #[test]
@@ -1067,10 +1067,10 @@ mod make_timestamp_tests {
     #[test]
     fn basic() {
         let r = eval("make_timestamp", &[i(2024), i(1), i(1), i(0), i(0), i(0)]);
-        assert_eq!(eval("extract_year", &[r.clone()]), i(2024));
-        assert_eq!(eval("extract_month", &[r.clone()]), i(1));
-        assert_eq!(eval("extract_day", &[r.clone()]), i(1));
-        assert_eq!(eval("extract_hour", &[r.clone()]), i(0));
+        assert_eq!(eval("extract_year", std::slice::from_ref(&r)), i(2024));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(1));
+        assert_eq!(eval("extract_day", std::slice::from_ref(&r)), i(1));
+        assert_eq!(eval("extract_hour", std::slice::from_ref(&r)), i(0));
     }
     #[test]
     fn with_time() {
@@ -1078,8 +1078,8 @@ mod make_timestamp_tests {
             "make_timestamp",
             &[i(2024), i(3), i(15), i(12), i(30), i(45)],
         );
-        assert_eq!(eval("extract_hour", &[r.clone()]), i(12));
-        assert_eq!(eval("extract_minute", &[r.clone()]), i(30));
+        assert_eq!(eval("extract_hour", std::slice::from_ref(&r)), i(12));
+        assert_eq!(eval("extract_minute", std::slice::from_ref(&r)), i(30));
         assert_eq!(eval("extract_second", &[r]), i(45));
     }
     #[test]
@@ -1093,7 +1093,7 @@ mod make_timestamp_tests {
     #[test]
     fn leap_day() {
         let r = eval("make_timestamp", &[i(2024), i(2), i(29), i(0), i(0), i(0)]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(2));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(2));
         assert_eq!(eval("extract_day", &[r]), i(29));
     }
     #[test]
@@ -1102,8 +1102,8 @@ mod make_timestamp_tests {
             "make_timestamp",
             &[i(2024), i(12), i(31), i(23), i(59), i(59)],
         );
-        assert_eq!(eval("extract_hour", &[r.clone()]), i(23));
-        assert_eq!(eval("extract_minute", &[r.clone()]), i(59));
+        assert_eq!(eval("extract_hour", std::slice::from_ref(&r)), i(23));
+        assert_eq!(eval("extract_minute", std::slice::from_ref(&r)), i(59));
         assert_eq!(eval("extract_second", &[r]), i(59));
     }
     #[test]
@@ -1112,7 +1112,7 @@ mod make_timestamp_tests {
             "make_timestamp",
             &[i(2000), i(6), i(15), i(10), i(20), i(30)],
         );
-        assert_eq!(eval("extract_year", &[r.clone()]), i(2000));
+        assert_eq!(eval("extract_year", std::slice::from_ref(&r)), i(2000));
         assert_eq!(eval("extract_month", &[r]), i(6));
     }
 }
@@ -1182,7 +1182,7 @@ mod month_boundary_tests {
     #[test]
     fn first_of_feb() {
         let r = eval("first_of_month", &[ts(TS_2024_02_29)]);
-        assert_eq!(eval("extract_day", &[r.clone()]), i(1));
+        assert_eq!(eval("extract_day", std::slice::from_ref(&r)), i(1));
         assert_eq!(eval("extract_month", &[r]), i(2));
     }
     #[test]
@@ -1368,14 +1368,14 @@ mod timestamp_ceil_tests {
     fn ceil_month() {
         let mid_jan = TS_2024_01_01 + 15 * NANOS_PER_DAY;
         let r = eval("timestamp_ceil", &[s("month"), ts(mid_jan)]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(2));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(2));
         assert_eq!(eval("extract_day", &[r]), i(1));
     }
     #[test]
     fn ceil_year() {
         let mid_year = TS_2024_06_15;
         let r = eval("timestamp_ceil", &[s("year"), ts(mid_year)]);
-        assert_eq!(eval("extract_year", &[r.clone()]), i(2025));
+        assert_eq!(eval("extract_year", std::slice::from_ref(&r)), i(2025));
         assert_eq!(eval("extract_month", &[r]), i(1));
     }
 }
@@ -1562,7 +1562,7 @@ mod boundary_tests {
     #[test]
     fn start_of_year() {
         let r = eval("start_of_year", &[ts(TS_2024_06_15)]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(1));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(1));
         assert_eq!(eval("extract_day", &[r]), i(1));
     }
     #[test]
@@ -1578,7 +1578,7 @@ mod boundary_tests {
     #[test]
     fn end_of_year() {
         let r = eval("end_of_year", &[ts(TS_2024_06_15)]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(12));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(12));
         assert_eq!(eval("extract_day", &[r]), i(31));
     }
     #[test]
@@ -1594,19 +1594,19 @@ mod boundary_tests {
     #[test]
     fn start_of_quarter_q1() {
         let r = eval("start_of_quarter", &[ts(TS_2024_02_29)]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(1));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(1));
         assert_eq!(eval("extract_day", &[r]), i(1));
     }
     #[test]
     fn start_of_quarter_q2() {
         let r = eval("start_of_quarter", &[ts(TS_2024_06_15)]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(4));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(4));
         assert_eq!(eval("extract_day", &[r]), i(1));
     }
     #[test]
     fn start_of_quarter_q4() {
         let r = eval("start_of_quarter", &[ts(TS_2024_12_31_235959)]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(10));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(10));
         assert_eq!(eval("extract_day", &[r]), i(1));
     }
     #[test]
@@ -1648,8 +1648,8 @@ mod to_date_tests {
     #[test]
     fn basic() {
         let r = eval("to_date", &[s("2024-01-01"), s("yyyy-mm-dd")]);
-        assert_eq!(eval("extract_year", &[r.clone()]), i(2024));
-        assert_eq!(eval("extract_month", &[r.clone()]), i(1));
+        assert_eq!(eval("extract_year", std::slice::from_ref(&r)), i(2024));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(1));
         assert_eq!(eval("extract_day", &[r]), i(1));
     }
     #[test]
@@ -1664,7 +1664,7 @@ mod to_date_tests {
     #[test]
     fn end_of_year() {
         let r = eval("to_date", &[s("2024-12-31"), s("yyyy-mm-dd")]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(12));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(12));
         assert_eq!(eval("extract_day", &[r]), i(31));
     }
     #[test]
@@ -1821,7 +1821,7 @@ mod rnd_timestamp_tests {
             &[ts(TS_2024_01_01), ts(TS_2024_12_31_235959)],
         );
         match r {
-            Value::Timestamp(ns) => assert!(ns >= TS_2024_01_01 && ns <= TS_2024_12_31_235959),
+            Value::Timestamp(ns) => assert!((TS_2024_01_01..=TS_2024_12_31_235959).contains(&ns)),
             _ => panic!(),
         }
     }
@@ -1938,14 +1938,14 @@ mod additional_date_trunc_tests {
             &[i(2024), i(6), i(15), i(12), i(30), i(45)],
         );
         let r = eval("date_trunc", &[s("month"), t]);
-        assert_eq!(eval("extract_day", &[r.clone()]), i(1));
+        assert_eq!(eval("extract_day", std::slice::from_ref(&r)), i(1));
         assert_eq!(eval("extract_month", &[r]), i(6));
     }
     #[test]
     fn trunc_year_mid_year() {
         let t = eval("make_timestamp", &[i(2024), i(8), i(20), i(15), i(0), i(0)]);
         let r = eval("date_trunc", &[s("year"), t]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(1));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(1));
         assert_eq!(eval("extract_day", &[r]), i(1));
     }
     #[test]
@@ -1955,8 +1955,8 @@ mod additional_date_trunc_tests {
             &[i(2024), i(3), i(15), i(12), i(30), i(45)],
         );
         let r = eval("date_trunc", &[s("hour"), t]);
-        assert_eq!(eval("extract_hour", &[r.clone()]), i(12));
-        assert_eq!(eval("extract_minute", &[r.clone()]), i(0));
+        assert_eq!(eval("extract_hour", std::slice::from_ref(&r)), i(12));
+        assert_eq!(eval("extract_minute", std::slice::from_ref(&r)), i(0));
         assert_eq!(eval("extract_second", &[r]), i(0));
     }
     #[test]
@@ -1966,7 +1966,7 @@ mod additional_date_trunc_tests {
             &[i(2024), i(3), i(15), i(12), i(30), i(45)],
         );
         let r = eval("date_trunc", &[s("minute"), t]);
-        assert_eq!(eval("extract_minute", &[r.clone()]), i(30));
+        assert_eq!(eval("extract_minute", std::slice::from_ref(&r)), i(30));
         assert_eq!(eval("extract_second", &[r]), i(0));
     }
 }
@@ -1989,13 +1989,13 @@ mod additional_timestamp_add_tests {
     #[test]
     fn subtract_months() {
         let r = eval("timestamp_add", &[s("month"), i(-1), ts(TS_2024_01_01)]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(12));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(12));
         assert_eq!(eval("extract_year", &[r]), i(2023));
     }
     #[test]
     fn add_12_months() {
         let r = eval("timestamp_add", &[s("month"), i(12), ts(TS_2024_01_01)]);
-        assert_eq!(eval("extract_year", &[r.clone()]), i(2025));
+        assert_eq!(eval("extract_year", std::slice::from_ref(&r)), i(2025));
         assert_eq!(eval("extract_month", &[r]), i(1));
     }
     #[test]
@@ -2175,8 +2175,8 @@ mod additional_make_timestamp_tests {
     #[test]
     fn midnight() {
         let t = eval("make_timestamp", &[i(2024), i(6), i(15), i(0), i(0), i(0)]);
-        assert_eq!(eval("extract_hour", &[t.clone()]), i(0));
-        assert_eq!(eval("extract_minute", &[t.clone()]), i(0));
+        assert_eq!(eval("extract_hour", std::slice::from_ref(&t)), i(0));
+        assert_eq!(eval("extract_minute", std::slice::from_ref(&t)), i(0));
         assert_eq!(eval("extract_second", &[t]), i(0));
     }
     #[test]
@@ -2185,8 +2185,8 @@ mod additional_make_timestamp_tests {
             "make_timestamp",
             &[i(2024), i(6), i(15), i(23), i(59), i(59)],
         );
-        assert_eq!(eval("extract_hour", &[t.clone()]), i(23));
-        assert_eq!(eval("extract_minute", &[t.clone()]), i(59));
+        assert_eq!(eval("extract_hour", std::slice::from_ref(&t)), i(23));
+        assert_eq!(eval("extract_minute", std::slice::from_ref(&t)), i(59));
         assert_eq!(eval("extract_second", &[t]), i(59));
     }
     #[test]
@@ -2197,7 +2197,7 @@ mod additional_make_timestamp_tests {
     #[test]
     fn december_end() {
         let t = eval("make_timestamp", &[i(2024), i(12), i(31), i(0), i(0), i(0)]);
-        assert_eq!(eval("extract_month", &[t.clone()]), i(12));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&t)), i(12));
         assert_eq!(eval("extract_day", &[t]), i(31));
     }
     #[test]
@@ -2263,7 +2263,7 @@ mod additional_boundary_tests {
         for m in 1..=12 {
             let t = eval("make_timestamp", &[i(2024), i(m), i(15), i(0), i(0), i(0)]);
             let r = eval("first_of_month", &[t]);
-            assert_eq!(eval("extract_day", &[r.clone()]), i(1));
+            assert_eq!(eval("extract_day", std::slice::from_ref(&r)), i(1));
             assert_eq!(eval("extract_month", &[r]), i(m));
         }
     }
@@ -2380,7 +2380,7 @@ mod additional_timezone_tests {
     fn cet() {
         let r = eval("to_timezone", &[ts(TS_2024_01_01), s("CET")]);
         match r {
-            Value::Timestamp(ns) => assert_eq!(ns, TS_2024_01_01 + 1 * NANOS_PER_HOUR),
+            Value::Timestamp(ns) => assert_eq!(ns, TS_2024_01_01 + NANOS_PER_HOUR),
             _ => panic!(),
         }
     }
@@ -2579,21 +2579,21 @@ mod additional_start_of_quarter_tests {
     fn q1_start() {
         let t = eval("make_timestamp", &[i(2024), i(2), i(15), i(0), i(0), i(0)]);
         let r = eval("start_of_quarter", &[t]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(1));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(1));
         assert_eq!(eval("extract_day", &[r]), i(1));
     }
     #[test]
     fn q3_start() {
         let t = eval("make_timestamp", &[i(2024), i(8), i(15), i(0), i(0), i(0)]);
         let r = eval("start_of_quarter", &[t]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(7));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(7));
         assert_eq!(eval("extract_day", &[r]), i(1));
     }
     #[test]
     fn q4_start() {
         let t = eval("make_timestamp", &[i(2024), i(11), i(15), i(0), i(0), i(0)]);
         let r = eval("start_of_quarter", &[t]);
-        assert_eq!(eval("extract_month", &[r.clone()]), i(10));
+        assert_eq!(eval("extract_month", std::slice::from_ref(&r)), i(10));
         assert_eq!(eval("extract_day", &[r]), i(1));
     }
 }
@@ -2656,7 +2656,7 @@ mod additional_extract_deep_tests {
             let t = ts(TS_2024_01_01 + d * NANOS_PER_DAY);
             let dow = eval("extract_day_of_week", &[t]);
             match dow {
-                Value::I64(v) => assert!(v >= 0 && v <= 6),
+                Value::I64(v) => assert!((0..=6).contains(&v)),
                 _ => panic!(),
             }
         }

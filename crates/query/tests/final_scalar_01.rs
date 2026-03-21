@@ -18,6 +18,7 @@ fn null() -> Value {
 fn ev(name: &str, args: &[Value]) -> Value {
     evaluate_scalar(name, args).unwrap()
 }
+#[allow(dead_code)]
 fn ev_or(name: &str, args: &[Value]) -> Value {
     evaluate_scalar(name, args).unwrap_or(Value::Null)
 }
@@ -663,7 +664,7 @@ mod round_f01 {
     }
     #[test]
     fn r09() {
-        close(&ev("round", &[f(3.14)]), 3.0, 0.01);
+        close(&ev("round", &[f(3.15)]), 3.0, 0.01);
     }
     #[test]
     fn r10() {
@@ -794,7 +795,7 @@ mod floor_f01 {
     }
     #[test]
     fn f10() {
-        close(&ev("floor", &[f(3.14)]), 3.0, 0.01);
+        close(&ev("floor", &[f(3.15)]), 3.0, 0.01);
     }
     #[test]
     fn f11() {
@@ -921,7 +922,7 @@ mod ceil_f01 {
     }
     #[test]
     fn c10() {
-        close(&ev("ceil", &[f(3.14)]), 4.0, 0.01);
+        close(&ev("ceil", &[f(3.15)]), 4.0, 0.01);
     }
     #[test]
     fn c11() {
@@ -1107,11 +1108,11 @@ mod sign_f01 {
     }
     #[test]
     fn s03() {
-        close(&ev("sign", &[f(3.14)]), 1.0, 0.01);
+        close(&ev("sign", &[f(3.15)]), 1.0, 0.01);
     }
     #[test]
     fn s04() {
-        close(&ev("sign", &[f(-3.14)]), -1.0, 0.01);
+        close(&ev("sign", &[f(-3.15)]), -1.0, 0.01);
     }
     #[test]
     fn s05() {
@@ -2463,7 +2464,7 @@ mod math_extra_f01 {
     }
     #[test]
     fn exp01() {
-        close(&ev("exp", &[f(1.0)]), 2.718, 0.01);
+        close(&ev("exp", &[f(1.0)]), std::f64::consts::E, 0.01);
     }
     #[test]
     fn exp02() {
@@ -2534,7 +2535,7 @@ mod conditional_f01 {
     }
     #[test]
     fn coal07() {
-        assert_eq!(ev("coalesce", &[null(), f(3.14)]), f(3.14));
+        assert_eq!(ev("coalesce", &[null(), f(3.15)]), f(3.15));
     }
     #[test]
     fn coal08() {

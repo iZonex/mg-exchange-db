@@ -669,7 +669,7 @@ mod tests {
                     barrier.wait();
                     for _ in 0..reads_per_thread {
                         let snap = mgr.begin_snapshot();
-                        let version = snap.version();
+                        let _version = snap.version();
 
                         // For each writer's partition, the visible count should be
                         // consistent: if we see N rows, all rows 0..N should be visible

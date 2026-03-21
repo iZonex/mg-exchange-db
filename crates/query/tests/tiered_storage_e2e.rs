@@ -219,7 +219,7 @@ fn tiered_filter_timestamp_range() {
     let (_dir, db_root) = setup_tiered_table();
 
     // Day 2 starts at 2024-03-16 00:00:00 UTC = 1710547200 * 1e9
-    let day2_start_nanos: i64 = 1710547200_000_000_000;
+    let day2_start_nanos: i64 = 1_710_547_200_000_000_000;
     let sql = format!("SELECT * FROM trades WHERE timestamp >= {day2_start_nanos}");
     let count = query_count(&db_root, &sql);
     assert_eq!(
@@ -277,8 +277,8 @@ fn tiered_only_warm_partition() {
     let (_dir, db_root) = setup_tiered_table();
 
     // Select only from the warm partition (day 1 = 2024-03-15).
-    let day1_start: i64 = 1710460800_000_000_000;
-    let day1_end: i64 = day1_start + 86400_000_000_000;
+    let day1_start: i64 = 1_710_460_800_000_000_000;
+    let day1_end: i64 = day1_start + 86_400_000_000_000;
     let sql =
         format!("SELECT * FROM trades WHERE timestamp >= {day1_start} AND timestamp < {day1_end}");
     let count = query_count(&db_root, &sql);
@@ -293,8 +293,8 @@ fn tiered_only_cold_partition() {
     let (_dir, db_root) = setup_tiered_table();
 
     // Select only from the cold partition (day 2 = 2024-03-16).
-    let day2_start: i64 = 1710547200_000_000_000;
-    let day2_end: i64 = day2_start + 86400_000_000_000;
+    let day2_start: i64 = 1_710_547_200_000_000_000;
+    let day2_end: i64 = day2_start + 86_400_000_000_000;
     let sql =
         format!("SELECT * FROM trades WHERE timestamp >= {day2_start} AND timestamp < {day2_end}");
     let count = query_count(&db_root, &sql);
@@ -309,8 +309,8 @@ fn tiered_only_hot_partition() {
     let (_dir, db_root) = setup_tiered_table();
 
     // Select only from the hot partition (day 3 = 2024-03-17).
-    let day3_start: i64 = 1710633600_000_000_000;
-    let day3_end: i64 = day3_start + 86400_000_000_000;
+    let day3_start: i64 = 1_710_633_600_000_000_000;
+    let day3_end: i64 = day3_start + 86_400_000_000_000;
     let sql =
         format!("SELECT * FROM trades WHERE timestamp >= {day3_start} AND timestamp < {day3_end}");
     let count = query_count(&db_root, &sql);

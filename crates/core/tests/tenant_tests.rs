@@ -4,7 +4,6 @@
 //! storage isolation, and metering (record, persist, load).
 
 use std::fs;
-use std::path::PathBuf;
 
 use exchange_core::metering::{CounterSnapshot, UsageMeter};
 use exchange_core::tenant::{Tenant, TenantManager};

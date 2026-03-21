@@ -431,7 +431,7 @@ mod tests {
     fn test_value_to_json_variants() {
         assert_eq!(value_to_json(&Value::Null), serde_json::Value::Null);
         assert_eq!(value_to_json(&Value::I64(42)), serde_json::json!(42));
-        assert_eq!(value_to_json(&Value::F64(3.14)), serde_json::json!(3.14));
+        assert_eq!(value_to_json(&Value::F64(3.15)), serde_json::json!(3.15));
         assert_eq!(
             value_to_json(&Value::Str("hello".to_string())),
             serde_json::json!("hello")

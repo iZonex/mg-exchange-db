@@ -494,8 +494,8 @@ mod first_tests {
     #[test]
     fn float() {
         let mut a = First::default();
-        feed(&mut a, &[f(3.14), f(2.72)]);
-        assert_eq!(a.result(), f(3.14));
+        feed(&mut a, &[f(3.15), f(2.72)]);
+        assert_eq!(a.result(), f(3.15));
     }
 }
 
@@ -550,7 +550,7 @@ mod last_tests {
     #[test]
     fn float() {
         let mut a = Last::default();
-        feed(&mut a, &[f(3.14), f(2.72)]);
+        feed(&mut a, &[f(3.15), f(2.72)]);
         assert_eq!(a.result(), f(2.72));
     }
 }
@@ -2405,7 +2405,7 @@ mod bool_extended_tests {
     #[test]
     fn and_float_nonzero() {
         let mut a = BoolAnd::default();
-        a.add(&f(3.14));
+        a.add(&f(3.15));
         assert_eq!(a.result(), i(1));
     }
     #[test]
@@ -2436,7 +2436,7 @@ mod bool_extended_tests {
     #[test]
     fn or_float_nonzero() {
         let mut a = BoolOr::default();
-        a.add(&f(3.14));
+        a.add(&f(3.15));
         assert_eq!(a.result(), i(1));
     }
     #[test]
@@ -2570,7 +2570,7 @@ mod rsi_extended_tests {
         feed(&mut a, &[f(44.0), f(44.34), f(44.09), f(43.61)]);
         let r = a.result();
         match r {
-            Value::F64(v) => assert!(v >= 0.0 && v <= 100.0),
+            Value::F64(v) => assert!((0.0..=100.0).contains(&v)),
             _ => panic!(),
         }
     }
@@ -2588,7 +2588,7 @@ mod rsi_extended_tests {
         feed(&mut a, &[f(10.0), f(20.0), f(15.0)]);
         let r = a.result();
         match r {
-            Value::F64(v) => assert!(v >= 0.0 && v <= 100.0),
+            Value::F64(v) => assert!((0.0..=100.0).contains(&v)),
             _ => panic!(),
         }
     }
@@ -2606,8 +2606,8 @@ mod array_agg_extended_tests {
     #[test]
     fn mixed() {
         let mut a = ArrayAgg::default();
-        feed(&mut a, &[i(1), s("hello"), f(3.14)]);
-        assert_eq!(a.result(), s("[1,hello,3.14]"));
+        feed(&mut a, &[i(1), s("hello"), f(3.15)]);
+        assert_eq!(a.result(), s("[1,hello,3.15]"));
     }
     #[test]
     fn single_int() {
@@ -2735,7 +2735,7 @@ mod mode_extended_tests {
         feed(&mut a, &[i(1), i(2), i(3)]);
         let r = a.result();
         match r {
-            Value::I64(v) => assert!(v >= 1 && v <= 3),
+            Value::I64(v) => assert!((1..=3).contains(&v)),
             _ => panic!(),
         }
     }
@@ -2915,9 +2915,9 @@ mod median_more_tests {
     fn all_same_float() {
         let mut a = Median::default();
         for _ in 0..10 {
-            a.add(&f(3.14));
+            a.add(&f(3.15));
         }
-        assert_f64_close(&a.result(), 3.14, 0.001);
+        assert_f64_close(&a.result(), 3.15, 0.001);
     }
     #[test]
     fn reverse_order() {
@@ -2989,7 +2989,7 @@ mod percentile_more_tests {
         }
         let r = a.result();
         match r {
-            Value::F64(v) => assert!(v >= 1.0 && v <= 20.0),
+            Value::F64(v) => assert!((1.0..=20.0).contains(&v)),
             _ => panic!(),
         }
     }
@@ -3001,7 +3001,7 @@ mod percentile_more_tests {
         }
         let r = a.result();
         match r {
-            Value::F64(v) => assert!(v >= 80.0 && v <= 100.0),
+            Value::F64(v) => assert!((80.0..=100.0).contains(&v)),
             _ => panic!(),
         }
     }

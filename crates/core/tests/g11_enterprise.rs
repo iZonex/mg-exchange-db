@@ -1540,6 +1540,7 @@ mod cluster_extra {
                         NodeRole::ReadReplica,
                     ));
                 }
+                #[allow(clippy::reversed_empty_ranges)]
                 for i in 0..$rem {
                     mgr.remove_node(&format!("r{i}"));
                 }

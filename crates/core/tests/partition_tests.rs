@@ -171,7 +171,7 @@ mod partition_manager {
     #[test]
     fn partition_path_correct() {
         let dir = tempdir().unwrap();
-        let mut mgr = PartitionManager::new(dir.path().to_path_buf(), PartitionBy::Day);
+        let mgr = PartitionManager::new(dir.path().to_path_buf(), PartitionBy::Day);
         let ts = Timestamp::from_secs(1710513000);
         let path = mgr.partition_path(ts);
         assert_eq!(path, dir.path().join("2024-03-15"));
@@ -180,7 +180,7 @@ mod partition_manager {
     #[test]
     fn list_empty_partitions() {
         let dir = tempdir().unwrap();
-        let mut mgr = PartitionManager::new(dir.path().to_path_buf(), PartitionBy::Day);
+        let mgr = PartitionManager::new(dir.path().to_path_buf(), PartitionBy::Day);
         let parts = mgr.list_partitions().unwrap();
         assert!(parts.is_empty());
     }
@@ -190,7 +190,7 @@ mod partition_manager {
         let dir = tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("_internal")).unwrap();
         std::fs::create_dir_all(dir.path().join("2024-01-01")).unwrap();
-        let mut mgr = PartitionManager::new(dir.path().to_path_buf(), PartitionBy::Day);
+        let mgr = PartitionManager::new(dir.path().to_path_buf(), PartitionBy::Day);
         let parts = mgr.list_partitions().unwrap();
         assert_eq!(parts.len(), 1);
     }
@@ -198,7 +198,7 @@ mod partition_manager {
     #[test]
     fn root_and_partition_by_accessors() {
         let dir = tempdir().unwrap();
-        let mut mgr = PartitionManager::new(dir.path().to_path_buf(), PartitionBy::Hour);
+        let mgr = PartitionManager::new(dir.path().to_path_buf(), PartitionBy::Hour);
         assert_eq!(mgr.root(), dir.path());
         assert_eq!(mgr.partition_by(), PartitionBy::Hour);
     }
@@ -506,7 +506,7 @@ mod tiered_storage {
     fn compress_empty_column() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("empty.d");
-        std::fs::write(&path, &[]).unwrap();
+        std::fs::write(&path, []).unwrap();
         compress_column_file(&path).unwrap();
         let size = decompress_column_file(&path).unwrap();
         assert_eq!(size, 0);
@@ -587,7 +587,7 @@ mod partition_extra {
     #[test]
     fn partition_path_none_always_default() {
         let dir = tempdir().unwrap();
-        let mut mgr = PartitionManager::new(dir.path().to_path_buf(), PartitionBy::None);
+        let mgr = PartitionManager::new(dir.path().to_path_buf(), PartitionBy::None);
         let p1 = mgr.partition_path(Timestamp::from_secs(0));
         let p2 = mgr.partition_path(Timestamp::from_secs(1710513000));
         assert_eq!(p1, p2);
@@ -675,7 +675,7 @@ mod partition_extra {
             Timestamp::from_secs(1710513000),
             &[
                 ColumnValue::I32(42),
-                ColumnValue::F64(3.14),
+                ColumnValue::F64(3.15),
                 ColumnValue::Str("hello"),
             ],
         )

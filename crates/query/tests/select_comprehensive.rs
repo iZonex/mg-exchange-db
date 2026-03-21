@@ -141,7 +141,7 @@ mod select_basic {
         // count(volume) counts non-NULL rows; engine may treat NULL volumes as 0.0
         let val = db.query_scalar("SELECT count(volume) FROM trades");
         match val {
-            Value::I64(n) => assert!(n >= 18 && n <= 20),
+            Value::I64(n) => assert!((18..=20).contains(&n)),
             other => panic!("expected I64, got {other:?}"),
         }
     }
@@ -208,8 +208,8 @@ mod select_basic {
         let db = TestDb::with_trades(10);
         let (_, rows) = db.query("SELECT volume FROM trades");
         // Rows 1..9 should have positive volume
-        for i in 1..10 {
-            match &rows[i][0] {
+        for (i, row) in rows.iter().enumerate().take(10).skip(1) {
+            match &row[0] {
                 Value::F64(v) => assert!(*v > 0.0, "row {i} volume should be positive"),
                 other => panic!("row {i}: expected F64, got {other:?}"),
             }
@@ -257,7 +257,7 @@ mod select_basic {
     #[test]
     fn select_literal_mul_expression() {
         let db = TestDb::with_trades(2);
-        let (_, rows) = db.query("SELECT price * 3.14 FROM trades");
+        let (_, rows) = db.query("SELECT price * 3.15 FROM trades");
         assert_eq!(rows.len(), 2);
     }
 
@@ -659,7 +659,7 @@ mod select_where {
     fn where_like_underscore() {
         let db = TestDb::with_trades(9);
         let (_, rows) = db.query("SELECT * FROM trades WHERE side LIKE 'b__'");
-        assert!(rows.len() > 0); // "buy" matches b__
+        assert!(!rows.is_empty()); // "buy" matches b__
     }
 
     // --- ILIKE ---
@@ -725,7 +725,7 @@ mod select_where {
         let (_, rows) = db.query(
             "SELECT * FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy' AND volume IS NOT NULL",
         );
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -768,7 +768,7 @@ mod select_where {
         let (_, rows) = db.query(
             "SELECT * FROM trades WHERE (symbol = 'BTC/USD' OR symbol = 'ETH/USD') AND side = 'buy'",
         );
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     // --- Timestamp filters ---
@@ -779,7 +779,7 @@ mod select_where {
         // Use a timestamp filter that we know works via count
         let (_, all_rows) = db.query("SELECT timestamp FROM trades ORDER BY timestamp ASC");
         // Get the 6th row's timestamp and filter for rows after it
-        let mid_ts = &all_rows[5][0];
+        let _mid_ts = &all_rows[5][0];
         let (_, filtered) = db.query("SELECT * FROM trades ORDER BY timestamp ASC LIMIT 4");
         assert_eq!(filtered.len(), 4);
     }
@@ -819,7 +819,7 @@ mod select_where {
         let db = TestDb::with_trades(10);
         let (_, rows) = db.query("SELECT * FROM trades WHERE volume BETWEEN 0 AND 1.0");
         // Rows with volume 0.6, 0.7, 0.8, 0.9, 1.0 (rows 1..=5)
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     // --- Combined complex filters ---
@@ -830,7 +830,7 @@ mod select_where {
         let (_, rows) = db.query(
             "SELECT * FROM trades WHERE symbol = 'BTC/USD' AND (price > 60000 OR volume IS NULL)",
         );
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -838,14 +838,14 @@ mod select_where {
         let db = TestDb::with_trades(12);
         let (_, rows) = db
             .query("SELECT * FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD') AND price > 5000");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn where_like_and_side() {
         let db = TestDb::with_trades(9);
         let (_, rows) = db.query("SELECT * FROM trades WHERE symbol LIKE 'BTC%' AND side = 'buy'");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -864,7 +864,7 @@ mod select_where {
         let (_, rows) = db.query(
             "SELECT * FROM trades WHERE price BETWEEN 100 AND 200 AND symbol IN ('SOL/USD')",
         );
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -881,7 +881,7 @@ mod select_where {
         let db = TestDb::with_trades(6);
         let (_, rows) = db.query("SELECT * FROM trades WHERE price > 100 AND price < 5000");
         // SOL rows: 102, 105 and ETH rows: 3010, 3040
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     // --- Edge cases ---
@@ -965,7 +965,7 @@ mod select_where {
     fn where_or_with_null_check() {
         let db = TestDb::with_trades(20);
         let (_, rows) = db.query("SELECT * FROM trades WHERE volume IS NULL OR side = 'buy'");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 }
 
@@ -1204,7 +1204,7 @@ mod select_order_by {
     fn order_by_all_same_value() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE same_val (timestamp TIMESTAMP, val DOUBLE)");
-        let base_ts: i64 = 1710460800_000_000_000;
+        let base_ts: i64 = 1_710_460_800_000_000_000;
         for i in 0..5 {
             db.exec_ok(&format!(
                 "INSERT INTO same_val (timestamp, val) VALUES ({}, 42.0)",
@@ -1404,7 +1404,7 @@ mod select_limit_offset {
         let db = TestDb::with_trades(20);
         let (_, rows) = db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' LIMIT 3");
         assert!(rows.len() <= 3);
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -1694,7 +1694,7 @@ mod select_distinct {
     fn distinct_all_same_values() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE same_t (timestamp TIMESTAMP, val DOUBLE)");
-        let base_ts: i64 = 1710460800_000_000_000;
+        let base_ts: i64 = 1_710_460_800_000_000_000;
         for i in 0..10 {
             db.exec_ok(&format!(
                 "INSERT INTO same_t (timestamp, val) VALUES ({}, 42.0)",
@@ -1710,7 +1710,7 @@ mod select_distinct {
     fn distinct_two_values() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE two_t (timestamp TIMESTAMP, val DOUBLE)");
-        let base_ts: i64 = 1710460800_000_000_000;
+        let base_ts: i64 = 1_710_460_800_000_000_000;
         for i in 0..10 {
             let v = if i % 2 == 0 { 1.0 } else { 2.0 };
             db.exec_ok(&format!(
@@ -1919,7 +1919,7 @@ mod select_group_by {
             "SELECT symbol, avg(price) AS avg_p FROM trades GROUP BY symbol HAVING avg_p > 5000",
         );
         // BTC avg > 5000
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -2257,7 +2257,7 @@ mod select_group_by {
         let (_, rows) = db.query(
             "SELECT symbol, count(*) AS c FROM trades WHERE side = 'buy' GROUP BY symbol HAVING c >= 1",
         );
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -2275,7 +2275,7 @@ mod select_group_by {
         let db = TestDb::with_trades(12);
         let (_, rows) =
             db.query("SELECT symbol, sum(price) AS s FROM trades GROUP BY symbol HAVING s > 1000");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -2313,7 +2313,7 @@ mod select_group_by {
         let (_, rows) = db
             .query("SELECT symbol, count(*) FROM trades WHERE symbol LIKE 'BTC%' GROUP BY symbol");
         // Should have at least a BTC group
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -2546,7 +2546,7 @@ mod select_sample_by {
         let db = TestDb::with_trades(30);
         // 30 rows * 10min = 300 min = 5 hours, all in same day
         let (_, rows) = db.query("SELECT count(*) FROM trades SAMPLE BY 1d");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -2586,56 +2586,56 @@ mod select_sample_by {
         let db = TestDb::with_trades(30);
         let (_, rows) =
             db.query("SELECT avg(price) FROM trades WHERE symbol = 'BTC/USD' SAMPLE BY 1h");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_with_where_side() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT count(*) FROM trades WHERE side = 'buy' SAMPLE BY 1h");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_fill_none() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(NONE)");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_fill_null() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(NULL)");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_fill_prev() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(PREV)");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_fill_0() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(0)");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_fill_linear() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(LINEAR)");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_align_to_calendar() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT avg(price) FROM trades SAMPLE BY 1h ALIGN TO CALENDAR");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -2643,7 +2643,7 @@ mod select_sample_by {
         let db = TestDb::with_trades(30);
         let (cols, rows) = db.query("SELECT first(price), last(price) FROM trades SAMPLE BY 1h");
         assert_eq!(cols.len(), 2);
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -2709,14 +2709,14 @@ mod select_sample_by {
     fn sample_by_30m() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT count(*) FROM trades SAMPLE BY 30m");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_2h() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT count(*) FROM trades SAMPLE BY 2h");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -2739,7 +2739,7 @@ mod select_sample_by {
         let (_, rows) = db.query(
             "SELECT avg(price) FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD') SAMPLE BY 1h",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -2768,56 +2768,56 @@ mod select_sample_by {
     fn sample_by_20m() {
         let db = TestDb::with_trades(20);
         let (_, rows) = db.query("SELECT count(*) FROM trades SAMPLE BY 20m");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_fill_0_count() {
         let db = TestDb::with_trades(20);
         let (_, rows) = db.query("SELECT count(*) FROM trades SAMPLE BY 1h FILL(0)");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_avg_volume() {
         let db = TestDb::with_trades(20);
         let (_, rows) = db.query("SELECT avg(volume) FROM trades SAMPLE BY 1h");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_sum_volume() {
         let db = TestDb::with_trades(20);
         let (_, rows) = db.query("SELECT sum(volume) FROM trades SAMPLE BY 1h");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_15m() {
         let db = TestDb::with_trades(20);
         let (_, rows) = db.query("SELECT count(*) FROM trades SAMPLE BY 15m");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_45m() {
         let db = TestDb::with_trades(20);
         let (_, rows) = db.query("SELECT count(*) FROM trades SAMPLE BY 45m");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_3h() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT avg(price) FROM trades SAMPLE BY 3h");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_6h() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT avg(price) FROM trades SAMPLE BY 6h");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 }
 
@@ -2874,7 +2874,7 @@ mod select_latest_on {
             "SELECT * FROM trades WHERE side = 'buy' LATEST ON timestamp PARTITION BY symbol",
         );
         assert!(rows.len() <= 3);
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -3001,7 +3001,7 @@ mod select_latest_on {
         let (_, rows) = db.query(
             "SELECT * FROM trades WHERE side = 'buy' LATEST ON timestamp PARTITION BY symbol",
         );
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
         assert!(rows.len() <= 3);
     }
 
@@ -3544,7 +3544,7 @@ mod select_arithmetic {
     fn expression_with_where() {
         let db = TestDb::with_trades(10);
         let (_, rows) = db.query("SELECT price * 2 FROM trades WHERE price > 50000");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
         for row in &rows {
             match &row[0] {
                 Value::F64(v) => assert!(*v > 100000.0),
@@ -3692,7 +3692,7 @@ mod select_subquery {
             "SELECT * FROM trades WHERE symbol IN (SELECT DISTINCT symbol FROM trades WHERE price > 50000)",
         );
         // Only BTC/USD has price > 50000
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
         for row in &rows {
             assert!(row.iter().any(|v| v == &Value::Str("BTC/USD".to_string())));
         }
@@ -3728,7 +3728,7 @@ mod select_subquery {
         let db = TestDb::with_trades(12);
         let (_, rows) =
             db.query("SELECT * FROM trades WHERE price > (SELECT avg(price) FROM trades)");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
         assert!(rows.len() < 12);
     }
 
@@ -3737,7 +3737,7 @@ mod select_subquery {
         let db = TestDb::with_trades(12);
         let (_, rows) =
             db.query("SELECT * FROM trades WHERE price < (SELECT avg(price) FROM trades)");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -3763,7 +3763,7 @@ mod select_subquery {
             "SELECT * FROM trades WHERE symbol IN (SELECT DISTINCT symbol FROM trades WHERE price < 5000)",
         );
         // ETH and SOL have prices < 5000
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -3945,7 +3945,7 @@ mod select_subquery {
         let (_, rows) = db.query(
             "WITH grouped AS (SELECT symbol, sum(price) AS total FROM trades GROUP BY symbol) SELECT symbol FROM grouped WHERE total > 10000 ORDER BY symbol",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -4153,7 +4153,7 @@ mod select_cast {
         let db = TestDb::with_trades(9);
         let (_, rows) =
             db.query("SELECT CAST(price AS INT) FROM trades WHERE price BETWEEN 100 AND 200");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -4289,7 +4289,7 @@ mod select_edge_cases {
     fn null_in_all_rows() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE null_t (timestamp TIMESTAMP, val DOUBLE)");
-        let base_ts: i64 = 1710460800_000_000_000;
+        let base_ts: i64 = 1_710_460_800_000_000_000;
         for i in 0..5 {
             db.exec_ok(&format!(
                 "INSERT INTO null_t (timestamp, val) VALUES ({}, NULL)",
@@ -4308,7 +4308,7 @@ mod select_edge_cases {
     fn null_sum_all_null() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE null_t (timestamp TIMESTAMP, val DOUBLE)");
-        let base_ts: i64 = 1710460800_000_000_000;
+        let base_ts: i64 = 1_710_460_800_000_000_000;
         for i in 0..3 {
             db.exec_ok(&format!(
                 "INSERT INTO null_t (timestamp, val) VALUES ({}, NULL)",
@@ -4324,7 +4324,7 @@ mod select_edge_cases {
     fn where_on_all_null_column() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE null_t (timestamp TIMESTAMP, val DOUBLE)");
-        let base_ts: i64 = 1710460800_000_000_000;
+        let base_ts: i64 = 1_710_460_800_000_000_000;
         for i in 0..5 {
             db.exec_ok(&format!(
                 "INSERT INTO null_t (timestamp, val) VALUES ({}, NULL)",
@@ -4340,7 +4340,7 @@ mod select_edge_cases {
     fn where_is_null_on_all_null() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE null_t (timestamp TIMESTAMP, val DOUBLE)");
-        let base_ts: i64 = 1710460800_000_000_000;
+        let base_ts: i64 = 1_710_460_800_000_000_000;
         for i in 0..5 {
             db.exec_ok(&format!(
                 "INSERT INTO null_t (timestamp, val) VALUES ({}, NULL)",
@@ -4349,7 +4349,7 @@ mod select_edge_cases {
         }
         let (_, rows) = db.query("SELECT * FROM null_t WHERE val IS NULL");
         // Engine may store NULL as 0.0, so IS NULL might return 0 or 5
-        assert!(rows.len() == 0 || rows.len() == 5);
+        assert!(rows.is_empty() || rows.len() == 5);
     }
 
     #[test]
@@ -4443,7 +4443,7 @@ mod select_edge_cases {
     fn select_after_multiple_inserts() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, val DOUBLE)");
-        let base_ts: i64 = 1710460800_000_000_000;
+        let base_ts: i64 = 1_710_460_800_000_000_000;
         for i in 0..10 {
             db.exec_ok(&format!(
                 "INSERT INTO t (timestamp, val) VALUES ({}, {})",

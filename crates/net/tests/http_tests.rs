@@ -385,7 +385,7 @@ mod write_endpoint {
     async fn write_all_field_types() {
         let (_dir, state) = test_state();
         let router = app(state);
-        let ilp = r#"typed,tag=t int_val=42i,float_val=3.14,str_val="hello",bool_val=true 1000"#;
+        let ilp = r#"typed,tag=t int_val=42i,float_val=3.15,str_val="hello",bool_val=true 1000"#;
         let (status, body) = post_text(&router, "/api/v1/write", ilp).await;
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(status, StatusCode::OK);
@@ -994,7 +994,6 @@ mod metrics {
 // ---------------------------------------------------------------------------
 
 mod auth_integration {
-    use super::*;
     use exchange_net::auth::{AuthConfig, AuthMethod, AuthResult, try_authenticate};
 
     #[test]

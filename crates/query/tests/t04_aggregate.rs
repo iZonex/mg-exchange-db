@@ -623,8 +623,8 @@ mod avg_t04 {
     #[test]
     fn a15() {
         let mut a = Avg::default();
-        feed(&mut a, &[f(3.14)]);
-        close(&a.result(), 3.14, 0.01);
+        feed(&mut a, &[f(3.15)]);
+        close(&a.result(), 3.15, 0.01);
     }
     #[test]
     fn a16() {
@@ -898,7 +898,7 @@ mod min_t04 {
     #[test]
     fn m08() {
         let mut a = Min::default();
-        feed(&mut a, &[f(3.14), f(2.71), f(1.41)]);
+        feed(&mut a, &[f(3.15), f(2.71), f(1.41)]);
         assert_eq!(a.result(), f(1.41));
     }
     #[test]
@@ -1155,8 +1155,8 @@ mod max_t04 {
     #[test]
     fn x07() {
         let mut a = Max::default();
-        feed(&mut a, &[f(1.41), f(2.71), f(3.14)]);
-        assert_eq!(a.result(), f(3.14));
+        feed(&mut a, &[f(1.41), f(2.71), f(3.15)]);
+        assert_eq!(a.result(), f(3.15));
     }
     #[test]
     fn x08() {
@@ -1643,8 +1643,8 @@ mod first_last_t04 {
     #[test]
     fn first_float() {
         let mut a = First::default();
-        feed(&mut a, &[f(3.14), f(2.71)]);
-        assert_eq!(a.result(), f(3.14));
+        feed(&mut a, &[f(3.15), f(2.71)]);
+        assert_eq!(a.result(), f(3.15));
     }
     #[test]
     fn first_ts() {
@@ -1705,7 +1705,7 @@ mod first_last_t04 {
     #[test]
     fn last_float() {
         let mut a = Last::default();
-        feed(&mut a, &[f(3.14), f(2.71)]);
+        feed(&mut a, &[f(3.15), f(2.71)]);
         assert_eq!(a.result(), f(2.71));
     }
     #[test]

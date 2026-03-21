@@ -63,7 +63,7 @@ fn setup_logic_db() -> (TempDir, PathBuf) {
         "CREATE TABLE data (timestamp TIMESTAMP, label VARCHAR, x DOUBLE, y DOUBLE)",
     );
 
-    let base_ts = 1710460800_000_000_000i64;
+    let base_ts = 1_710_460_800_000_000_000i64;
 
     // Insert test data.
     let rows = vec![
@@ -320,7 +320,7 @@ fn sql_logic_dml_sequence() {
         "CREATE TABLE counters (timestamp TIMESTAMP, name VARCHAR, val DOUBLE)",
     );
 
-    let base_ts = 1710460800_000_000_000i64;
+    let base_ts = 1_710_460_800_000_000_000i64;
 
     // Insert 3 rows.
     for i in 0..3 {

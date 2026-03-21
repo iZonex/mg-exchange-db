@@ -6,7 +6,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use exchange_core::cluster::node::{ClusterNode, NodeLoad, NodeRole, NodeStatus};
+use exchange_core::cluster::node::{ClusterNode, NodeRole, NodeStatus};
 use exchange_core::cluster::router::{MergeStrategy, QueryRouter};
 use exchange_core::cluster::{ClusterConfig, ClusterManager};
 

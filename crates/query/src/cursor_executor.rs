@@ -102,7 +102,6 @@ pub fn execute_with_engine(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::batch::RecordBatch;
     use crate::cursors::filter::FilterCursor;
     use crate::cursors::hash_join::HashJoinCursor;
     use crate::cursors::limit::LimitCursor;
@@ -158,7 +157,7 @@ mod tests {
 
         // Path 2: TopK.
         let source2 = MemoryCursor::from_rows(schema.clone(), &rows);
-        let mut topk = TopKCursor::new(Box::new(source2), 10, order_by);
+        let topk = TopKCursor::new(Box::new(source2), 10, order_by);
         // TopK already returns exactly 10 rows, but we also need limit for offset=0.
         let mut topk_limited = LimitCursor::new(Box::new(topk), 10, 0);
         let result2 = drain_cursor(&mut topk_limited);

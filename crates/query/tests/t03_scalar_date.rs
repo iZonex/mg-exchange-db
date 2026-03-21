@@ -1190,7 +1190,7 @@ mod qtr_week_t03 {
     #[test]
     fn week_jan1() {
         let r = ev("extract_week", &[ts(TS_2024_01_01)]);
-        assert!(matches!(r, Value::I64(v) if v >= 1 && v <= 53));
+        assert!(matches!(r, Value::I64(v) if (1..=53).contains(&v)));
     }
     #[test]
     fn week_null() {
@@ -1199,12 +1199,12 @@ mod qtr_week_t03 {
     #[test]
     fn week_of_year() {
         let r = ev("week_of_year", &[ts(TS_2024_06_15)]);
-        assert!(matches!(r, Value::I64(v) if v >= 1 && v <= 53));
+        assert!(matches!(r, Value::I64(v) if (1..=53).contains(&v)));
     }
     #[test]
     fn dow_epoch() {
         let r = ev("extract_day_of_week", &[ts(0)]);
-        assert!(matches!(r, Value::I64(v) if v >= 0 && v <= 7));
+        assert!(matches!(r, Value::I64(v) if (0..=7).contains(&v)));
     }
     #[test]
     fn dow_null() {
@@ -1295,7 +1295,7 @@ mod qtr_week_t03 {
     #[test]
     fn q04() {
         let r = ev("extract_quarter", &[ts(TS_2024_01_01 + 180 * NPD)]);
-        assert!(matches!(r, Value::I64(v) if v >= 2 && v <= 3));
+        assert!(matches!(r, Value::I64(v) if (2..=3).contains(&v)));
     }
     #[test]
     fn q05() {
@@ -1548,14 +1548,14 @@ mod trunc_t03 {
     #[test]
     fn trunc_day() {
         let r = ev("date_trunc", &[s("day"), ts(TS_2024_03_15_123045)]);
-        assert_eq!(ev("extract_hour", &[r.clone()]), i(0));
-        assert_eq!(ev("extract_minute", &[r.clone()]), i(0));
+        assert_eq!(ev("extract_hour", std::slice::from_ref(&r)), i(0));
+        assert_eq!(ev("extract_minute", std::slice::from_ref(&r)), i(0));
     }
     #[test]
     fn trunc_hour() {
         let r = ev("date_trunc", &[s("hour"), ts(TS_2024_03_15_123045)]);
-        assert_eq!(ev("extract_minute", &[r.clone()]), i(0));
-        assert_eq!(ev("extract_second", &[r.clone()]), i(0));
+        assert_eq!(ev("extract_minute", std::slice::from_ref(&r)), i(0));
+        assert_eq!(ev("extract_second", std::slice::from_ref(&r)), i(0));
     }
     #[test]
     fn trunc_null() {
@@ -1564,13 +1564,13 @@ mod trunc_t03 {
     #[test]
     fn timestamp_floor_alias() {
         let r = ev("timestamp_floor", &[s("day"), ts(TS_2024_03_15_123045)]);
-        assert_eq!(ev("extract_hour", &[r.clone()]), i(0));
+        assert_eq!(ev("extract_hour", std::slice::from_ref(&r)), i(0));
     }
     #[test]
     fn trunc_day_preserves_date() {
         let r = ev("date_trunc", &[s("day"), ts(TS_2024_01_01 + 5 * NPH)]);
-        assert_eq!(ev("extract_day", &[r.clone()]), i(1));
-        assert_eq!(ev("extract_month", &[r.clone()]), i(1));
+        assert_eq!(ev("extract_day", std::slice::from_ref(&r)), i(1));
+        assert_eq!(ev("extract_month", std::slice::from_ref(&r)), i(1));
     }
     #[test]
     fn td01() {
@@ -1601,7 +1601,7 @@ mod trunc_t03 {
     #[test]
     fn td05() {
         let r = ev("date_trunc", &[s("day"), ts(TS_2024_02_29 + 6 * NPH)]);
-        assert_eq!(ev("extract_day", &[r.clone()]), i(29));
+        assert_eq!(ev("extract_day", std::slice::from_ref(&r)), i(29));
         assert_eq!(ev("extract_hour", &[r]), i(0));
     }
     #[test]
@@ -1625,7 +1625,7 @@ mod trunc_t03 {
             "date_trunc",
             &[s("day"), ts(TS_2024_01_01 + 10 * NPD + 5 * NPH)],
         );
-        assert_eq!(ev("extract_day", &[r.clone()]), i(11));
+        assert_eq!(ev("extract_day", std::slice::from_ref(&r)), i(11));
         assert_eq!(ev("extract_hour", &[r]), i(0));
     }
     #[test]
@@ -1634,8 +1634,8 @@ mod trunc_t03 {
             "date_trunc",
             &[s("hour"), ts(TS_2024_01_01 + 3 * NPH + 15 * NPM + 30 * NPS)],
         );
-        assert_eq!(ev("extract_hour", &[r.clone()]), i(3));
-        assert_eq!(ev("extract_minute", &[r.clone()]), i(0));
+        assert_eq!(ev("extract_hour", std::slice::from_ref(&r)), i(3));
+        assert_eq!(ev("extract_minute", std::slice::from_ref(&r)), i(0));
         assert_eq!(ev("extract_second", &[r]), i(0));
     }
     #[test]
@@ -1644,7 +1644,7 @@ mod trunc_t03 {
             "date_trunc",
             &[s("day"), ts(TS_2024_06_15 + 23 * NPH + 59 * NPM)],
         );
-        assert_eq!(ev("extract_day", &[r.clone()]), i(15));
+        assert_eq!(ev("extract_day", std::slice::from_ref(&r)), i(15));
         assert_eq!(ev("extract_hour", &[r]), i(0));
     }
     #[test]
@@ -1653,7 +1653,7 @@ mod trunc_t03 {
             "date_trunc",
             &[s("hour"), ts(TS_2024_06_15 + 12 * NPH + 30 * NPM)],
         );
-        assert_eq!(ev("extract_hour", &[r.clone()]), i(12));
+        assert_eq!(ev("extract_hour", std::slice::from_ref(&r)), i(12));
         assert_eq!(ev("extract_minute", &[r]), i(0));
     }
     #[test]
@@ -1711,13 +1711,13 @@ mod trunc_t03 {
     #[test]
     fn td21() {
         let r = ev("date_trunc", &[s("day"), ts(TS_2024_03_15_123045)]);
-        assert_eq!(ev("extract_day", &[r.clone()]), i(15));
+        assert_eq!(ev("extract_day", std::slice::from_ref(&r)), i(15));
         assert_eq!(ev("extract_month", &[r]), i(3));
     }
     #[test]
     fn td22() {
         let r = ev("date_trunc", &[s("hour"), ts(TS_2024_03_15_123045)]);
-        assert_eq!(ev("extract_hour", &[r.clone()]), i(12));
+        assert_eq!(ev("extract_hour", std::slice::from_ref(&r)), i(12));
     }
     #[test]
     fn td23() {
@@ -1978,7 +1978,7 @@ mod boundaries_t03 {
     #[test]
     fn soy() {
         let r = ev("start_of_year", &[ts(TS_2024_06_15)]);
-        assert_eq!(ev("extract_month", &[r.clone()]), i(1));
+        assert_eq!(ev("extract_month", std::slice::from_ref(&r)), i(1));
         assert_eq!(ev("extract_day", &[r]), i(1));
     }
     #[test]
@@ -1988,7 +1988,7 @@ mod boundaries_t03 {
     #[test]
     fn eoy() {
         let r = ev("end_of_year", &[ts(TS_2024_06_15)]);
-        assert_eq!(ev("extract_month", &[r.clone()]), i(12));
+        assert_eq!(ev("extract_month", std::slice::from_ref(&r)), i(12));
         assert_eq!(ev("extract_day", &[r]), i(31));
     }
     #[test]
@@ -1998,7 +1998,7 @@ mod boundaries_t03 {
     #[test]
     fn soq() {
         let r = ev("start_of_quarter", &[ts(TS_2024_06_15)]);
-        assert_eq!(ev("extract_month", &[r.clone()]), i(4));
+        assert_eq!(ev("extract_month", std::slice::from_ref(&r)), i(4));
         assert_eq!(ev("extract_day", &[r]), i(1));
     }
     #[test]
@@ -2047,7 +2047,7 @@ mod boundaries_t03 {
     #[test]
     fn fom_mar() {
         let r = ev("first_of_month", &[ts(TS_2024_03_15_123045)]);
-        assert_eq!(ev("extract_day", &[r.clone()]), i(1));
+        assert_eq!(ev("extract_day", std::slice::from_ref(&r)), i(1));
         assert_eq!(ev("extract_month", &[r]), i(3));
     }
     #[test]
@@ -2058,7 +2058,7 @@ mod boundaries_t03 {
     #[test]
     fn fom_jun() {
         let r = ev("first_of_month", &[ts(TS_2024_06_15)]);
-        assert_eq!(ev("extract_day", &[r.clone()]), i(1));
+        assert_eq!(ev("extract_day", std::slice::from_ref(&r)), i(1));
         assert_eq!(ev("extract_month", &[r]), i(6));
     }
     #[test]
@@ -2069,7 +2069,7 @@ mod boundaries_t03 {
     #[test]
     fn fom_dec() {
         let r = ev("first_of_month", &[ts(TS_2024_12_31)]);
-        assert_eq!(ev("extract_day", &[r.clone()]), i(1));
+        assert_eq!(ev("extract_day", std::slice::from_ref(&r)), i(1));
         assert_eq!(ev("extract_month", &[r]), i(12));
     }
     #[test]
@@ -2125,7 +2125,7 @@ mod boundaries_t03 {
     #[test]
     fn lom_2000() {
         let r = ev("last_of_month", &[ts(TS_2000_01_01 + 40 * NPD)]);
-        assert_eq!(ev("extract_day", &[r.clone()]), i(29));
+        assert_eq!(ev("extract_day", std::slice::from_ref(&r)), i(29));
     } // Feb 2000 (leap)
     #[test]
     fn soy_dec() {
@@ -2135,7 +2135,7 @@ mod boundaries_t03 {
     #[test]
     fn eoy_jan() {
         let r = ev("end_of_year", &[ts(TS_2024_01_01)]);
-        assert_eq!(ev("extract_month", &[r.clone()]), i(12));
+        assert_eq!(ev("extract_month", std::slice::from_ref(&r)), i(12));
         assert_eq!(ev("extract_day", &[r]), i(31));
     }
     #[test]
@@ -2180,7 +2180,7 @@ mod arith_t03 {
     #[test]
     fn add_30d() {
         let r = ev("timestamp_add", &[s("day"), i(30), ts(TS_2024_01_01)]);
-        assert_eq!(ev("extract_month", &[r.clone()]), i(1));
+        assert_eq!(ev("extract_month", std::slice::from_ref(&r)), i(1));
         assert_eq!(ev("extract_day", &[r]), i(31));
     }
     #[test]
@@ -2352,7 +2352,7 @@ mod arith_t03 {
     #[test]
     fn a08() {
         let r = ev("timestamp_add", &[s("day"), i(365), ts(TS_2024_01_01)]);
-        assert_eq!(ev("extract_year", &[r.clone()]), i(2024));
+        assert_eq!(ev("extract_year", std::slice::from_ref(&r)), i(2024));
         assert_eq!(ev("extract_month", &[r]), i(12));
     }
     #[test]
@@ -2547,14 +2547,14 @@ mod make_ts_t03 {
     #[test]
     fn make_basic() {
         let r = ev("make_timestamp", &[i(2024), i(1), i(1), i(0), i(0), i(0)]);
-        assert_eq!(ev("extract_year", &[r.clone()]), i(2024));
-        assert_eq!(ev("extract_month", &[r.clone()]), i(1));
+        assert_eq!(ev("extract_year", std::slice::from_ref(&r)), i(2024));
+        assert_eq!(ev("extract_month", std::slice::from_ref(&r)), i(1));
         assert_eq!(ev("extract_day", &[r]), i(1));
     }
     #[test]
     fn make_feb29() {
         let r = ev("make_timestamp", &[i(2024), i(2), i(29), i(0), i(0), i(0)]);
-        assert_eq!(ev("extract_month", &[r.clone()]), i(2));
+        assert_eq!(ev("extract_month", std::slice::from_ref(&r)), i(2));
         assert_eq!(ev("extract_day", &[r]), i(29));
     }
     #[test]
@@ -2570,8 +2570,8 @@ mod make_ts_t03 {
             "make_timestamp",
             &[i(2024), i(6), i(15), i(12), i(30), i(45)],
         );
-        assert_eq!(ev("extract_hour", &[r.clone()]), i(12));
-        assert_eq!(ev("extract_minute", &[r.clone()]), i(30));
+        assert_eq!(ev("extract_hour", std::slice::from_ref(&r)), i(12));
+        assert_eq!(ev("extract_minute", std::slice::from_ref(&r)), i(30));
         assert_eq!(ev("extract_second", &[r]), i(45));
     }
     #[test]
@@ -2585,9 +2585,9 @@ mod make_ts_t03 {
             "make_timestamp",
             &[i(2024), i(12), i(31), i(23), i(59), i(59)],
         );
-        assert_eq!(ev("extract_month", &[r.clone()]), i(12));
-        assert_eq!(ev("extract_day", &[r.clone()]), i(31));
-        assert_eq!(ev("extract_hour", &[r.clone()]), i(23));
+        assert_eq!(ev("extract_month", std::slice::from_ref(&r)), i(12));
+        assert_eq!(ev("extract_day", std::slice::from_ref(&r)), i(31));
+        assert_eq!(ev("extract_hour", std::slice::from_ref(&r)), i(23));
     }
     #[test]
     fn make_2000() {
@@ -2600,9 +2600,9 @@ mod make_ts_t03 {
             "make_timestamp",
             &[i(2024), i(3), i(15), i(12), i(30), i(45)],
         );
-        assert_eq!(ev("extract_year", &[r.clone()]), i(2024));
-        assert_eq!(ev("extract_month", &[r.clone()]), i(3));
-        assert_eq!(ev("extract_day", &[r.clone()]), i(15));
+        assert_eq!(ev("extract_year", std::slice::from_ref(&r)), i(2024));
+        assert_eq!(ev("extract_month", std::slice::from_ref(&r)), i(3));
+        assert_eq!(ev("extract_day", std::slice::from_ref(&r)), i(15));
         assert_eq!(ev("extract_hour", &[r]), i(12));
     }
     #[test]
@@ -2643,8 +2643,8 @@ mod make_ts_t03 {
     #[test]
     fn make_midnight() {
         let r = ev("make_timestamp", &[i(2024), i(1), i(1), i(0), i(0), i(0)]);
-        assert_eq!(ev("extract_hour", &[r.clone()]), i(0));
-        assert_eq!(ev("extract_minute", &[r.clone()]), i(0));
+        assert_eq!(ev("extract_hour", std::slice::from_ref(&r)), i(0));
+        assert_eq!(ev("extract_minute", std::slice::from_ref(&r)), i(0));
         assert_eq!(ev("extract_second", &[r]), i(0));
     }
     #[test]
@@ -2671,8 +2671,8 @@ mod make_ts_t03 {
             "make_timestamp",
             &[i(2024), i(1), i(1), i(23), i(59), i(59)],
         );
-        assert_eq!(ev("extract_hour", &[r.clone()]), i(23));
-        assert_eq!(ev("extract_minute", &[r.clone()]), i(59));
+        assert_eq!(ev("extract_hour", std::slice::from_ref(&r)), i(23));
+        assert_eq!(ev("extract_minute", std::slice::from_ref(&r)), i(59));
         assert_eq!(ev("extract_second", &[r]), i(59));
     }
 }

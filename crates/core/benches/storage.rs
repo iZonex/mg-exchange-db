@@ -1,6 +1,4 @@
-use criterion::{
-    BenchmarkGroup, Criterion, Throughput, black_box, criterion_group, criterion_main,
-};
+use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
 use exchange_common::ringbuf::SpscRingBuffer;
 use exchange_common::types::ColumnType;
 use exchange_core::column::{FixedColumnReader, FixedColumnWriter, VarColumnWriter};

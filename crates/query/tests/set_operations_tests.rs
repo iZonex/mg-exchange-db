@@ -5,7 +5,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -187,7 +187,7 @@ mod union_distinct {
         db.exec_ok(&format!("INSERT INTO b VALUES ({}, NULL)", ts(0)));
         let (_, rows) = db.query("SELECT v FROM a UNION SELECT v FROM b");
         // Both NULLs might be deduped or not depending on implementation
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]

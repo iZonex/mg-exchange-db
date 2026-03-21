@@ -1147,7 +1147,6 @@ mod tenant_f06 {
 // ===========================================================================
 mod metering_f06 {
     use super::*;
-    use std::path::PathBuf;
     fn meter() -> (TempDir, UsageMeter) {
         let dir = TempDir::new().unwrap();
         let m = UsageMeter::new(dir.path().to_path_buf());

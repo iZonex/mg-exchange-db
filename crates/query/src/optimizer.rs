@@ -1074,9 +1074,9 @@ mod tests {
         let meta = writer.meta().clone();
 
         // 2024-01-01 through 2024-01-30, 10 rows per day.
-        let base = 1704067200_000_000_000i64; // 2024-01-01 00:00 UTC
+        let base = 1_704_067_200_000_000_000_i64; // 2024-01-01 00:00 UTC
         for day in 0..30 {
-            let day_base = base + day * 86400_000_000_000;
+            let day_base = base + day * 86_400_000_000_000;
             for i in 0..10 {
                 let ts = Timestamp(day_base + i * 1_000_000_000);
                 writer
@@ -1105,8 +1105,8 @@ mod tests {
         assert_eq!(all_partitions.len(), 30);
 
         // Query for just 2024-01-15.
-        let day15_start = 1704067200_000_000_000i64 + 14 * 86400_000_000_000;
-        let day15_end = day15_start + 86400_000_000_000 - 1;
+        let day15_start = 1_704_067_200_000_000_000_i64 + 14 * 86_400_000_000_000;
+        let day15_end = day15_start + 86_400_000_000_000 - 1;
         let filter = Filter::Between(
             "timestamp".to_string(),
             Value::Timestamp(day15_start),
@@ -1139,8 +1139,8 @@ mod tests {
         let all_partitions = list_partition_dirs(&table_dir).unwrap();
 
         // Query for 2024-01-10 through 2024-01-12.
-        let day10_start = 1704067200_000_000_000i64 + 9 * 86400_000_000_000;
-        let day12_end = 1704067200_000_000_000i64 + 12 * 86400_000_000_000 - 1;
+        let day10_start = 1_704_067_200_000_000_000_i64 + 9 * 86_400_000_000_000;
+        let day12_end = 1_704_067_200_000_000_000_i64 + 12 * 86_400_000_000_000 - 1;
         let filter = Filter::And(vec![
             Filter::Gte("timestamp".to_string(), Value::Timestamp(day10_start)),
             Filter::Lte("timestamp".to_string(), Value::Timestamp(day12_end)),
@@ -1183,7 +1183,7 @@ mod tests {
         let all_partitions = list_partition_dirs(&table_dir).unwrap();
 
         // Query for timestamp > 2024-01-28 00:00 UTC
-        let day28_start = 1704067200_000_000_000i64 + 27 * 86400_000_000_000;
+        let day28_start = 1_704_067_200_000_000_000_i64 + 27 * 86_400_000_000_000;
         let filter = Filter::Gt("timestamp".to_string(), Value::Timestamp(day28_start));
 
         let pruned = prune_partitions(
@@ -1246,7 +1246,7 @@ mod tests {
         let mut writer = TableWriter::open(tmp.path(), table_name).expect("open writer");
 
         // Write 1000 rows, 100 distinct symbols.
-        let base = 1704067200_000_000_000i64;
+        let base = 1_704_067_200_000_000_000_i64;
         for i in 0..1000 {
             let ts = Timestamp(base + i * 1_000_000_000);
             let symbol_id = (i % 100) as i32;
@@ -1436,8 +1436,8 @@ mod tests {
         use crate::plan::SelectColumn;
 
         // Query: SELECT * FROM trades_opt WHERE timestamp BETWEEN day15_start AND day15_end LIMIT 5
-        let day15_start = 1704067200_000_000_000i64 + 14 * 86400_000_000_000;
-        let day15_end = day15_start + 86400_000_000_000 - 1;
+        let day15_start = 1_704_067_200_000_000_000_i64 + 14 * 86_400_000_000_000;
+        let day15_end = day15_start + 86_400_000_000_000 - 1;
 
         let plan = QueryPlan::Select {
             table: "trades_opt".to_string(),

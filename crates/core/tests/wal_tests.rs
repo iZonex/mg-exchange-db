@@ -804,8 +804,8 @@ mod row_codec {
             OwnedColumnValue::I16(1234),
             OwnedColumnValue::I32(-100_000),
             OwnedColumnValue::I64(i64::MAX),
-            OwnedColumnValue::F32(3.14),
-            OwnedColumnValue::F64(2.71828),
+            OwnedColumnValue::F32(std::f32::consts::PI),
+            OwnedColumnValue::F64(std::f64::consts::E),
             OwnedColumnValue::Timestamp(1_710_513_000_000_000_000),
             OwnedColumnValue::Symbol(7),
         ];

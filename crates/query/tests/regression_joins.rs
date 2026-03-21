@@ -6,7 +6,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
 }
@@ -194,14 +194,14 @@ mod inner_join {
         let db = setup_ab();
         let (_, r) =
             db.query("SELECT a.id FROM a INNER JOIN b ON a.id = b.id WHERE b.value > 250.0");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_where_order() {
         let db = setup_ab();
         let (_, r) =
             db.query("SELECT a.id FROM a INNER JOIN b ON a.id = b.id WHERE a.id > 2 ORDER BY a.id");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_where_limit() {
@@ -251,13 +251,13 @@ mod inner_join {
     fn inner_group_by() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, count(*) FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_group_having() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, count(*) FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym HAVING count(*) >= 1 ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_group_order_limit() {
@@ -328,13 +328,13 @@ mod inner_join {
         let (_, r) = db.query(
             "SELECT a.id FROM a INNER JOIN b ON a.id = b.id WHERE a.id > 2 AND b.value < 500.0",
         );
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_distinct() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT DISTINCT o.sym FROM orders o INNER JOIN fills f ON o.oid = f.oid ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_count_star() {
@@ -411,7 +411,7 @@ mod left_join {
         let (_, r) = db.query(
             "SELECT a.id FROM a LEFT JOIN b ON a.id = b.id WHERE b.value > 250.0 ORDER BY a.id",
         );
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn left_where_a_only() {
@@ -481,7 +481,7 @@ mod left_join {
     fn left_group_having() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, count(f.oid) AS fc FROM orders o LEFT JOIN fills f ON o.oid = f.oid GROUP BY o.sym HAVING count(f.oid) >= 1 ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn left_order_limit() {
@@ -990,7 +990,7 @@ mod self_join {
     fn self_group() {
         let db = db_self();
         let (_, r) = db.query("SELECT p.name, count(*) FROM items c INNER JOIN items p ON c.parent_id = p.id GROUP BY p.name ORDER BY p.name");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn self_alias_cols() {
@@ -1008,7 +1008,7 @@ mod self_join {
     fn self_distinct() {
         let db = db_self();
         let (_, r) = db.query("SELECT DISTINCT p.name FROM items c INNER JOIN items p ON c.parent_id = p.id ORDER BY p.name");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn self_join_empty() {
@@ -1037,43 +1037,43 @@ mod join_combos {
     fn inner_sum_group_order() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, sum(f.price) FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_avg_group() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, avg(f.price) FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_min_group() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, min(f.price) FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_max_group() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, max(f.price) FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_count_group_having() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, count(*) AS c FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym HAVING count(*) >= 2 ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_sum_having() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, sum(f.price) AS sp FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym HAVING sum(f.price) > 50000 ORDER BY sp");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_group_order_desc() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, count(*) AS c FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym ORDER BY c DESC");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_group_order_limit() {
@@ -1085,7 +1085,7 @@ mod join_combos {
     fn inner_where_group() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, count(*) FROM orders o INNER JOIN fills f ON o.oid = f.oid WHERE f.price > 50000 GROUP BY o.sym ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_where_group_having_order_limit() {
@@ -1115,7 +1115,7 @@ mod join_combos {
     fn left_group_having() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, count(f.oid) AS fc FROM orders o LEFT JOIN fills f ON o.oid = f.oid GROUP BY o.sym HAVING count(f.oid) > 0 ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn left_group_order_limit() {
@@ -1148,13 +1148,13 @@ mod join_combos {
         let db = setup_orders_fills();
         let (c, r) = db.query("SELECT o.sym, count(*), sum(f.price), avg(f.price), min(f.price), max(f.price) FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym ORDER BY o.sym");
         assert!(c.len() >= 6);
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_distinct_after_join() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT DISTINCT o.sym FROM orders o INNER JOIN fills f ON o.oid = f.oid ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn cross_group() {
@@ -1219,7 +1219,7 @@ mod join_combos {
     fn inner_group_having_order() {
         let db = setup_ab();
         let (_, r) = db.query("SELECT a.name, sum(b.value) AS sv FROM a INNER JOIN b ON a.id = b.id GROUP BY a.name HAVING sum(b.value) > 250 ORDER BY sv");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_min_no_group() {
@@ -1258,13 +1258,13 @@ mod join_combos {
     fn inner_with_case_group() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT CASE WHEN o.sym = 'BTC' THEN 'bitcoin' ELSE 'altcoin' END AS coin, count(*) FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY coin ORDER BY coin");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn inner_having_avg() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, avg(f.price) AS ap FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym HAVING avg(f.price) > 0 ORDER BY ap");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
 }
 
@@ -1290,7 +1290,7 @@ mod join_on_conditions {
     fn on_with_where() {
         let db = setup_ab();
         let (_, r) = db.query("SELECT a.id FROM a INNER JOIN b ON a.id = b.id WHERE a.id > 2");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn on_different_col_names() {
@@ -1340,7 +1340,7 @@ mod join_on_conditions {
     fn inner_on_with_group_having() {
         let db = setup_orders_fills();
         let (_, r) = db.query("SELECT o.sym, count(*) AS c FROM orders o INNER JOIN fills f ON o.oid = f.oid GROUP BY o.sym HAVING count(*) > 0 ORDER BY o.sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn on_int_matches_all() {

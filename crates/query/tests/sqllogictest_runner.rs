@@ -44,6 +44,7 @@ struct SltResult {
 
 /// Sort mode for query results.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 enum SortMode {
     NoSort,
     RowSort,

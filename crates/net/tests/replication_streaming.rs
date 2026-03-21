@@ -48,10 +48,10 @@ fn count_rows(db_root: &Path, table: &str, column: &str, col_type: ColumnType) -
         for entry in entries.flatten() {
             if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
                 let col_path = entry.path().join(format!("{column}.d"));
-                if col_path.exists() {
-                    if let Ok(reader) = FixedColumnReader::open(&col_path, col_type) {
-                        total += reader.row_count();
-                    }
+                if col_path.exists()
+                    && let Ok(reader) = FixedColumnReader::open(&col_path, col_type)
+                {
+                    total += reader.row_count();
                 }
             }
         }

@@ -803,7 +803,7 @@ mod math_functions {
     }
     #[test]
     fn abs_float() {
-        assert_eq!(eval("abs", &[f(-3.14)]), f(3.14));
+        assert_eq!(eval("abs", &[f(-3.15)]), f(3.15));
     }
     #[test]
     fn abs_null() {
@@ -1101,7 +1101,7 @@ mod math_functions {
         let result = eval("random", &[]);
         match result {
             Value::F64(v) => {
-                assert!(v >= 0.0 && v < 1.0, "random() = {v}, expected [0, 1)");
+                assert!((0.0..1.0).contains(&v), "random() = {v}, expected [0, 1)");
             }
             _ => panic!("expected F64"),
         }
@@ -1463,13 +1463,13 @@ mod date_functions {
 
     // Known timestamp: 2024-03-15 12:30:45 UTC
     // = 1710505845 seconds since epoch
-    const KNOWN_TS: i64 = 1710505845_000_000_000;
+    const KNOWN_TS: i64 = 1_710_505_845_000_000_000;
 
     // 2024-01-01 00:00:00 UTC
-    const JAN_1_2024: i64 = 1704067200_000_000_000;
+    const JAN_1_2024: i64 = 1_704_067_200_000_000_000;
 
     // 2000-02-29 00:00:00 UTC (leap year)
-    const FEB_29_2000: i64 = 951782400_000_000_000;
+    const FEB_29_2000: i64 = 951_782_400_000_000_000;
 
     // --- now ---
     #[test]
@@ -1622,18 +1622,18 @@ mod date_functions {
     #[test]
     fn date_diff_days() {
         let ts1 = JAN_1_2024;
-        let ts2 = JAN_1_2024 + 3 * 86400_000_000_000i64; // 3 days later
+        let ts2 = JAN_1_2024 + 3 * 86_400_000_000_000i64; // 3 days later
         assert_eq!(eval("date_diff", &[s("days"), ts(ts1), ts(ts2)]), i(3));
     }
     #[test]
     fn date_diff_hours() {
         let ts1 = JAN_1_2024;
-        let ts2 = JAN_1_2024 + 5 * 3600_000_000_000i64; // 5 hours later
+        let ts2 = JAN_1_2024 + 5 * 3_600_000_000_000i64; // 5 hours later
         assert_eq!(eval("date_diff", &[s("hours"), ts(ts1), ts(ts2)]), i(5));
     }
     #[test]
     fn date_diff_negative() {
-        let ts1 = JAN_1_2024 + 86400_000_000_000i64;
+        let ts1 = JAN_1_2024 + 86_400_000_000_000i64;
         let ts2 = JAN_1_2024;
         assert_eq!(eval("date_diff", &[s("days"), ts(ts1), ts(ts2)]), i(-1));
     }
@@ -1719,13 +1719,13 @@ mod date_functions {
     #[test]
     fn is_weekend_saturday() {
         // 2024-03-16 is Saturday
-        let sat = 1710547200_000_000_000i64;
+        let sat = 1_710_547_200_000_000_000i64;
         assert_eq!(eval("is_weekend", &[ts(sat)]), i(1));
     }
     #[test]
     fn is_weekend_weekday() {
         // 2024-03-15 is Friday
-        let fri = 1710460800_000_000_000i64;
+        let fri = 1_710_460_800_000_000_000i64;
         assert_eq!(eval("is_weekend", &[ts(fri)]), i(0));
     }
     #[test]
@@ -1736,12 +1736,12 @@ mod date_functions {
     // --- is_business_day ---
     #[test]
     fn is_business_day_weekday() {
-        let fri = 1710460800_000_000_000i64;
+        let fri = 1_710_460_800_000_000_000i64;
         assert_eq!(eval("is_business_day", &[ts(fri)]), i(1));
     }
     #[test]
     fn is_business_day_weekend() {
-        let sat = 1710547200_000_000_000i64;
+        let sat = 1_710_547_200_000_000_000i64;
         assert_eq!(eval("is_business_day", &[ts(sat)]), i(0));
     }
     #[test]
@@ -1804,7 +1804,7 @@ mod date_functions {
     #[test]
     fn days_in_month_april() {
         // April 2024 => 30 days. April 1, 2024: 1711929600 sec
-        let apr_1 = 1711929600_000_000_000i64;
+        let apr_1 = 1_711_929_600_000_000_000i64;
         assert_eq!(eval("days_in_month_fn", &[ts(apr_1)]), i(30));
     }
     #[test]
@@ -1824,7 +1824,7 @@ mod date_functions {
     #[test]
     fn is_leap_year_2023() {
         // 2023-06-15: 1686787200 sec
-        let ts_2023 = 1686787200_000_000_000i64;
+        let ts_2023 = 1_686_787_200_000_000_000i64;
         assert_eq!(eval("is_leap_year_fn", &[ts(ts_2023)]), i(0));
     }
     #[test]
@@ -2243,9 +2243,8 @@ mod aggregate_functions {
         let min_v = db.query_scalar("SELECT min(volume) FROM trades");
         let max_v = db.query_scalar("SELECT max(volume) FROM trades");
         // nulls should be skipped; min < max
-        match (&min_v, &max_v) {
-            (Value::F64(mn), Value::F64(mx)) => assert!(mn < mx),
-            _ => {} // may be I64, just check non-null
+        if let (Value::F64(mn), Value::F64(mx)) = (&min_v, &max_v) {
+            assert!(mn < mx);
         }
         assert_ne!(min_v, Value::Null);
         assert_ne!(max_v, Value::Null);
@@ -2263,11 +2262,8 @@ mod aggregate_functions {
         let db = TestDb::with_trades(20);
         let count_star = db.query_scalar("SELECT count(*) FROM trades");
         let count_vol = db.query_scalar("SELECT count(volume) FROM trades");
-        match (&count_star, &count_vol) {
-            (Value::I64(star), Value::I64(col)) => {
-                assert!(*col <= *star, "count(volume) should be <= count(*)");
-            }
-            _ => {}
+        if let (Value::I64(star), Value::I64(col)) = (&count_star, &count_vol) {
+            assert!(*col <= *star, "count(volume) should be <= count(*)");
         }
     }
 
@@ -2472,11 +2468,11 @@ mod cast_functions {
     }
     #[test]
     fn cast_float_from_float() {
-        assert_eq!(eval("cast_float", &[f(3.14)]), f(3.14));
+        assert_eq!(eval("cast_float", &[f(3.15)]), f(3.15));
     }
     #[test]
     fn cast_float_from_string() {
-        assert_eq!(eval("cast_float", &[s("3.14")]), f(3.14));
+        assert_eq!(eval("cast_float", &[s("3.15")]), f(3.15));
     }
     #[test]
     fn cast_float_null() {
@@ -2490,9 +2486,9 @@ mod cast_functions {
     }
     #[test]
     fn cast_str_from_float() {
-        let result = eval("cast_str", &[f(3.14)]);
+        let result = eval("cast_str", &[f(3.15)]);
         match result {
-            Value::Str(r) => assert!(r.starts_with("3.14")),
+            Value::Str(r) => assert!(r.starts_with("3.15")),
             _ => panic!("expected Str"),
         }
     }
@@ -2534,7 +2530,7 @@ mod cast_functions {
     // --- cast_timestamp ---
     #[test]
     fn cast_timestamp_from_int() {
-        let ns = 1710460800_000_000_000i64;
+        let ns = 1_710_460_800_000_000_000i64;
         assert_eq!(eval("cast_timestamp", &[i(ns)]), ts(ns));
     }
     #[test]
@@ -2555,7 +2551,7 @@ mod cast_functions {
     }
     #[test]
     fn typeof_float() {
-        let result = eval("typeof", &[f(3.14)]);
+        let result = eval("typeof", &[f(3.15)]);
         match result {
             Value::Str(r) => assert!(
                 r.to_lowercase().contains("float")
@@ -2599,7 +2595,7 @@ mod cast_functions {
     // --- safe_cast_float ---
     #[test]
     fn safe_cast_float_valid() {
-        assert_eq!(eval("safe_cast_float", &[s("3.14")]), f(3.14));
+        assert_eq!(eval("safe_cast_float", &[s("3.15")]), f(3.15));
     }
     #[test]
     fn safe_cast_float_invalid() {
@@ -2632,11 +2628,8 @@ mod window_functions {
     fn row_number_basic() {
         let db = make_ordered_db();
         let result = db.exec("SELECT val FROM t ORDER BY val");
-        match result {
-            Ok(exchange_query::QueryResult::Rows { rows, .. }) => {
-                assert_eq!(rows.len(), 6);
-            }
-            _ => {} // row_number might not be directly available in SELECT
+        if let Ok(exchange_query::QueryResult::Rows { rows, .. }) = result {
+            assert_eq!(rows.len(), 6);
         }
     }
 
@@ -2720,7 +2713,7 @@ mod utility_functions {
     fn rnd_int_returns_int() {
         let result = eval("rnd_int", &[i(0), i(100)]);
         match result {
-            Value::I64(v) => assert!(v >= 0 && v <= 100, "expected [0,100], got {v}"),
+            Value::I64(v) => assert!((0..=100).contains(&v), "expected [0,100], got {v}"),
             _ => panic!("expected I64"),
         }
     }

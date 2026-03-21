@@ -430,7 +430,7 @@ mod extract_misc_extra {
     fn week_epoch() {
         let r = eval("extract_week", &[ts(EPOCH)]);
         match r {
-            Value::I64(v) => assert!(v >= 1 && v <= 53),
+            Value::I64(v) => assert!((1..=53).contains(&v)),
             _ => panic!(),
         }
     }
@@ -438,7 +438,7 @@ mod extract_misc_extra {
     fn week_2024_jan() {
         let r = eval("extract_week", &[ts(TS_2024_01_01)]);
         match r {
-            Value::I64(v) => assert!(v >= 1 && v <= 53),
+            Value::I64(v) => assert!((1..=53).contains(&v)),
             _ => panic!(),
         }
     }
@@ -450,7 +450,7 @@ mod extract_misc_extra {
     fn week_of_year_alias() {
         let r = eval("week_of_year", &[ts(TS_2024_06_15)]);
         match r {
-            Value::I64(v) => assert!(v >= 1 && v <= 53),
+            Value::I64(v) => assert!((1..=53).contains(&v)),
             _ => panic!(),
         }
     }
@@ -488,7 +488,7 @@ mod extract_misc_extra {
     fn dow_sat() {
         let r = eval("extract_day_of_week", &[ts(TS_2024_06_15)]);
         match r {
-            Value::I64(v) => assert!(v >= 0 && v <= 7),
+            Value::I64(v) => assert!((0..=7).contains(&v)),
             _ => panic!(),
         }
     }
@@ -1181,7 +1181,7 @@ mod age_between_extra {
     fn months_6() {
         let r = eval("months_between", &[ts(TS_2024_06_15), ts(TS_2024_01_01)]);
         match r {
-            Value::I64(v) => assert!(v >= 5 && v <= 6),
+            Value::I64(v) => assert!((5..=6).contains(&v)),
             _ => panic!("{r:?}"),
         }
     }
@@ -1388,7 +1388,7 @@ mod format_extra {
     fn to_char_ts() {
         let r = eval("to_char", &[ts(TS_2024_01_01)]);
         match r {
-            Value::Str(v) => assert!(v.len() > 0),
+            Value::Str(v) => assert!(!v.is_empty()),
             _ => panic!("{r:?}"),
         }
     }
@@ -1518,9 +1518,9 @@ mod cast_to_extra {
     }
     #[test]
     fn cast_to_float_from_str() {
-        let r = eval("cast_to_float", &[s("3.14")]);
+        let r = eval("cast_to_float", &[s("3.15")]);
         match r {
-            Value::F64(v) => assert!((v - 3.14).abs() < 0.001),
+            Value::F64(v) => assert!((v - 3.15).abs() < 0.001),
             _ => panic!(),
         }
     }
@@ -1673,7 +1673,7 @@ mod extra_timestamp_combos {
             &[s("day"), ts(TS_2024_01_01), ts(TS_2024_03_15_123045)],
         );
         match r {
-            Value::I64(v) => assert!(v >= 74 && v <= 75),
+            Value::I64(v) => assert!((74..=75).contains(&v)),
             _ => panic!("{r:?}"),
         }
     }
@@ -1684,7 +1684,7 @@ mod extra_timestamp_combos {
             &[s("day"), ts(TS_2024_01_01), ts(TS_2024_06_15)],
         );
         match r {
-            Value::I64(v) => assert!(v >= 165 && v <= 167),
+            Value::I64(v) => assert!((165..=167).contains(&v)),
             _ => panic!("{r:?}"),
         }
     }
@@ -1695,7 +1695,7 @@ mod extra_timestamp_combos {
             &[s("day"), ts(TS_2024_01_01), ts(TS_2024_12_31_235959)],
         );
         match r {
-            Value::I64(v) => assert!(v >= 365 && v <= 366),
+            Value::I64(v) => assert!((365..=366).contains(&v)),
             _ => panic!("{r:?}"),
         }
     }
@@ -1706,7 +1706,7 @@ mod extra_timestamp_combos {
             &[s("day"), ts(TS_2023_06_15), ts(TS_2024_06_15)],
         );
         match r {
-            Value::I64(v) => assert!(v >= 365 && v <= 367),
+            Value::I64(v) => assert!((365..=367).contains(&v)),
             _ => panic!("{r:?}"),
         }
     }

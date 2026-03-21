@@ -194,7 +194,7 @@ mod length {
     }
     #[test]
     fn l_float_str() {
-        assert_eq!(ev("length", &[s("3.14")]), i(4));
+        assert_eq!(ev("length", &[s("3.15")]), i(4));
     }
     #[test]
     fn l_path() {

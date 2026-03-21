@@ -14,6 +14,8 @@
 use crate::mmap::MmapReadOnly;
 use exchange_common::error::Result;
 use std::path::Path;
+#[cfg(target_os = "linux")]
+use std::path::PathBuf;
 
 // ---------------------------------------------------------------------------
 // Linux io_uring detection
@@ -49,7 +51,6 @@ mod linux_io {
 
     #[cfg(test)]
     mod tests {
-        use super::*;
 
         #[test]
         fn parse_kernel_version_valid() {
@@ -621,7 +622,6 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     mod linux_tests {
-        use super::*;
 
         #[test]
         fn io_uring_available_does_not_panic() {

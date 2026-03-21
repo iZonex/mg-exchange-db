@@ -273,8 +273,8 @@ mod tests {
         assert_eq!(ip[1], 0x01);
         assert_eq!(ip[15], 0x01);
         // Middle should be all zeros
-        for i in 4..15 {
-            assert_eq!(ip[i], 0, "byte {i} should be 0");
+        for (i, &byte) in ip.iter().enumerate().take(15).skip(4) {
+            assert_eq!(byte, 0, "byte {i} should be 0");
         }
     }
 

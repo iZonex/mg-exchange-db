@@ -526,7 +526,7 @@ mod tests {
         let num_rows: usize = 200;
 
         let ts_data: Vec<u8> = (0..num_rows as i64)
-            .flat_map(|i| (1710460800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
+            .flat_map(|i| (1_710_460_800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
             .collect();
         let price_data: Vec<u8> = (0..num_rows)
             .flat_map(|i| (65000.50 + i as f64 * 0.25).to_le_bytes())
@@ -557,7 +557,7 @@ mod tests {
 
         // Verify first row.
         match &rows[0][0] {
-            RowValue::Timestamp(ts) => assert_eq!(*ts, 1710460800_000_000_000i64),
+            RowValue::Timestamp(ts) => assert_eq!(*ts, 1_710_460_800_000_000_000i64),
             other => panic!("expected Timestamp, got {:?}", other),
         }
         match &rows[0][1] {
@@ -576,7 +576,7 @@ mod tests {
         let num_rows: usize = 50;
 
         let ts_data: Vec<u8> = (0..num_rows as i64)
-            .flat_map(|i| (1710460800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
+            .flat_map(|i| (1_710_460_800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
             .collect();
         let price_data: Vec<u8> = (0..num_rows)
             .flat_map(|i| (100.0 + i as f64 * 0.5).to_le_bytes())
@@ -622,7 +622,7 @@ mod tests {
         let num_rows: usize = 3;
 
         let ts_data: Vec<u8> = (0..num_rows as i64)
-            .flat_map(|i| (1710460800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
+            .flat_map(|i| (1_710_460_800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
             .collect();
         fs::write(partition_path.join("timestamp.d"), &ts_data).unwrap();
 
@@ -671,9 +671,9 @@ mod tests {
         fs::create_dir_all(&partition_path).unwrap();
 
         let meta = test_meta_fixed();
-        fs::write(partition_path.join("timestamp.d"), &[]).unwrap();
-        fs::write(partition_path.join("price.d"), &[]).unwrap();
-        fs::write(partition_path.join("volume.d"), &[]).unwrap();
+        fs::write(partition_path.join("timestamp.d"), []).unwrap();
+        fs::write(partition_path.join("price.d"), []).unwrap();
+        fs::write(partition_path.join("volume.d"), []).unwrap();
 
         let parquet_path = dir.path().join("empty.parquet");
         let schema = make_schema(&meta);
@@ -701,7 +701,7 @@ mod tests {
         let num_rows: usize = 10;
 
         let ts_data: Vec<u8> = (0..num_rows as i64)
-            .flat_map(|i| (1710460800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
+            .flat_map(|i| (1_710_460_800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
             .collect();
         let price_data: Vec<u8> = (0..num_rows)
             .flat_map(|i| (100.0 + i as f64).to_le_bytes())

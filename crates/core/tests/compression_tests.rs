@@ -211,15 +211,9 @@ mod rle {
     #[test]
     fn i32_symbol_ids() {
         let mut values = Vec::new();
-        for _ in 0..50 {
-            values.push(0);
-        }
-        for _ in 0..30 {
-            values.push(1);
-        }
-        for _ in 0..20 {
-            values.push(2);
-        }
+        values.extend(std::iter::repeat_n(0, 50));
+        values.extend(std::iter::repeat_n(1, 30));
+        values.extend(std::iter::repeat_n(2, 20));
         let encoded = rle_encode(&values);
         assert_eq!(encoded, vec![(0, 50), (1, 30), (2, 20)]);
         assert_eq!(rle_decode(&encoded), values);
@@ -271,7 +265,7 @@ mod lz4 {
     fn compress_small_data() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("tiny.d");
-        std::fs::write(&path, &[42u8]).unwrap();
+        std::fs::write(&path, [42u8]).unwrap();
         compress_column_file(&path).unwrap();
         let size = decompress_column_file(&path).unwrap();
         assert_eq!(size, 1);
@@ -295,7 +289,7 @@ mod lz4 {
     fn decompress_via_lz4_path() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("col.d");
-        std::fs::write(&path, &[1, 2, 3, 4, 5]).unwrap();
+        std::fs::write(&path, [1, 2, 3, 4, 5]).unwrap();
         compress_column_file(&path).unwrap();
         let lz4_path = dir.path().join("col.d.lz4");
         let size = decompress_column_file(&lz4_path).unwrap();
@@ -334,7 +328,7 @@ mod lz4 {
     fn empty_file() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("empty.d");
-        std::fs::write(&path, &[]).unwrap();
+        std::fs::write(&path, []).unwrap();
         compress_column_file(&path).unwrap();
         let size = decompress_column_file(&path).unwrap();
         assert_eq!(size, 0);
@@ -384,7 +378,7 @@ mod lz4 {
     fn compress_100_bytes() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("hundred.d");
-        std::fs::write(&path, &[42u8; 100]).unwrap();
+        std::fs::write(&path, [42u8; 100]).unwrap();
         compress_column_file(&path).unwrap();
         let size = decompress_column_file(&path).unwrap();
         assert_eq!(size, 100);
@@ -406,7 +400,7 @@ mod lz4 {
     fn compress_all_zeros() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("zeros.d");
-        std::fs::write(&path, &vec![0u8; 10_000]).unwrap();
+        std::fs::write(&path, vec![0u8; 10_000]).unwrap();
         let compressed = compress_column_file(&path).unwrap();
         assert!(compressed < 10_000);
         let size = decompress_column_file(&path).unwrap();
@@ -417,7 +411,7 @@ mod lz4 {
     fn compress_all_ff() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("ff.d");
-        std::fs::write(&path, &vec![0xFFu8; 5000]).unwrap();
+        std::fs::write(&path, vec![0xFFu8; 5000]).unwrap();
         compress_column_file(&path).unwrap();
         let size = decompress_column_file(&path).unwrap();
         assert_eq!(size, 5000);

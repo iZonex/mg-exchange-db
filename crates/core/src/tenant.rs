@@ -198,7 +198,7 @@ mod tests {
         Tenant {
             id: id.to_string(),
             name: format!("Tenant {id}"),
-            namespace: format!("{id}"),
+            namespace: id.to_string(),
             storage_quota: 1_000_000,
             query_quota: 10,
             created_at: 1700000000,

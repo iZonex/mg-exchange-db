@@ -5,6 +5,7 @@ use exchange_exchange::tick::{delta_decode_prices, delta_encode_prices};
 
 const MILLION: u64 = 1_000_000;
 const HUNDRED_K: u64 = 100_000;
+#[allow(dead_code)]
 const SECOND_NS: i64 = 1_000_000_000;
 
 fn ohlcv_aggregation(c: &mut Criterion) {

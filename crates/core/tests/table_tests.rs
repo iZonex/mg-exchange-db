@@ -525,7 +525,7 @@ mod table_write {
             .unwrap();
         let mut w = TableWriter::open(dir.path(), "t").unwrap();
         let ts = Timestamp::from_secs(1710513000);
-        w.write_row(ts, &[ColumnValue::F64(3.14)]).unwrap();
+        w.write_row(ts, &[ColumnValue::F64(3.15)]).unwrap();
         w.flush().unwrap();
     }
 

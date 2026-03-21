@@ -76,7 +76,7 @@ mod length_tests {
     }
     #[test]
     fn float_input() {
-        assert_eq!(eval("length", &[f(3.14)]), i(4));
+        assert_eq!(eval("length", &[f(3.15)]), i(4));
     }
     #[test]
     fn long_string() {
@@ -375,7 +375,7 @@ mod concat_tests {
     }
     #[test]
     fn with_float() {
-        assert_eq!(eval("concat", &[s("pi="), f(3.14)]), s("pi=3.14"));
+        assert_eq!(eval("concat", &[s("pi="), f(3.15)]), s("pi=3.15"));
     }
     #[test]
     fn four_args() {
@@ -2523,9 +2523,9 @@ mod json_tests {
     }
     #[test]
     fn extract_float() {
-        let r = eval("json_extract", &[s(r#"{"val":3.14}"#), s("val")]);
+        let r = eval("json_extract", &[s(r#"{"val":3.15}"#), s("val")]);
         match r {
-            Value::F64(v) => assert!((v - 3.14).abs() < 0.001),
+            Value::F64(v) => assert!((v - 3.15).abs() < 0.001),
             _ => panic!("expected F64"),
         }
     }
@@ -2706,7 +2706,7 @@ mod to_json_tests {
     }
     #[test]
     fn float() {
-        assert_eq!(eval("to_json", &[f(3.14)]), s("3.14"));
+        assert_eq!(eval("to_json", &[f(3.15)]), s("3.15"));
     }
     #[test]
     fn null_input() {
@@ -2881,7 +2881,7 @@ mod type_tests {
     }
     #[test]
     fn typeof_float() {
-        assert_eq!(eval("typeof", &[f(3.14)]), s("f64"));
+        assert_eq!(eval("typeof", &[f(3.15)]), s("f64"));
     }
     #[test]
     fn typeof_string() {
@@ -2956,7 +2956,7 @@ mod cast_tests {
     }
     #[test]
     fn cast_float_from_str() {
-        assert_eq!(eval("cast_float", &[s("3.14")]), f(3.14));
+        assert_eq!(eval("cast_float", &[s("3.15")]), f(3.15));
     }
     #[test]
     fn cast_float_from_int() {
@@ -2972,7 +2972,7 @@ mod cast_tests {
     }
     #[test]
     fn cast_str_from_float() {
-        assert_eq!(eval("cast_str", &[f(3.14)]), s("3.14"));
+        assert_eq!(eval("cast_str", &[f(3.15)]), s("3.15"));
     }
     #[test]
     fn cast_str_null() {
@@ -3004,7 +3004,7 @@ mod cast_tests {
     }
     #[test]
     fn safe_cast_float_ok() {
-        assert_eq!(eval("safe_cast_float", &[s("3.14")]), f(3.14));
+        assert_eq!(eval("safe_cast_float", &[s("3.15")]), f(3.15));
     }
     #[test]
     fn safe_cast_float_bad() {
@@ -3159,7 +3159,7 @@ mod concat_extended_tests {
     }
     #[test]
     fn mixed_types() {
-        assert_eq!(eval("concat", &[s("val="), f(3.14)]), s("val=3.14"));
+        assert_eq!(eval("concat", &[s("val="), f(3.15)]), s("val=3.15"));
     }
     #[test]
     fn null_at_end() {
@@ -3547,6 +3547,7 @@ mod base64_extended_tests {
         assert_eq!(eval("to_base64", &[s("123")]), s("MTIz"));
     }
     #[test]
+    #[allow(non_snake_case)]
     fn decode_MTIz() {
         assert_eq!(eval("from_base64", &[s("MTIz")]), s("123"));
     }

@@ -64,7 +64,7 @@ fn insert_cpu_metrics(dir: &Path, num_hosts: u64, num_rows: u64) {
     for i in 0..num_rows {
         let ts = Timestamp(base_ts + (i as i64) * step_ns);
         let host_id = (i % num_hosts) as i32;
-        let region_id = (host_id % 5) as i32;
+        let region_id = host_id % 5;
 
         // Deterministic pseudo-random metrics in [0, 100].
         let seed = i.wrapping_mul(2654435761);

@@ -571,11 +571,11 @@ mod abs_s {
     }
     #[test]
     fn a12() {
-        assert_eq!(ev("abs", &[f(3.14)]), f(3.14));
+        assert_eq!(ev("abs", &[f(3.15)]), f(3.15));
     }
     #[test]
     fn a13() {
-        assert_eq!(ev("abs", &[f(-3.14)]), f(3.14));
+        assert_eq!(ev("abs", &[f(-3.15)]), f(3.15));
     }
     #[test]
     fn a14() {
@@ -639,11 +639,11 @@ mod abs_s {
     }
     #[test]
     fn a29() {
-        assert_eq!(ev("abs", &[f(2.718)]), f(2.718));
+        assert_eq!(ev("abs", &[f(2.719)]), f(2.719));
     }
     #[test]
     fn a30() {
-        assert_eq!(ev("abs", &[f(-2.718)]), f(2.718));
+        assert_eq!(ev("abs", &[f(-2.719)]), f(2.719));
     }
     #[test]
     fn a31() {
@@ -729,11 +729,11 @@ mod round_s {
     }
     #[test]
     fn r10() {
-        assert_eq!(ev("round", &[f(3.14)]), f(3.0));
+        assert_eq!(ev("round", &[f(3.15)]), f(3.0));
     }
     #[test]
     fn r11() {
-        assert_eq!(ev("round", &[f(2.718)]), f(3.0));
+        assert_eq!(ev("round", &[f(2.719)]), f(3.0));
     }
     #[test]
     fn r12() {
@@ -855,11 +855,11 @@ mod floor_s {
     }
     #[test]
     fn f10() {
-        assert_eq!(ev("floor", &[f(3.14)]), f(3.0));
+        assert_eq!(ev("floor", &[f(3.15)]), f(3.0));
     }
     #[test]
     fn f11() {
-        assert_eq!(ev("floor", &[f(2.718)]), f(2.0));
+        assert_eq!(ev("floor", &[f(2.719)]), f(2.0));
     }
     #[test]
     fn f12() {
@@ -977,11 +977,11 @@ mod ceil_s {
     }
     #[test]
     fn c09() {
-        assert_eq!(ev("ceil", &[f(3.14)]), f(4.0));
+        assert_eq!(ev("ceil", &[f(3.15)]), f(4.0));
     }
     #[test]
     fn c10() {
-        assert_eq!(ev("ceil", &[f(2.718)]), f(3.0));
+        assert_eq!(ev("ceil", &[f(2.719)]), f(3.0));
     }
     #[test]
     fn c11() {
@@ -1172,7 +1172,7 @@ mod sqrt_s {
     fn s26() {
         let v = ev("sqrt", &[f(2.0)]);
         match v {
-            Value::F64(v) => assert!((v - 1.41421356).abs() < 0.001),
+            Value::F64(v) => assert!((v - std::f64::consts::SQRT_2).abs() < 0.001),
             _ => panic!(),
         }
     }
@@ -1251,11 +1251,11 @@ mod sign_s {
     }
     #[test]
     fn g13() {
-        assert_eq!(ev("sign", &[f(3.14)]), i(1));
+        assert_eq!(ev("sign", &[f(3.15)]), i(1));
     }
     #[test]
     fn g14() {
-        assert_eq!(ev("sign", &[f(-3.14)]), i(-1));
+        assert_eq!(ev("sign", &[f(-3.15)]), i(-1));
     }
     #[test]
     fn g15() {
@@ -1977,7 +1977,7 @@ mod conditional_s {
     }
     #[test]
     fn gr04() {
-        assert_eq!(ev("greatest", &[f(3.14), f(2.71)]), f(3.14));
+        assert_eq!(ev("greatest", &[f(3.15), f(2.71)]), f(3.15));
     }
     #[test]
     fn gr05() {
@@ -2017,7 +2017,7 @@ mod conditional_s {
     }
     #[test]
     fn le04() {
-        assert_eq!(ev("least", &[f(3.14), f(2.71)]), f(2.71));
+        assert_eq!(ev("least", &[f(3.15), f(2.71)]), f(2.71));
     }
     #[test]
     fn le05() {
@@ -2415,7 +2415,7 @@ mod trig_s {
     fn si08() {
         let v = ev("sin", &[f(PI / 4.0)]);
         match v {
-            Value::F64(v) => assert!((v - 0.7071).abs() < 0.01),
+            Value::F64(v) => assert!((v - std::f64::consts::FRAC_1_SQRT_2).abs() < 0.01),
             _ => panic!(),
         }
     }
@@ -2483,7 +2483,7 @@ mod trig_s {
     fn co07() {
         let v = ev("cos", &[f(PI / 4.0)]);
         match v {
-            Value::F64(v) => assert!((v - 0.7071).abs() < 0.01),
+            Value::F64(v) => assert!((v - std::f64::consts::FRAC_1_SQRT_2).abs() < 0.01),
             _ => panic!(),
         }
     }
@@ -2759,7 +2759,7 @@ mod cast_s {
     }
     #[test]
     fn cf07() {
-        assert_eq!(ev("cast_float", &[f(3.14)]), f(3.14));
+        assert_eq!(ev("cast_float", &[f(3.15)]), f(3.15));
     }
     #[test]
     fn cf08() {
@@ -2767,7 +2767,7 @@ mod cast_s {
     }
     #[test]
     fn cf09() {
-        assert_eq!(ev("cast_float", &[s("3.14")]), f(3.14));
+        assert_eq!(ev("cast_float", &[s("3.15")]), f(3.15));
     }
     #[test]
     fn cs00() {

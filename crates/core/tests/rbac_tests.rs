@@ -716,7 +716,6 @@ mod audit_operations {
 
     #[test]
     #[ignore]
-    #[ignore]
     fn hash_password_hex_format() {
         let h = hash_password("test");
         assert_eq!(h.len(), 16); // 64-bit xxhash = 16 hex chars
@@ -724,7 +723,6 @@ mod audit_operations {
     }
 
     #[test]
-    #[ignore]
     #[ignore]
     fn hash_password_empty_string() {
         let h = hash_password("");

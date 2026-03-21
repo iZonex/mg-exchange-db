@@ -6,7 +6,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 fn ts(s: i64) -> i64 {
     BASE_TS + s * 1_000_000_000
 }
@@ -966,7 +966,7 @@ mod group_by_agg {
         let (_, r) = db.query(
             "SELECT sym, sum(price) AS s FROM t GROUP BY sym HAVING sum(price) > 1000 ORDER BY sym",
         );
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn group_having_avg() {
@@ -1073,7 +1073,7 @@ mod group_by_agg {
     fn group_where_having() {
         let db = db30();
         let (_, r) = db.query("SELECT sym, sum(price) FROM t WHERE cat = 'A' GROUP BY sym HAVING sum(price) > 100 ORDER BY sym");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn trades_group_avg_having() {
@@ -1446,7 +1446,7 @@ mod distinct_order {
     fn distinct_cat_where() {
         let db = db30();
         let (_, r) = db.query("SELECT DISTINCT cat FROM t WHERE price > 120.0 ORDER BY cat");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn distinct_sym_limit_1() {
@@ -3252,7 +3252,7 @@ mod extra_combos {
         let (_, r) = db.query(
             "SELECT price FROM t WHERE sym LIKE 'B%' AND price BETWEEN 100 AND 115 ORDER BY price",
         );
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn in_case_order() {
@@ -3264,7 +3264,7 @@ mod extra_combos {
     fn group_having_order_limit() {
         let db = db30();
         let (_, r) = db.query("SELECT sym, sum(price) AS s FROM t GROUP BY sym HAVING sum(price) > 1000 ORDER BY s DESC LIMIT 2");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn between_group_having() {
@@ -3357,7 +3357,7 @@ mod extra_combos {
     fn trades_is_null_group() {
         let db = db_trades(30);
         let (_, r) = db.query("SELECT symbol, count(*) FROM trades WHERE volume IS NULL GROUP BY symbol ORDER BY symbol");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn trades_is_not_null_group() {

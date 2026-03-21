@@ -21,6 +21,7 @@ fn null() -> Value {
 fn ev(name: &str, args: &[Value]) -> Value {
     evaluate_scalar(name, args).unwrap()
 }
+#[allow(dead_code)]
 fn ev_or(name: &str, args: &[Value]) -> Value {
     evaluate_scalar(name, args).unwrap_or(Value::Null)
 }
@@ -88,7 +89,7 @@ mod length_t01 {
     }
     #[test]
     fn len_float() {
-        assert_eq!(ev("length", &[f(3.14)]), i(4));
+        assert_eq!(ev("length", &[f(3.15)]), i(4));
     }
     #[test]
     fn len_20() {
@@ -492,10 +493,12 @@ mod lower_t01 {
         );
     }
     #[test]
+    #[allow(non_snake_case)]
     fn single_A() {
         assert_eq!(ev("lower", &[s("A")]), s("a"));
     }
     #[test]
+    #[allow(non_snake_case)]
     fn single_Z() {
         assert_eq!(ev("lower", &[s("Z")]), s("z"));
     }
@@ -1952,7 +1955,7 @@ mod concat_t01 {
     }
     #[test]
     fn float_concat() {
-        assert_eq!(ev("concat", &[s("pi="), f(3.14)]), s("pi=3.14"));
+        assert_eq!(ev("concat", &[s("pi="), f(3.15)]), s("pi=3.15"));
     }
     #[test]
     fn c01() {
@@ -3352,8 +3355,8 @@ mod conditional_t01 {
     }
     #[test]
     fn cast_float_str() {
-        let r = ev("cast_float", &[s("3.14")]);
-        assert!(matches!(r, Value::F64(v) if (v - 3.14).abs() < 0.001));
+        let r = ev("cast_float", &[s("3.15")]);
+        assert!(matches!(r, Value::F64(v) if (v - 3.15).abs() < 0.001));
     }
     #[test]
     fn cast_str_int() {
@@ -3501,7 +3504,7 @@ mod url_json_t01 {
     }
     #[test]
     fn to_json_float() {
-        let r = ev("to_json", &[f(3.14)]);
+        let r = ev("to_json", &[f(3.15)]);
         assert!(matches!(r, Value::Str(_)));
     }
     #[test]
@@ -3511,8 +3514,8 @@ mod url_json_t01 {
     }
     #[test]
     fn json_extract_num() {
-        let r = ev("json_extract", &[s(r#"{"x":3.14}"#), s("x")]);
-        assert!(matches!(r, Value::F64(v) if (v - 3.14).abs() < 0.001));
+        let r = ev("json_extract", &[s(r#"{"x":3.15}"#), s("x")]);
+        assert!(matches!(r, Value::F64(v) if (v - 3.15).abs() < 0.001));
     }
 }
 

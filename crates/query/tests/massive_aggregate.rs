@@ -39,7 +39,7 @@ fn feed<A: AggregateFunction>(agg: &mut A, values: &[Value]) {
 }
 
 fn ints(n: i64) -> Vec<Value> {
-    (0..n).map(|x| i(x)).collect()
+    (0..n).map(i).collect()
 }
 fn floats(n: i64) -> Vec<Value> {
     (0..n).map(|x| f(x as f64)).collect()
@@ -56,10 +56,10 @@ fn constants(n: i64, v: i64) -> Vec<Value> {
     (0..n).map(|_| i(v)).collect()
 }
 fn ascending(n: i64) -> Vec<Value> {
-    (0..n).map(|x| i(x)).collect()
+    (0..n).map(i).collect()
 }
 fn descending(n: i64) -> Vec<Value> {
-    (0..n).rev().map(|x| i(x)).collect()
+    (0..n).rev().map(i).collect()
 }
 
 // ===========================================================================
@@ -81,8 +81,8 @@ mod sum_extra {
     #[test]
     fn one_float() {
         let mut a = Sum::default();
-        a.add(&f(3.14));
-        assert_f64_close(&a.result(), 3.14, 0.001);
+        a.add(&f(3.15));
+        assert_f64_close(&a.result(), 3.15, 0.001);
     }
     #[test]
     fn ten_ints() {
@@ -283,8 +283,8 @@ mod avg_extra {
     #[test]
     fn one_float() {
         let mut a = Avg::default();
-        a.add(&f(3.14));
-        assert_f64_close(&a.result(), 3.14, 0.001);
+        a.add(&f(3.15));
+        assert_f64_close(&a.result(), 3.15, 0.001);
     }
     #[test]
     fn two_floats() {
@@ -616,8 +616,8 @@ mod first_last_extra {
     #[test]
     fn first_float() {
         let mut a = First::default();
-        feed(&mut a, &[f(3.14), f(2.72)]);
-        assert_eq!(a.result(), f(3.14));
+        feed(&mut a, &[f(3.15), f(2.72)]);
+        assert_eq!(a.result(), f(3.15));
     }
     #[test]
     fn first_reset() {
@@ -677,7 +677,7 @@ mod first_last_extra {
     #[test]
     fn last_float() {
         let mut a = Last::default();
-        feed(&mut a, &[f(3.14), f(2.72)]);
+        feed(&mut a, &[f(3.15), f(2.72)]);
         assert_eq!(a.result(), f(2.72));
     }
     #[test]
@@ -1688,7 +1688,7 @@ mod financial_extra2 {
         let mut a = Rsi::default();
         feed(&mut a, &floats(20));
         match a.result() {
-            Value::F64(v) => assert!(v >= 0.0 && v <= 100.0),
+            Value::F64(v) => assert!((0.0..=100.0).contains(&v)),
             _ => panic!(),
         }
     }
@@ -1743,8 +1743,8 @@ mod typed_agg_extra {
     #[test]
     fn sumd_one() {
         let mut a = SumDouble::default();
-        a.add(&f(3.14));
-        assert_f64_close(&a.result(), 3.14, 0.001);
+        a.add(&f(3.15));
+        assert_f64_close(&a.result(), 3.15, 0.001);
     }
     #[test]
     fn sumd_ten() {
@@ -1932,7 +1932,7 @@ mod advanced_agg_extra {
         let mut a = ApproxCountDistinct::default();
         feed(&mut a, &ints(10));
         match a.result() {
-            Value::I64(v) => assert!(v >= 8 && v <= 12),
+            Value::I64(v) => assert!((8..=12).contains(&v)),
             _ => panic!(),
         }
     }
@@ -1941,7 +1941,7 @@ mod advanced_agg_extra {
         let mut a = ApproxCountDistinct::default();
         feed(&mut a, &constants(100, 5));
         match a.result() {
-            Value::I64(v) => assert!(v >= 1 && v <= 3),
+            Value::I64(v) => assert!((1..=3).contains(&v)),
             _ => panic!(),
         }
     }

@@ -242,7 +242,7 @@ fn plan_references_table(plan: &QueryPlan, table_name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plan::{Filter, OrderBy, SelectColumn, Value};
+    use crate::plan::SelectColumn;
 
     fn sample_plan(table: &str) -> QueryPlan {
         QueryPlan::Select {

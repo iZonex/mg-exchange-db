@@ -1048,7 +1048,7 @@ mod tests {
         let partition_dir = table_dir.join("2020-01-01");
         std::fs::create_dir_all(&partition_dir).unwrap();
         let ts_data: Vec<u8> = (0..10i64)
-            .flat_map(|i| (1577836800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
+            .flat_map(|i| (1_577_836_800_000_000_000i64 + i * 1_000_000_000).to_le_bytes())
             .collect();
         std::fs::write(partition_dir.join("timestamp.d"), &ts_data).unwrap();
         let price_data: Vec<u8> = (0..10)

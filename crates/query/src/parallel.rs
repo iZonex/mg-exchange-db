@@ -685,7 +685,7 @@ mod tests {
         let meta = writer.meta().clone();
 
         // Day 1: 2024-01-01 (3 rows)
-        let day1_base = 1704067200_000_000_000i64; // 2024-01-01 00:00:00 UTC
+        let day1_base = 1_704_067_200_000_000_000_i64; // 2024-01-01 00:00:00 UTC
         for i in 0..3 {
             let ts = Timestamp(day1_base + i * 1_000_000_000);
             writer
@@ -697,7 +697,7 @@ mod tests {
         }
 
         // Day 2: 2024-01-02 (2 rows)
-        let day2_base = day1_base + 86400_000_000_000;
+        let day2_base = day1_base + 86_400_000_000_000;
         for i in 0..2 {
             let ts = Timestamp(day2_base + i * 1_000_000_000);
             writer
@@ -709,7 +709,7 @@ mod tests {
         }
 
         // Day 3: 2024-01-03 (4 rows)
-        let day3_base = day1_base + 2 * 86400_000_000_000;
+        let day3_base = day1_base + 2 * 86_400_000_000_000;
         for i in 0..4 {
             let ts = Timestamp(day3_base + i * 1_000_000_000);
             writer

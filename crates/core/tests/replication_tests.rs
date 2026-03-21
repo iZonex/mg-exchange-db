@@ -4,7 +4,6 @@
 //! S3 shipper, auto-failover, and replication manager.
 
 use std::collections::HashMap;
-use std::path::Path;
 use std::time::Duration;
 
 use exchange_core::replication::AutoFailover;

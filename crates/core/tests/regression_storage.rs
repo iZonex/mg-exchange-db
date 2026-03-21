@@ -5,14 +5,13 @@
 
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::column::{
-    ColumnTopReader, FixedColumnReader, FixedColumnWriter, Value, VarColumnReader, VarColumnWriter,
+    FixedColumnReader, FixedColumnWriter, VarColumnReader, VarColumnWriter,
 };
 use exchange_core::compression::{
     compress_column_file, compression_stats, decompress_column_file, delta_decode_i64,
     delta_decode_i64_nonempty, delta_encode_i64, rle_decode, rle_encode,
 };
 use exchange_core::index::bitmap::{BitmapIndexReader, BitmapIndexWriter};
-use exchange_core::index::symbol_column::{SymbolColumnReader, SymbolColumnWriter};
 use exchange_core::index::symbol_map::{SYMBOL_NULL, SymbolMap};
 use exchange_core::partition::partition_dir;
 use exchange_core::wal::event::{EventType, WalEvent};
@@ -234,12 +233,12 @@ mod fixed_f64 {
         let p = d.path().join("c.d");
         {
             let mut w = FixedColumnWriter::open(&p, ColumnType::F64).unwrap();
-            w.append_f64(3.14).unwrap();
+            w.append_f64(3.15).unwrap();
             w.flush().unwrap();
         }
         let r = FixedColumnReader::open(&p, ColumnType::F64).unwrap();
         assert_eq!(r.row_count(), 1);
-        assert!((r.read_f64(0) - 3.14).abs() < 1e-10);
+        assert!((r.read_f64(0) - 3.15).abs() < 1e-10);
     }
     #[test]
     fn write_10() {
@@ -752,15 +751,9 @@ mod rle {
     #[test]
     fn mixed_runs() {
         let mut v = vec![];
-        for _ in 0..5 {
-            v.push(1i64);
-        }
-        for _ in 0..3 {
-            v.push(2);
-        }
-        for _ in 0..7 {
-            v.push(3);
-        }
+        v.extend(std::iter::repeat_n(1i64, 5));
+        v.extend(std::iter::repeat_n(2, 3));
+        v.extend(std::iter::repeat_n(3, 7));
         let e = rle_encode(&v);
         assert_eq!(rle_decode(&e), v);
     }
@@ -1332,7 +1325,7 @@ mod row_codec_tests {
     #[test]
     fn single_f64() {
         let t = [ColumnType::F64];
-        let c = vec![OwnedColumnValue::F64(3.14)];
+        let c = vec![OwnedColumnValue::F64(3.15)];
         assert_eq!(roundtrip(&t, &c), c);
     }
     #[test]

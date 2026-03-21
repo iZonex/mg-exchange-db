@@ -9,7 +9,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -316,7 +316,7 @@ mod avg_tests {
     fn avg_with_having() {
         let db = db_grouped(&[("A", 10.0), ("B", 100.0), ("A", 30.0), ("B", 200.0)]);
         let (_, rows) = db.query("SELECT sym, avg(v) AS a FROM t GROUP BY sym HAVING a > 50");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -509,7 +509,7 @@ mod max_tests {
     fn max_with_having() {
         let db = db_grouped(&[("A", 10.0), ("B", 100.0), ("A", 50.0), ("B", 200.0)]);
         let (_, rows) = db.query("SELECT sym, max(v) AS m FROM t GROUP BY sym HAVING m > 80");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 
     #[test]
@@ -1158,7 +1158,7 @@ mod aggregate_integration {
     fn first_last_price_trades() {
         let db = TestDb::with_trades(5);
         let first = db.query_scalar("SELECT first(price) FROM trades");
-        let last = db.query_scalar("SELECT last(price) FROM trades");
+        let _last = db.query_scalar("SELECT last(price) FROM trades");
         assert_eq!(first, Value::F64(60000.0));
     }
 

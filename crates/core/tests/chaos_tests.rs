@@ -151,8 +151,8 @@ fn crash_mid_partition_write() {
     {
         let config = WalTableWriterConfig::default();
         let mut writer = WalTableWriter::open(db_root, "test", config).unwrap();
-        for i in 0..500 {
-            let ts = Timestamp(TS_BASE + (i as i64) * 1_000_000_000);
+        for i in 0..500_i64 {
+            let ts = Timestamp(TS_BASE + i * 1_000_000_000);
             writer
                 .write_row(
                     ts,

@@ -153,10 +153,10 @@ mod tests {
         assert_eq!(interner.len(), 1000);
 
         // Re-intern the same strings.
-        for i in 0..1000 {
+        for (i, original) in arcs.iter().enumerate() {
             let s = format!("SYM{i:04}");
             let arc = interner.intern(&s);
-            assert!(Arc::ptr_eq(&arc, &arcs[i]));
+            assert!(Arc::ptr_eq(&arc, original));
         }
         // No new entries should have been added.
         assert_eq!(interner.len(), 1000);

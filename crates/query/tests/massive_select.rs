@@ -1942,13 +1942,13 @@ mod having_tests {
     fn having_sum_gt() {
         let db = setup_hv();
         let (_, rows) = db.query("SELECT cat, sum(val) FROM h GROUP BY cat HAVING sum(val) > 50");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_avg_gt() {
         let db = setup_hv();
         let (_, rows) = db.query("SELECT cat, avg(val) FROM h GROUP BY cat HAVING avg(val) > 10");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_count_eq() {
@@ -1962,7 +1962,7 @@ mod having_tests {
         let (_, rows) = db.query(
             "SELECT cat, sum(val) FROM h GROUP BY cat HAVING sum(val) > 50 ORDER BY cat ASC",
         );
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_with_limit() {
@@ -1975,13 +1975,13 @@ mod having_tests {
     fn having_min() {
         let db = setup_hv();
         let (_, rows) = db.query("SELECT cat, min(val) FROM h GROUP BY cat HAVING min(val) < 5");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_max() {
         let db = setup_hv();
         let (_, rows) = db.query("SELECT cat, max(val) FROM h GROUP BY cat HAVING max(val) > 20");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_all_pass() {
@@ -2837,14 +2837,14 @@ mod complex_combos {
     fn where_and_group_by() {
         let db = setup();
         let (_, rows) = db.query("SELECT vs, count(*) FROM t WHERE vi > 5 GROUP BY vs");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn where_group_by_having() {
         let db = setup();
         let (_, rows) =
             db.query("SELECT vs, sum(vi) FROM t WHERE vi > 0 GROUP BY vs HAVING sum(vi) > 0");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn where_order_limit_offset() {
@@ -2886,7 +2886,7 @@ mod complex_combos {
     fn nested_where() {
         let db = setup();
         let (_, rows) = db.query("SELECT vi FROM t WHERE vi > 2 AND vi < 18 AND vs != 's10'");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn all_features() {
@@ -3025,13 +3025,13 @@ mod multi_table {
     fn trades_filter() {
         let db = TestDb::with_trades_and_quotes();
         let (_, rows) = db.query("SELECT symbol, price FROM trades WHERE symbol = 'BTC/USD'");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn quotes_filter() {
         let db = TestDb::with_trades_and_quotes();
         let (_, rows) = db.query("SELECT symbol, bid FROM quotes WHERE symbol = 'ETH/USD'");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn trades_count() {
@@ -3061,19 +3061,19 @@ mod multi_table {
     fn trades_group() {
         let db = TestDb::with_trades_and_quotes();
         let (_, rows) = db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn quotes_group() {
         let db = TestDb::with_trades_and_quotes();
         let (_, rows) = db.query("SELECT symbol, count(*) FROM quotes GROUP BY symbol");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn trades_distinct() {
         let db = TestDb::with_trades_and_quotes();
         let (_, rows) = db.query("SELECT DISTINCT symbol FROM trades");
-        assert!(rows.len() > 0 && rows.len() <= 3);
+        assert!(!rows.is_empty() && rows.len() <= 3);
     }
 }
 
@@ -3133,13 +3133,13 @@ mod more_edges {
         let (_, rows) = db.query(
             "SELECT vs, count(*) FROM t GROUP BY vs HAVING count(*) >= 1 ORDER BY vs DESC LIMIT 5",
         );
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn distinct_with_where() {
         let db = setup();
         let (_, rows) = db.query("SELECT DISTINCT vs FROM t WHERE vi > 10");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn count_with_like() {
@@ -3182,7 +3182,7 @@ mod more_edges {
         let db = setup();
         let (_, rows) = db
             .query("SELECT vs, count(*) FROM t GROUP BY vs HAVING count(*) >= 1 LIMIT 5 OFFSET 0");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn count_null_col() {
@@ -3219,8 +3219,7 @@ mod large_dataset {
     use super::*;
 
     fn setup_large() -> TestDb {
-        let db = TestDb::with_trades(100);
-        db
+        TestDb::with_trades(100)
     }
 
     #[test]
@@ -3250,32 +3249,32 @@ mod large_dataset {
     fn group_by_symbol() {
         let db = setup_large();
         let (_, rows) = db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol");
-        assert!(rows.len() > 0 && rows.len() <= 3);
+        assert!(!rows.is_empty() && rows.len() <= 3);
     }
     #[test]
     fn group_sum() {
         let db = setup_large();
         let (_, rows) = db.query("SELECT symbol, sum(price) FROM trades GROUP BY symbol");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn group_avg() {
         let db = setup_large();
         let (_, rows) = db.query("SELECT symbol, avg(price) FROM trades GROUP BY symbol");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn group_min_max() {
         let db = setup_large();
         let (_, rows) =
             db.query("SELECT symbol, min(price), max(price) FROM trades GROUP BY symbol");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn where_symbol() {
         let db = setup_large();
         let (_, rows) = db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD'");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn where_side() {
@@ -3306,7 +3305,7 @@ mod large_dataset {
         let db = setup_large();
         let (_, rows) =
             db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol HAVING count(*) > 10");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn offset_large() {
@@ -3328,24 +3327,24 @@ mod large_dataset {
     fn where_in_symbols() {
         let db = setup_large();
         let (_, rows) = db.query("SELECT * FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD')");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn where_not_in_symbols() {
         let db = setup_large();
         let (_, rows) = db.query("SELECT * FROM trades WHERE symbol NOT IN ('SOL/USD')");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn where_like_btc() {
         let db = setup_large();
         let (_, rows) = db.query("SELECT * FROM trades WHERE symbol LIKE 'BTC%'");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn complex_query() {
         let db = setup_large();
         let (_, rows) = db.query("SELECT symbol, count(*), avg(price) FROM trades WHERE side = 'buy' GROUP BY symbol HAVING count(*) > 5 ORDER BY symbol ASC");
-        assert!(rows.len() > 0);
+        assert!(!rows.is_empty());
     }
 }

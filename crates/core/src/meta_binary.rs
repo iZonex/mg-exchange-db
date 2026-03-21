@@ -292,7 +292,7 @@ fn u8_to_col_type(v: u8) -> Result<ColumnTypeSerializable> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use exchange_common::types::{ColumnType, PartitionBy};
+
     use tempfile::tempdir;
 
     fn sample_meta() -> TableMeta {

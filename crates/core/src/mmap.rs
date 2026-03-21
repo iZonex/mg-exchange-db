@@ -617,7 +617,7 @@ mod tests {
     fn advise_helpers_do_not_panic() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("advise.d");
-        std::fs::write(&path, &[0u8; 4096]).unwrap();
+        std::fs::write(&path, [0u8; 4096]).unwrap();
 
         let ro = MmapReadOnly::open(&path).unwrap();
         let mmap = ro.inner_mmap();

@@ -1533,7 +1533,7 @@ mod tests {
         let n = 1000;
         let base_ts: i64 = 1_704_067_200_000_000_000;
         let timestamps: Vec<i64> = (0..n).map(|i| base_ts + i as i64 * 1_000_000).collect();
-        let symbols: Vec<i32> = (0..n).map(|i| (i % 100) as i32).collect();
+        let symbols: Vec<i32> = (0..n).map(|i| i % 100).collect();
         let prices: Vec<f64> = (0..n).map(|i| 50_000.0 + i as f64 * 0.5).collect();
         let volumes: Vec<f64> = (0..n).map(|i| 1.0 + i as f64 * 0.01).collect();
 

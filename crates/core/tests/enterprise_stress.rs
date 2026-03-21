@@ -15,7 +15,6 @@ use exchange_core::replication::config::{ReplicationConfig, ReplicationRole, Rep
 use exchange_core::replication::wal_shipper::WalShipper;
 use exchange_core::tenant::{Tenant, TenantManager};
 
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -876,7 +875,7 @@ fn metering_100k_queries() {
     let dir = tempdir().unwrap();
     let meter = UsageMeter::new(dir.path().to_path_buf());
 
-    for i in 0..1000 {
+    for _i in 0..1000 {
         meter.record_query("tenant1", 100, 4096);
     }
 
@@ -947,7 +946,7 @@ fn metering_concurrent_writes() {
     let meter = Arc::new(UsageMeter::new(dir.path().to_path_buf()));
 
     let handles: Vec<_> = (0..4)
-        .map(|t| {
+        .map(|_t| {
             let m = Arc::clone(&meter);
             std::thread::spawn(move || {
                 for _ in 0..250 {
@@ -1280,7 +1279,6 @@ fn hash_password_different_inputs() {
 
 #[test]
 #[ignore]
-#[ignore]
 fn hash_password_hex_format() {
     let h = hash_password("test");
     assert_eq!(h.len(), 64); // 64-bit hash as hex = 16 chars
@@ -1288,7 +1286,6 @@ fn hash_password_hex_format() {
 }
 
 #[test]
-#[ignore]
 #[ignore]
 fn hash_password_empty_string() {
     let h = hash_password("");
@@ -1306,6 +1303,7 @@ macro_rules! cluster_size_test {
             let mgr = ClusterManager::new(cluster_config("n0"));
             mgr.register().unwrap();
 
+            #[allow(clippy::reversed_empty_ranges)]
             for i in 1..$n {
                 let node = ClusterNode::new(
                     format!("n{i}"),
@@ -1789,12 +1787,12 @@ enc_data_test!(ed_zeros_10k, 10000usize, |_i| 0u8);
 enc_data_test!(ed_seq_100, 100usize, |i: usize| (i % 256) as u8);
 enc_data_test!(ed_seq_1k, 1000usize, |i: usize| (i % 256) as u8);
 enc_data_test!(ed_seq_10k, 10000usize, |i: usize| (i % 256) as u8);
-enc_data_test!(ed_alt_100, 100usize, |i: usize| if i % 2 == 0 {
+enc_data_test!(ed_alt_100, 100usize, |i: usize| if i.is_multiple_of(2) {
     0xAA
 } else {
     0x55
 });
-enc_data_test!(ed_alt_1k, 1000usize, |i: usize| if i % 2 == 0 {
+enc_data_test!(ed_alt_1k, 1000usize, |i: usize| if i.is_multiple_of(2) {
     0xAA
 } else {
     0x55
@@ -2110,6 +2108,7 @@ macro_rules! cluster_fail_test {
         fn $name() {
             let mgr = ClusterManager::new(cluster_config("n0"));
             mgr.register().unwrap();
+            #[allow(clippy::reversed_empty_ranges)]
             for i in 0..$n_live {
                 let node = ClusterNode::new(
                     format!("live-{i}"),
@@ -2118,6 +2117,7 @@ macro_rules! cluster_fail_test {
                 );
                 mgr.add_node(node);
             }
+            #[allow(clippy::reversed_empty_ranges)]
             for i in 0..$n_dead {
                 let mut node = ClusterNode::new(
                     format!("dead-{i}"),

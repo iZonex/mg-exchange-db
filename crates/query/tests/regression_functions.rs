@@ -7,7 +7,7 @@ use exchange_query::plan::Value;
 use exchange_query::scalar::evaluate_scalar;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
 }
@@ -55,11 +55,11 @@ mod math_scalars {
     }
     #[test]
     fn abs_pos_f() {
-        assert_eq!(eval("abs", &[f(3.14)]), f(3.14));
+        assert_eq!(eval("abs", &[f(3.15)]), f(3.15));
     }
     #[test]
     fn abs_neg_f() {
-        assert_eq!(eval("abs", &[f(-3.14)]), f(3.14));
+        assert_eq!(eval("abs", &[f(-3.15)]), f(3.15));
     }
     #[test]
     fn abs_null() {
@@ -97,11 +97,11 @@ mod math_scalars {
     }
     #[test]
     fn round_2dp() {
-        assert_f64_close(&eval("round", &[f(3.14159), i(2)]), 3.14, 0.001);
+        assert_f64_close(&eval("round", &[f(3.15159), i(2)]), 3.15, 0.001);
     }
     #[test]
     fn round_3dp() {
-        assert_f64_close(&eval("round", &[f(3.14159), i(3)]), 3.142, 0.001);
+        assert_f64_close(&eval("round", &[f(3.15159), i(3)]), 3.152, 0.001);
     }
     #[test]
     fn round_int() {

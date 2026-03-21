@@ -189,8 +189,8 @@ mod order_by {
     fn asc_first5() {
         let db = setup();
         let v = col_f(&db, "SELECT vi FROM t ORDER BY vi ASC LIMIT 5", 0);
-        for i in 0..5 {
-            assert!((v[i] - i as f64).abs() < 0.01);
+        for (i, &vi) in v.iter().enumerate().take(5) {
+            assert!((vi - i as f64).abs() < 0.01);
         }
     }
     #[test]
@@ -203,8 +203,8 @@ mod order_by {
     fn desc_first5() {
         let db = setup();
         let v = col_f(&db, "SELECT vi FROM t ORDER BY vi DESC LIMIT 5", 0);
-        for i in 0..5 {
-            assert!((v[i] - (59 - i) as f64).abs() < 0.01);
+        for (i, &vi) in v.iter().enumerate().take(5) {
+            assert!((vi - (59 - i) as f64).abs() < 0.01);
         }
     }
     #[test]
@@ -228,8 +228,8 @@ mod order_by {
         let db = setup();
         let v = col_f(&db, "SELECT vi FROM t ORDER BY vi ASC LIMIT 10", 0);
         assert_eq!(v.len(), 10);
-        for i in 0..10 {
-            assert!((v[i] - i as f64).abs() < 0.01);
+        for (i, &vi) in v.iter().enumerate().take(10) {
+            assert!((vi - i as f64).abs() < 0.01);
         }
     }
     #[test]
@@ -237,8 +237,8 @@ mod order_by {
         let db = setup();
         let v = col_f(&db, "SELECT vi FROM t ORDER BY vi DESC LIMIT 10", 0);
         assert_eq!(v.len(), 10);
-        for i in 0..10 {
-            assert!((v[i] - (59 - i) as f64).abs() < 0.01);
+        for (i, &vi) in v.iter().enumerate().take(10) {
+            assert!((vi - (59 - i) as f64).abs() < 0.01);
         }
     }
 }
@@ -405,8 +405,8 @@ mod order_where {
             "SELECT vi FROM t WHERE vi > 10 ORDER BY vi ASC LIMIT 5",
             0,
         );
-        for i in 0..5 {
-            assert!((v[i] - (11 + i) as f64).abs() < 0.01);
+        for (i, &vi) in v.iter().enumerate().take(5) {
+            assert!((vi - (11 + i) as f64).abs() < 0.01);
         }
     }
     #[test]
@@ -417,8 +417,8 @@ mod order_where {
             "SELECT vi FROM t WHERE vi < 50 ORDER BY vi DESC LIMIT 5",
             0,
         );
-        for i in 0..5 {
-            assert!((v[i] - (49 - i) as f64).abs() < 0.01);
+        for (i, &vi) in v.iter().enumerate().take(5) {
+            assert!((vi - (49 - i) as f64).abs() < 0.01);
         }
     }
     #[test]
@@ -810,8 +810,8 @@ mod order_extra {
         let db = setup();
         let v = col_f(&db, "SELECT vi FROM t ORDER BY vi ASC LIMIT 20", 0);
         assert_eq!(v.len(), 20);
-        for i in 0..20 {
-            assert!((v[i] - i as f64).abs() < 0.01);
+        for (i, &vi) in v.iter().enumerate().take(20) {
+            assert!((vi - i as f64).abs() < 0.01);
         }
     }
     #[test]
@@ -819,8 +819,8 @@ mod order_extra {
         let db = setup();
         let v = col_f(&db, "SELECT vi FROM t ORDER BY vi DESC LIMIT 20", 0);
         assert_eq!(v.len(), 20);
-        for i in 0..20 {
-            assert!((v[i] - (59 - i) as f64).abs() < 0.01);
+        for (i, &vi) in v.iter().enumerate().take(20) {
+            assert!((vi - (59 - i) as f64).abs() < 0.01);
         }
     }
     #[test]

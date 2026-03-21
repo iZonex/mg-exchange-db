@@ -1169,7 +1169,7 @@ mod tests {
     fn value_display() {
         assert_eq!(format!("{}", Value::Null), "NULL");
         assert_eq!(format!("{}", Value::I64(42)), "42");
-        assert_eq!(format!("{}", Value::F64(3.14)), "3.14");
+        assert_eq!(format!("{}", Value::F64(3.15)), "3.15");
         assert_eq!(format!("{}", Value::Str("hello".into())), "'hello'");
     }
 

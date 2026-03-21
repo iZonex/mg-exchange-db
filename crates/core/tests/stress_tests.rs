@@ -3,9 +3,8 @@
 
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::compression::{
-    CompressionStats, DeltaEncoded, compress_column_file, compression_stats,
-    decompress_column_file, delta_decode_i64, delta_decode_i64_nonempty, delta_encode_i64,
-    rle_decode, rle_encode,
+    DeltaEncoded, compress_column_file, compression_stats, decompress_column_file,
+    delta_decode_i64, delta_decode_i64_nonempty, delta_encode_i64, rle_decode, rle_encode,
 };
 use exchange_core::engine::Engine;
 use exchange_core::table::{ColumnValue, TableBuilder, TableMeta, TableWriter};
@@ -363,7 +362,7 @@ fn rle_10k_alternating() {
 
 #[test]
 fn rle_100k_runs_of_100() {
-    let values: Vec<i32> = (0..100_000).map(|i| (i / 100) as i32).collect();
+    let values: Vec<i32> = (0..100_000).map(|i| i / 100).collect();
     let encoded = rle_encode(&values);
     assert_eq!(encoded.len(), 1000);
     for &(_, count) in &encoded {
@@ -1127,7 +1126,7 @@ engine_create_test!(engine_create_25, 25);
 fn lz4_single_byte() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("tiny.d");
-    fs::write(&path, &[42u8]).unwrap();
+    fs::write(&path, [42u8]).unwrap();
     compress_column_file(&path).unwrap();
     decompress_column_file(&path).unwrap();
     assert_eq!(fs::read(&path).unwrap(), vec![42u8]);
@@ -1137,7 +1136,7 @@ fn lz4_single_byte() {
 fn lz4_exact_8_bytes() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("exact8.d");
-    fs::write(&path, &42i64.to_le_bytes()).unwrap();
+    fs::write(&path, 42i64.to_le_bytes()).unwrap();
     compress_column_file(&path).unwrap();
     decompress_column_file(&path).unwrap();
     let data = fs::read(&path).unwrap();
@@ -1300,7 +1299,7 @@ macro_rules! write_type_test {
 }
 
 write_type_test!(write_i64_stress, ColumnType::I64, ColumnValue::I64(42));
-write_type_test!(write_f64_stress, ColumnType::F64, ColumnValue::F64(3.14));
+write_type_test!(write_f64_stress, ColumnType::F64, ColumnValue::F64(3.15));
 write_type_test!(write_i32_stress, ColumnType::I32, ColumnValue::I32(100));
 write_type_test!(write_symbol_stress, ColumnType::Symbol, ColumnValue::I32(0));
 write_type_test!(
@@ -2089,6 +2088,7 @@ macro_rules! engine_meta_test {
             let mut builder = TableBuilder::new("t")
                 .column("timestamp", ColumnType::Timestamp)
                 .timestamp("timestamp");
+            #[allow(clippy::reversed_empty_ranges)]
             for i in 0..$ncols {
                 builder = builder.column(&format!("col_{i}"), ColumnType::F64);
             }

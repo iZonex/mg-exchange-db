@@ -3,7 +3,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 fn ts(s: i64) -> i64 {
     BASE_TS + s * 1_000_000_000
 }
@@ -132,10 +132,10 @@ mod insert {
     fn f64_pi() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14159)", ts(0)));
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.15159)", ts(0)));
         let v = db.query_scalar("SELECT v FROM t");
         match v {
-            Value::F64(f) => assert!((f - 3.14159).abs() < 0.001),
+            Value::F64(f) => assert!((f - 3.15159).abs() < 0.001),
             _ => panic!(),
         }
     }
@@ -796,10 +796,10 @@ mod update {
     #[test]
     fn update_double_to_pi() {
         let db = db_double();
-        db.exec_ok("UPDATE t SET v = 3.14 WHERE v = 0.0");
+        db.exec_ok("UPDATE t SET v = 3.15 WHERE v = 0.0");
         let v = db.query_scalar("SELECT v FROM t ORDER BY timestamp LIMIT 1");
         match v {
-            Value::F64(f) => assert!((f - 3.14).abs() < 0.01),
+            Value::F64(f) => assert!((f - 3.15).abs() < 0.01),
             _ => panic!(),
         }
     }
@@ -1806,8 +1806,8 @@ mod truncate_ddl {
     fn create_double_only() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14)", ts(0)));
-        assert_eq!(db.query_scalar("SELECT v FROM t"), Value::F64(3.14));
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.15)", ts(0)));
+        assert_eq!(db.query_scalar("SELECT v FROM t"), Value::F64(3.15));
     }
     #[test]
     fn create_varchar_only() {

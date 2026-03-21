@@ -168,6 +168,22 @@ pub enum ExchangeDbError {
     },
 }
 
+/// Helper to attach database path context to a TableNotFound error.
+impl ExchangeDbError {
+    /// Upgrade a plain `TableNotFound` into `TableNotFoundAt` with a database path.
+    pub fn with_db_path(self, db_path: &std::path::Path) -> Self {
+        match self {
+            ExchangeDbError::TableNotFound(table) => ExchangeDbError::TableNotFoundAt {
+                table,
+                db_path: db_path.display().to_string(),
+            },
+            other => other,
+        }
+    }
+}
+
+pub type Result<T> = std::result::Result<T, ExchangeDbError>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246,19 +262,3 @@ mod tests {
         assert!(msg.contains("5000ms"), "should show wait time");
     }
 }
-
-/// Helper to attach database path context to a TableNotFound error.
-impl ExchangeDbError {
-    /// Upgrade a plain `TableNotFound` into `TableNotFoundAt` with a database path.
-    pub fn with_db_path(self, db_path: &std::path::Path) -> Self {
-        match self {
-            ExchangeDbError::TableNotFound(table) => ExchangeDbError::TableNotFoundAt {
-                table,
-                db_path: db_path.display().to_string(),
-            },
-            other => other,
-        }
-    }
-}
-
-pub type Result<T> = std::result::Result<T, ExchangeDbError>;

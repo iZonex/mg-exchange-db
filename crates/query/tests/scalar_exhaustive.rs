@@ -383,11 +383,11 @@ mod math_basic {
     }
     #[test]
     fn abs_f_pos() {
-        approx(eval("abs", &[f(3.14)]), 3.14);
+        approx(eval("abs", &[f(3.15)]), 3.15);
     }
     #[test]
     fn abs_f_neg() {
-        approx(eval("abs", &[f(-3.14)]), 3.14);
+        approx(eval("abs", &[f(-3.15)]), 3.15);
     }
     #[test]
     fn abs_null() {
@@ -1236,7 +1236,7 @@ mod conditional {
     }
     #[test]
     fn nullif_zero_f_nonzero() {
-        assert_eq!(eval("nullif_zero", &[f(3.14)]), f(3.14));
+        assert_eq!(eval("nullif_zero", &[f(3.15)]), f(3.15));
     }
 }
 
@@ -1267,7 +1267,7 @@ mod casting {
     }
     #[test]
     fn cast_float_from_s() {
-        approx(eval("cast_float", &[s("3.14")]), 3.14);
+        approx(eval("cast_float", &[s("3.15")]), 3.15);
     }
     #[test]
     fn cast_float_null() {
@@ -1283,7 +1283,7 @@ mod casting {
     }
     #[test]
     fn cast_str_from_f() {
-        assert_eq!(eval("cast_str", &[f(3.14)]), s("3.14"));
+        assert_eq!(eval("cast_str", &[f(3.15)]), s("3.15"));
     }
     #[test]
     fn cast_str_null() {
@@ -1327,7 +1327,7 @@ mod casting {
     }
     #[test]
     fn typeof_f64() {
-        assert_eq!(eval("typeof", &[f(3.14)]), s("f64"));
+        assert_eq!(eval("typeof", &[f(3.15)]), s("f64"));
     }
     #[test]
     fn typeof_str() {
@@ -1363,7 +1363,7 @@ mod casting {
     }
     #[test]
     fn to_number_float() {
-        approx(eval("to_number", &[s("3.14")]), 3.14);
+        approx(eval("to_number", &[s("3.15")]), 3.15);
     }
     #[test]
     fn to_number_null() {
@@ -1383,7 +1383,7 @@ mod casting {
     }
     #[test]
     fn safe_cast_float_ok() {
-        approx(eval("safe_cast_float", &[s("3.14")]), 3.14);
+        approx(eval("safe_cast_float", &[s("3.15")]), 3.15);
     }
     #[test]
     fn safe_cast_float_bad() {
@@ -1396,8 +1396,8 @@ mod casting {
 // ===========================================================================
 mod datetime_extract {
     use super::*;
-    // 2024-03-15 12:30:45 UTC in nanos = 1710505845_000_000_000
-    const TS: i64 = 1710505845_000_000_000;
+    // 2024-03-15 12:30:45 UTC in nanos = 1_710_505_845_000_000_000
+    const TS: i64 = 1_710_505_845_000_000_000;
     #[test]
     fn year() {
         assert_eq!(eval("extract_year", &[ts(TS)]), i(2024));
@@ -1471,8 +1471,8 @@ mod datetime_extract {
     fn second_epoch() {
         assert_eq!(eval("extract_second", &[ts(0)]), i(0));
     }
-    // 2000-01-01 00:00:00 UTC in nanos = 946684800_000_000_000
-    const Y2K: i64 = 946684800_000_000_000;
+    // 2000-01-01 00:00:00 UTC in nanos = 946_684_800_000_000_000
+    const Y2K: i64 = 946_684_800_000_000_000;
     #[test]
     fn year_2000() {
         assert_eq!(eval("extract_year", &[ts(Y2K)]), i(2000));
@@ -1508,7 +1508,7 @@ mod datetime_extract {
     #[test]
     fn quarter_apr() {
         assert_eq!(
-            eval("extract_quarter", &[ts(Y2K + 91i64 * 86400_000_000_000)]),
+            eval("extract_quarter", &[ts(Y2K + 91i64 * 86_400_000_000_000)]),
             i(2)
         );
     }
@@ -1519,14 +1519,14 @@ mod datetime_extract {
 // ===========================================================================
 mod datetime_ops {
     use super::*;
-    const DAY_NS: i64 = 86400_000_000_000;
-    const HOUR_NS: i64 = 3600_000_000_000;
+    const DAY_NS: i64 = 86_400_000_000_000;
+    const HOUR_NS: i64 = 3_600_000_000_000;
     const MIN_NS: i64 = 60_000_000_000;
     const SEC_NS: i64 = 1_000_000_000;
     // 2024-03-15 12:30:45 UTC
-    const TS: i64 = 1710505845_000_000_000;
+    const TS: i64 = 1_710_505_845_000_000_000;
     // 2024-03-15 00:00:00 UTC
-    const DAY_START: i64 = 1710460800_000_000_000;
+    const DAY_START: i64 = 1_710_460_800_000_000_000;
 
     #[test]
     fn trunc_day() {
@@ -2363,8 +2363,8 @@ mod misc_funcs {
     }
     #[test]
     fn to_json_f() {
-        match eval("to_json", &[f(3.14)]) {
-            Value::Str(v) => assert!(v.contains("3.14")),
+        match eval("to_json", &[f(3.15)]) {
+            Value::Str(v) => assert!(v.contains("3.15")),
             other => panic!("expected Str, got {other:?}"),
         }
     }
@@ -2758,7 +2758,7 @@ mod more_aliases {
     }
     #[test]
     fn pg_typeof_f() {
-        assert_eq!(eval("pg_typeof", &[f(3.14)]), s("double precision"));
+        assert_eq!(eval("pg_typeof", &[f(3.15)]), s("double precision"));
     }
     #[test]
     fn pg_typeof_s() {
@@ -2902,13 +2902,12 @@ mod log_base_etc {
 // ===========================================================================
 mod date_period {
     use super::*;
-    const DAY_NS: i64 = 86400_000_000_000;
-    // 2024-03-15 (Friday) = 1710460800_000_000_000
-    const FRIDAY: i64 = 1710460800_000_000_000;
+    // 2024-03-15 (Friday) = 1_710_460_800_000_000_000
+    const FRIDAY: i64 = 1_710_460_800_000_000_000;
     // Saturday = Friday + 1 day
-    const SATURDAY: i64 = 1710460800_000_000_000 + 86400_000_000_000;
+    const SATURDAY: i64 = 1_710_460_800_000_000_000 + 86_400_000_000_000;
     // Sunday = Saturday + 1 day
-    const SUNDAY: i64 = SATURDAY + 86400_000_000_000;
+    const SUNDAY: i64 = SATURDAY + 86_400_000_000_000;
 
     #[test]
     fn is_weekend_friday() {
@@ -2938,8 +2937,8 @@ mod date_period {
     fn is_business_null() {
         assert_eq!(eval("is_business_day", &[null()]), null());
     }
-    // 2024-01-01 00:00:00 UTC = 1704067200_000_000_000
-    const JAN1: i64 = 1704067200_000_000_000;
+    // 2024-01-01 00:00:00 UTC = 1_704_067_200_000_000_000
+    const JAN1: i64 = 1_704_067_200_000_000_000;
     #[test]
     fn start_of_year_basic() {
         assert_eq!(eval("start_of_year", &[ts(FRIDAY)]), ts(JAN1));
@@ -2952,7 +2951,7 @@ mod date_period {
     fn first_of_month_basic() {
         assert_eq!(
             eval("first_of_month", &[ts(FRIDAY)]),
-            ts(1709251200_000_000_000)
+            ts(1_709_251_200_000_000_000)
         );
     }
     #[test]
@@ -3205,7 +3204,7 @@ mod edge_cases_extra {
     #[test]
     fn date_diff_neg() {
         assert_eq!(
-            eval("date_diff", &[s("day"), ts(86400_000_000_000), ts(0)]),
+            eval("date_diff", &[s("day"), ts(86_400_000_000_000), ts(0)]),
             i(-1)
         );
     }

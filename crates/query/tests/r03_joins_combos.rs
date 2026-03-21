@@ -4,7 +4,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 fn ts(s: i64) -> i64 {
     BASE_TS + s * 1_000_000_000
 }
@@ -399,7 +399,7 @@ mod inner {
     fn where_and() {
         let db = setup_ab();
         let (_, r) = db.query("SELECT a.id FROM a INNER JOIN b ON a.id = b.id WHERE a.id > 6 AND b.value < 90.0 ORDER BY a.id");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn where_or() {
@@ -536,7 +536,7 @@ mod inner {
     fn sym_where_eth() {
         let db = setup_sym();
         let (_, r) = db.query("SELECT t.price FROM trades t INNER JOIN meta m ON t.sym = m.sym WHERE t.sym = 'ETH' ORDER BY t.price");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn sym_order_price() {
@@ -1759,7 +1759,7 @@ mod extras {
     fn sym_inner_where_eth() {
         let db = setup_sym();
         let (_, r) = db.query("SELECT t.price FROM trades t INNER JOIN meta m ON t.sym = m.sym WHERE t.sym = 'ETH' ORDER BY t.price");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn sym_inner_where_price() {
@@ -2089,7 +2089,7 @@ mod extras {
     fn left_having_sum() {
         let db = setup_ab();
         let (_, r) = db.query("SELECT a.name, sum(b.value) AS s FROM a LEFT JOIN b ON a.id = b.id GROUP BY a.name HAVING sum(b.value) > 0 ORDER BY a.name");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     // Additional WHERE combos
     #[test]
@@ -2166,7 +2166,7 @@ mod extras {
     fn trades_join() {
         let db = TestDb::with_trades_and_quotes();
         let (_, r) = db.query("SELECT t.symbol, q.bid FROM trades t INNER JOIN quotes q ON t.symbol = q.symbol AND t.timestamp = q.timestamp ORDER BY t.timestamp LIMIT 5");
-        assert!(r.len() >= 1);
+        assert!(!r.is_empty());
     }
     #[test]
     fn trades_left_join() {

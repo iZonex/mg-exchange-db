@@ -369,7 +369,7 @@ mod tests {
                     barrier.wait();
                     let mut handle = engine.get_writer("trades").unwrap();
                     // Verify we have exclusive access
-                    let prev = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let _prev = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     // Simulate work
                     let ts = Timestamp::from_secs(1710513000 + i * 86400);
                     handle

@@ -1303,7 +1303,7 @@ mod tests {
 
     #[test]
     fn test_cast_double_to_boolean() {
-        let result = evaluate_scalar("cast_double_to_boolean", &[Value::F64(3.14)]).unwrap();
+        let result = evaluate_scalar("cast_double_to_boolean", &[Value::F64(3.15)]).unwrap();
         assert_eq!(result, Value::I64(1));
         let result = evaluate_scalar("cast_double_to_boolean", &[Value::F64(0.0)]).unwrap();
         assert_eq!(result, Value::I64(0));

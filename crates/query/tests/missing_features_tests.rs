@@ -337,12 +337,9 @@ fn rls_no_filter_without_manager() {
 
 #[test]
 fn error_messages_include_sql_context() {
-    use exchange_common::error::ExchangeDbError;
     use exchange_query::context::ExecutionContext;
     use exchange_query::execute_with_context;
     use exchange_query::plan_query;
-    use std::path::PathBuf;
-    use std::sync::Arc;
     use std::time::Instant;
 
     let dir = tempfile::tempdir().unwrap();

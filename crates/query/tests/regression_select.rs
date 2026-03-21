@@ -7,7 +7,7 @@
 use exchange_query::plan::Value;
 use exchange_query::test_utils::TestDb;
 
-const BASE_TS: i64 = 1710460800_000_000_000;
+const BASE_TS: i64 = 1_710_460_800_000_000_000;
 
 fn ts(offset_secs: i64) -> i64 {
     BASE_TS + offset_secs * 1_000_000_000
@@ -803,7 +803,7 @@ mod group_agg {
     fn group_by_with_where_gt() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT symbol, avg(price) FROM trades WHERE price > 1000 GROUP BY symbol ORDER BY symbol");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn group_by_with_limit() {
@@ -982,7 +982,7 @@ mod group_having {
         let db = TestDb::with_trades(30);
         let (_, rows) =
             db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol HAVING count(*) > 5");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_count_eq() {
@@ -994,25 +994,25 @@ mod group_having {
     fn having_sum_gt() {
         let db = db_mixed();
         let (_, rows) = db.query("SELECT s, sum(d) FROM t GROUP BY s HAVING sum(d) > 100.0");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_avg_gt() {
         let db = db_mixed();
         let (_, rows) = db.query("SELECT s, avg(d) FROM t GROUP BY s HAVING avg(d) > 50.0");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_min_lt() {
         let db = db_mixed();
         let (_, rows) = db.query("SELECT s, min(d) FROM t GROUP BY s HAVING min(d) < 30.0");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_max_gt() {
         let db = db_mixed();
         let (_, rows) = db.query("SELECT s, max(d) FROM t GROUP BY s HAVING max(d) > 80.0");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_filters_all() {
@@ -1026,21 +1026,21 @@ mod group_having {
         let (_, rows) = db.query(
             "SELECT symbol, count(*) FROM trades WHERE side = 'buy' GROUP BY symbol HAVING count(*) >= 3"
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_with_order() {
         let db = db_mixed();
         let (_, rows) =
             db.query("SELECT s, sum(d) FROM t GROUP BY s HAVING sum(d) > 50.0 ORDER BY sum(d)");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_with_order_desc() {
         let db = db_mixed();
         let (_, rows) = db
             .query("SELECT s, sum(d) FROM t GROUP BY s HAVING sum(d) > 50.0 ORDER BY sum(d) DESC");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_with_limit() {
@@ -1073,13 +1073,13 @@ mod group_having {
         let (_, rows) =
             db.query("SELECT s, sum(d) FROM t GROUP BY s HAVING sum(d) <= 70.0 ORDER BY s");
         // alpha: 10+60=70, beta: 20+70=90
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_avg_lt() {
         let db = db_mixed();
         let (_, rows) = db.query("SELECT s, avg(d) FROM t GROUP BY s HAVING avg(d) < 40.0");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_where_order_limit() {
@@ -1094,7 +1094,7 @@ mod group_having {
         let db = db_mixed();
         let (_, rows) = db.query("SELECT s, sum(d) FROM t GROUP BY s HAVING sum(d) = 70.0");
         // alpha: 10+60=70
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_max_lt() {
@@ -1106,7 +1106,7 @@ mod group_having {
     fn having_min_gte() {
         let db = db_mixed();
         let (_, rows) = db.query("SELECT s, min(d) FROM t GROUP BY s HAVING min(d) >= 40.0");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn group_having_on_trades() {
@@ -1114,7 +1114,7 @@ mod group_having {
         let (_, rows) = db.query(
             "SELECT symbol, avg(price) FROM trades GROUP BY symbol HAVING avg(price) > 100.0 ORDER BY symbol"
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn group_having_multiple_aggs() {
@@ -1122,33 +1122,33 @@ mod group_having {
         let (_, rows) = db.query(
             "SELECT s, count(*), sum(d) FROM t GROUP BY s HAVING count(*) >= 2 AND sum(d) > 60.0",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_on_int_sum() {
         let db = db_mixed();
         let (_, rows) =
             db.query("SELECT s, sum(i) FROM t GROUP BY s HAVING sum(i) > 10 ORDER BY s");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_on_int_avg() {
         let db = db_mixed();
         let (_, rows) =
             db.query("SELECT s, avg(i) FROM t GROUP BY s HAVING avg(i) > 5.0 ORDER BY s");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_on_int_min() {
         let db = db_mixed();
         let (_, rows) = db.query("SELECT s, min(i) FROM t GROUP BY s HAVING min(i) > 3 ORDER BY s");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_on_int_max() {
         let db = db_mixed();
         let (_, rows) = db.query("SELECT s, max(i) FROM t GROUP BY s HAVING max(i) < 8 ORDER BY s");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_count_1() {
@@ -1168,7 +1168,7 @@ mod group_having {
         let (_, rows) = db.query(
             "SELECT s, sum(d) AS total FROM t GROUP BY s HAVING sum(d) > 60.0 ORDER BY total",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_sum_negative() {
@@ -1181,7 +1181,7 @@ mod group_having {
         let db = db_mixed();
         let (_, rows) =
             db.query("SELECT s, avg(d) FROM t GROUP BY s HAVING avg(d) >= 30.0 AND avg(d) <= 60.0");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_with_two_groups() {
@@ -1189,7 +1189,7 @@ mod group_having {
         let (_, rows) = db.query(
             "SELECT symbol, side, count(*) FROM trades GROUP BY symbol, side HAVING count(*) >= 3",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_count_order_desc_limit_1() {
@@ -1205,7 +1205,7 @@ mod group_having {
         let (_, rows) = db.query(
             "SELECT s, count(*) FROM t WHERE i > 3 GROUP BY s HAVING count(*) >= 1 ORDER BY s",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_on_empty_result() {
@@ -1219,7 +1219,7 @@ mod group_having {
         let db = db_mixed();
         // beta: 20+70=90
         let (_, rows) = db.query("SELECT s, sum(d) FROM t GROUP BY s HAVING sum(d) = 90.0");
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn having_max_eq() {
@@ -1254,7 +1254,7 @@ mod group_having {
         let (_, rows) = db.query(
             "SELECT s, min(d), max(d), avg(d) FROM t GROUP BY s HAVING max(d) - min(d) > 40.0",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
 }
 
@@ -2204,7 +2204,7 @@ mod larger_data {
         let (_, rows) = db.query(
             "SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING count(*) > 20 ORDER BY c"
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn sum_by_side_100() {
@@ -2218,7 +2218,7 @@ mod larger_data {
         let (_, rows) = db.query(
             "SELECT CASE WHEN price > 10000 THEN 'high' ELSE 'low' END AS tier, count(*) FROM trades GROUP BY tier ORDER BY tier"
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn arithmetic_on_100() {
@@ -2410,7 +2410,7 @@ mod larger_data {
         let (_, rows) = db.query(
             "SELECT symbol, avg(price) FROM trades GROUP BY symbol HAVING avg(price) > 50.0",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn case_arith_50() {
@@ -2442,7 +2442,7 @@ mod multi_feature {
         let (_, rows) = db.query(
             "SELECT symbol, count(*) FROM trades WHERE side = 'buy' GROUP BY symbol HAVING count(*) >= 1 ORDER BY symbol"
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn where_group_having_order_limit() {
@@ -2478,7 +2478,7 @@ mod multi_feature {
         let (_, rows) = db.query(
             "SELECT CASE WHEN price > 10000 THEN 'high' ELSE 'low' END AS tier, count(*) FROM trades GROUP BY tier ORDER BY tier"
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn case_where_order_limit() {
@@ -2525,7 +2525,7 @@ mod multi_feature {
         let (_, rows) = db.query(
             "SELECT s, sum(d + 1.0) AS total FROM t GROUP BY s HAVING sum(d + 1.0) > 70.0 ORDER BY total"
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn count_case_group() {
@@ -2624,7 +2624,7 @@ mod multi_feature {
         let (_, rows) = db.query(
             "SELECT s, min(d), max(d), count(*) FROM t GROUP BY s HAVING max(d) > 50.0 ORDER BY s",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn where_or_group_order_limit() {
@@ -2671,7 +2671,7 @@ mod multi_feature {
         let (_, rows) = db.query(
             "SELECT symbol, count(*) FROM trades WHERE side = 'buy' AND (symbol = 'BTC/USD' OR symbol = 'ETH/USD') GROUP BY symbol HAVING count(*) >= 1 ORDER BY symbol"
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn case_sum_group() {
@@ -2718,7 +2718,7 @@ mod multi_feature {
         let (_, rows) = db.query(
             "SELECT s, sum(d) AS total FROM t GROUP BY s HAVING sum(d) * 2 > 100 ORDER BY total",
         );
-        assert!(rows.len() >= 1);
+        assert!(!rows.is_empty());
     }
     #[test]
     fn case_where_distinct() {

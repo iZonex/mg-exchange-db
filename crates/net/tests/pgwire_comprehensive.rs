@@ -187,13 +187,11 @@ fn tag_insert() {
 
 #[test]
 #[ignore]
-#[ignore]
 fn tag_insert_lowercase() {
     assert_eq!(infer_command_tag("insert into t values (1)"), "INSERT 0");
 }
 
 #[test]
-#[ignore]
 #[ignore]
 fn tag_insert_mixed_case() {
     assert_eq!(infer_command_tag("Insert INTO t VALUES (1)"), "INSERT 0");
@@ -969,8 +967,8 @@ fn csv_long_value() {
 
 #[test]
 fn csv_numeric_values() {
-    let fields = parse_csv_line("42,3.14,-100,0", ',');
-    assert_eq!(fields, vec!["42", "3.14", "-100", "0"]);
+    let fields = parse_csv_line("42,3.15,-100,0", ',');
+    assert_eq!(fields, vec!["42", "3.15", "-100", "0"]);
 }
 
 // =============================================================================
@@ -1273,7 +1271,6 @@ fn tag_select_subquery() {
 }
 
 #[test]
-#[ignore]
 #[ignore]
 fn tag_insert_select() {
     assert_eq!(
@@ -1707,7 +1704,7 @@ csv_value_test!(cv_int_1, "1");
 csv_value_test!(cv_int_neg, "-1");
 csv_value_test!(cv_int_large, "999999");
 csv_value_test!(cv_float_0, "0.0");
-csv_value_test!(cv_float_pi, "3.14159");
+csv_value_test!(cv_float_pi, "3.15159");
 csv_value_test!(cv_float_neg, "-99.9");
 csv_value_test!(cv_word, "hello");
 csv_value_test!(cv_upper, "HELLO");

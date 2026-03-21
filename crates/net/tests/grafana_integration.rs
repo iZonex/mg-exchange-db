@@ -461,7 +461,7 @@ async fn grafana_style_time_filter_query() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    assert!(json["rows"].as_array().unwrap().len() > 0);
+    assert!(!json["rows"].as_array().unwrap().is_empty());
 }
 
 #[tokio::test]

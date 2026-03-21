@@ -160,7 +160,7 @@ mod tests {
     fn scheduler_release_does_not_panic() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("release_col.d");
-        std::fs::write(&path, &[0u8; 4096]).unwrap();
+        std::fs::write(&path, [0u8; 4096]).unwrap();
 
         let sched = PrefetchScheduler::new(4);
         sched.release(&path, 0, 4096);
@@ -179,7 +179,7 @@ mod tests {
         let dir = tempdir().unwrap();
         // Create a file for the scheduler to open.
         let path = dir.path().join("lookahead.d");
-        std::fs::write(&path, &[0u8; 4096]).unwrap();
+        std::fs::write(&path, [0u8; 4096]).unwrap();
 
         let mut sched = PrefetchScheduler::new(2);
         for i in 0..10 {

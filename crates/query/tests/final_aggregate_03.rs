@@ -973,8 +973,8 @@ mod first_last_f03 {
     #[test]
     fn first_f02() {
         let mut a = First::default();
-        feed(&mut a, &[f(3.14), f(2.71)]);
-        close(&a.result(), 3.14, 0.01);
+        feed(&mut a, &[f(3.15), f(2.71)]);
+        close(&a.result(), 3.15, 0.01);
     }
     #[test]
     fn first_f03() {
@@ -1065,7 +1065,7 @@ mod first_last_f03 {
     #[test]
     fn last_f02() {
         let mut a = Last::default();
-        feed(&mut a, &[f(3.14), f(2.71)]);
+        feed(&mut a, &[f(3.15), f(2.71)]);
         close(&a.result(), 2.71, 0.01);
     }
     #[test]

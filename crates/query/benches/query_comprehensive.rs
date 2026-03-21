@@ -351,10 +351,10 @@ fn bench_compiled_filter(c: &mut Criterion) {
             let mut count = 0u64;
             let threshold = 50_100.0_f64;
             for row in &rows {
-                if let Value::F64(p) = &row[2] {
-                    if *p > threshold {
-                        count += 1;
-                    }
+                if let Value::F64(p) = &row[2]
+                    && *p > threshold
+                {
+                    count += 1;
                 }
             }
             black_box(count);
