@@ -1885,7 +1885,9 @@ fn fs_usage(_path: &Path) -> Option<(u64, u64)> {
         unsafe {
             let mut stat: libc::statvfs = std::mem::zeroed();
             if libc::statvfs(c_path.as_ptr(), &mut stat) == 0 {
+                #[allow(clippy::unnecessary_cast)]
                 let total = stat.f_blocks as u64 * stat.f_frsize as u64;
+                #[allow(clippy::unnecessary_cast)]
                 let free = stat.f_bfree as u64 * stat.f_frsize as u64;
                 Some((total.saturating_sub(free), total))
             } else {

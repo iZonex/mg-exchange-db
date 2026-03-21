@@ -22,7 +22,8 @@ use std::path::PathBuf;
 // ---------------------------------------------------------------------------
 
 #[cfg(target_os = "linux")]
-mod linux_io {
+#[allow(dead_code)]
+pub(crate) mod linux_io {
     /// Check if io_uring is available on this kernel.
     ///
     /// io_uring was introduced in Linux 5.1. We check the kernel version
@@ -31,16 +32,16 @@ mod linux_io {
     /// to verify actual availability.
     pub fn io_uring_available() -> bool {
         // Try to read kernel version
-        if let Ok(version_str) = std::fs::read_to_string("/proc/version") {
-            if let Some(version) = parse_kernel_version(&version_str) {
-                return version.0 > 5 || (version.0 == 5 && version.1 >= 1);
-            }
+        if let Ok(version_str) = std::fs::read_to_string("/proc/version")
+            && let Some(version) = parse_kernel_version(&version_str)
+        {
+            return version.0 > 5 || (version.0 == 5 && version.1 >= 1);
         }
         false
     }
 
     /// Parse a kernel version string like "Linux version 5.15.0-..." into (major, minor).
-    fn parse_kernel_version(s: &str) -> Option<(u32, u32)> {
+    pub(crate) fn parse_kernel_version(s: &str) -> Option<(u32, u32)> {
         // Expected format: "Linux version X.Y.Z..."
         let version_part = s.split_whitespace().nth(2)?;
         let mut parts = version_part.split('.');
@@ -51,6 +52,7 @@ mod linux_io {
 
     #[cfg(test)]
     mod tests {
+        use super::*;
 
         #[test]
         fn parse_kernel_version_valid() {
@@ -99,7 +101,7 @@ mod linux_io {
 pub struct DirectIoReader {
     fd: std::os::unix::io::RawFd,
     len: u64,
-    path: PathBuf,
+    _path: PathBuf,
 }
 
 #[cfg(target_os = "linux")]
@@ -126,7 +128,7 @@ impl DirectIoReader {
         Ok(Self {
             fd,
             len,
-            path: path.to_path_buf(),
+            _path: path.to_path_buf(),
         })
     }
 
