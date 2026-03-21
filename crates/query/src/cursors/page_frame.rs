@@ -52,9 +52,7 @@ impl RecordCursor for PageFrameCursor {
                 Some(batch) => {
                     let ncols = batch.columns.len();
                     for r in 0..batch.row_count() {
-                        let row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> = (0..ncols).map(|c| batch.get_value(r, c)).collect();
                         self.buffer.push(row);
                     }
                 }

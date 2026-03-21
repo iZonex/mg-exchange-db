@@ -52,11 +52,7 @@ impl RecordCursor for ProjectCursor {
             Some(b) => {
                 let mut result = RecordBatch::new(self.schema.clone());
                 for r in 0..b.row_count() {
-                    let row: Vec<Value> = self
-                        .columns
-                        .iter()
-                        .map(|&c| b.get_value(r, c))
-                        .collect();
+                    let row: Vec<Value> = self.columns.iter().map(|&c| b.get_value(r, c)).collect();
                     result.append_row(&row);
                 }
                 Ok(Some(result))

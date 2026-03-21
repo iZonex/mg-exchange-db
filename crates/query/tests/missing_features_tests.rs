@@ -24,14 +24,22 @@ fn natural_join_basic() {
     let (cols, rows) = db.query("SELECT * FROM orders NATURAL JOIN fills");
     assert!(!rows.is_empty(), "NATURAL JOIN should produce rows");
     // Each row should have columns from both tables.
-    assert!(cols.len() >= 4, "expected at least 4 columns, got {}", cols.len());
+    assert!(
+        cols.len() >= 4,
+        "expected at least 4 columns, got {}",
+        cols.len()
+    );
 }
 
 #[test]
 fn natural_join_plans_correctly() {
     // Verify the planner handles NATURAL JOIN without error.
     let plan = exchange_query::plan_query("SELECT * FROM t1 NATURAL JOIN t2");
-    assert!(plan.is_ok(), "NATURAL JOIN should plan successfully: {:?}", plan.err());
+    assert!(
+        plan.is_ok(),
+        "NATURAL JOIN should plan successfully: {:?}",
+        plan.err()
+    );
 }
 
 // ===========================================================================
@@ -105,7 +113,9 @@ fn stored_procedure_drop() {
 
 #[test]
 fn stored_procedure_plans_correctly() {
-    let plan = exchange_query::plan_query("CREATE PROCEDURE foo() AS BEGIN SELECT 1 FROM long_sequence(1) END");
+    let plan = exchange_query::plan_query(
+        "CREATE PROCEDURE foo() AS BEGIN SELECT 1 FROM long_sequence(1) END",
+    );
     assert!(plan.is_ok());
     match plan.unwrap() {
         exchange_query::QueryPlan::CreateProcedure { name, body } => {
@@ -132,9 +142,13 @@ fn stored_procedure_plans_correctly() {
 #[test]
 fn create_downsampling_plans_correctly() {
     let plan = exchange_query::plan_query(
-        "CREATE DOWNSAMPLING ON trades INTERVAL 1m AS trades_1m COLUMNS first(price) as open, max(price) as high, min(price) as low, last(price) as close, sum(volume) as vol"
+        "CREATE DOWNSAMPLING ON trades INTERVAL 1m AS trades_1m COLUMNS first(price) as open, max(price) as high, min(price) as low, last(price) as close, sum(volume) as vol",
     );
-    assert!(plan.is_ok(), "CREATE DOWNSAMPLING should plan: {:?}", plan.err());
+    assert!(
+        plan.is_ok(),
+        "CREATE DOWNSAMPLING should plan: {:?}",
+        plan.err()
+    );
     match plan.unwrap() {
         exchange_query::QueryPlan::CreateDownsampling {
             source_table,
@@ -146,8 +160,14 @@ fn create_downsampling_plans_correctly() {
             assert_eq!(target_name, "trades_1m");
             assert_eq!(interval_secs, 60);
             assert_eq!(columns.len(), 5);
-            assert_eq!(columns[0], ("first".to_string(), "price".to_string(), "open".to_string()));
-            assert_eq!(columns[1], ("max".to_string(), "price".to_string(), "high".to_string()));
+            assert_eq!(
+                columns[0],
+                ("first".to_string(), "price".to_string(), "open".to_string())
+            );
+            assert_eq!(
+                columns[1],
+                ("max".to_string(), "price".to_string(), "high".to_string())
+            );
         }
         other => panic!("expected CreateDownsampling, got {other:?}"),
     }
@@ -197,10 +217,10 @@ fn select_current_schema_no_from() {
 
 #[test]
 fn mvcc_snapshot_guard_in_context() {
-    use std::sync::Arc;
     use exchange_core::mvcc::MvccManager;
     use exchange_query::context::ExecutionContext;
     use std::path::PathBuf;
+    use std::sync::Arc;
     use std::time::Instant;
 
     let mgr = Arc::new(MvccManager::new());
@@ -220,13 +240,17 @@ fn mvcc_snapshot_guard_in_context() {
         rls: None,
         current_user: None,
         sql_text: None,
-        audit_log: None, cancellation_token: None,
+        audit_log: None,
+        cancellation_token: None,
         replication_manager: None,
     };
 
     // Begin snapshot through context.
     let guard = ctx.begin_snapshot();
-    assert!(guard.is_some(), "snapshot guard should be created when MVCC is configured");
+    assert!(
+        guard.is_some(),
+        "snapshot guard should be created when MVCC is configured"
+    );
     let guard = guard.unwrap();
     assert_eq!(guard.visible_row_count("p1"), 100);
     assert_eq!(mgr.active_snapshot_count(), 1);
@@ -251,10 +275,10 @@ fn mvcc_snapshot_not_created_without_manager() {
 
 #[test]
 fn rls_filter_injection_in_context() {
-    use std::sync::Arc;
     use exchange_core::rls::{RlsManager, RowLevelPolicy};
     use exchange_query::context::ExecutionContext;
     use std::path::PathBuf;
+    use std::sync::Arc;
     use std::time::Instant;
 
     let mut rls = RlsManager::new();
@@ -281,13 +305,17 @@ fn rls_filter_injection_in_context() {
         rls: Some(Arc::new(rls)),
         current_user: Some("alice".to_string()),
         sql_text: None,
-        audit_log: None, cancellation_token: None,
+        audit_log: None,
+        cancellation_token: None,
         replication_manager: None,
     };
 
     // Should return a filter for alice on trades.
     let filter = ctx.get_rls_filter("trades");
-    assert!(filter.is_some(), "RLS filter should exist for alice on trades");
+    assert!(
+        filter.is_some(),
+        "RLS filter should exist for alice on trades"
+    );
 
     // Should not return a filter for a different table.
     let no_filter = ctx.get_rls_filter("orders");
@@ -309,12 +337,12 @@ fn rls_no_filter_without_manager() {
 
 #[test]
 fn error_messages_include_sql_context() {
-    use std::sync::Arc;
-    use exchange_query::context::ExecutionContext;
-    use exchange_query::plan_query;
-    use exchange_query::execute_with_context;
     use exchange_common::error::ExchangeDbError;
+    use exchange_query::context::ExecutionContext;
+    use exchange_query::execute_with_context;
+    use exchange_query::plan_query;
     use std::path::PathBuf;
+    use std::sync::Arc;
     use std::time::Instant;
 
     let dir = tempfile::tempdir().unwrap();
@@ -337,7 +365,8 @@ fn error_messages_include_sql_context() {
         rls: None,
         current_user: None,
         sql_text: Some(sql.to_string()),
-        audit_log: None, cancellation_token: None,
+        audit_log: None,
+        cancellation_token: None,
         replication_manager: None,
     };
 
@@ -364,5 +393,8 @@ fn query_detailed_error_format() {
     };
     let msg = err.to_string();
     assert!(msg.contains("column 'foo'"), "should contain detail: {msg}");
-    assert!(msg.contains("SELECT foo FROM trades"), "should contain SQL: {msg}");
+    assert!(
+        msg.contains("SELECT foo FROM trades"),
+        "should contain SQL: {msg}"
+    );
 }

@@ -72,9 +72,7 @@ pub fn batch_scan_and_filter(
             let row_values: Vec<Value> = columns
                 .iter()
                 .enumerate()
-                .map(|(col_idx, (_, ct))| {
-                    read_value(&mmaps[col_idx], row, *ct)
-                })
+                .map(|(col_idx, (_, ct))| read_value(&mmaps[col_idx], row, *ct))
                 .collect();
 
             let passes = match filter {
@@ -241,8 +239,7 @@ mod tests {
             ("price".into(), ColumnType::F64),
         ];
 
-        let column_indices: HashMap<String, usize> =
-            [("id".into(), 0), ("price".into(), 1)].into();
+        let column_indices: HashMap<String, usize> = [("id".into(), 0), ("price".into(), 1)].into();
 
         let filter = crate::compiled_filter::compile_filter(
             &crate::plan::Filter::Gt("price".into(), Value::F64(50.0)),

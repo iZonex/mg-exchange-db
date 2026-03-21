@@ -90,10 +90,7 @@ impl UsageMeter {
 
     /// Record a query execution for a tenant.
     pub fn record_query(&self, tenant: &str, rows_read: u64, bytes_scanned: u64) {
-        let entry = self
-            .counters
-            .entry(tenant.to_string())
-            .or_default();
+        let entry = self.counters.entry(tenant.to_string()).or_default();
         entry.queries.fetch_add(1, Ordering::Relaxed);
         entry.rows_read.fetch_add(rows_read, Ordering::Relaxed);
         entry
@@ -103,10 +100,7 @@ impl UsageMeter {
 
     /// Record a write operation for a tenant.
     pub fn record_write(&self, tenant: &str, rows: u64) {
-        let entry = self
-            .counters
-            .entry(tenant.to_string())
-            .or_default();
+        let entry = self.counters.entry(tenant.to_string()).or_default();
         entry.rows_written.fetch_add(rows, Ordering::Relaxed);
     }
 

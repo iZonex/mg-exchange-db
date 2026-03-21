@@ -7,4 +7,4 @@ pub mod model;
 pub mod store;
 
 pub use model::{Permission, Role, SecurityContext, User};
-pub use store::{hash_password, needs_rehash, verify_password, RbacStore};
+pub use store::{RbacStore, hash_password, needs_rehash, verify_password};

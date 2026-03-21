@@ -98,20 +98,27 @@ pub fn execute_join(
         // Hash join: build hash map on right side, probe with left.
         let mut right_map: HashMap<Vec<HashableValue>, Vec<usize>> = HashMap::new();
         for (i, row) in right_rows.iter().enumerate() {
-            let key: Vec<HashableValue> = on_pairs.iter().map(|(_, ri)| HashableValue::from(&row[*ri])).collect();
+            let key: Vec<HashableValue> = on_pairs
+                .iter()
+                .map(|(_, ri)| HashableValue::from(&row[*ri]))
+                .collect();
             right_map.entry(key).or_default().push(i);
         }
 
         let mut rows: Vec<Vec<Value>> = Vec::new();
         // Track which right rows were matched (for RIGHT and FULL OUTER).
-        let mut right_matched = if join_type == JoinType::Right || join_type == JoinType::FullOuter {
+        let mut right_matched = if join_type == JoinType::Right || join_type == JoinType::FullOuter
+        {
             vec![false; right_rows.len()]
         } else {
             Vec::new()
         };
 
         for left_row in &left_rows {
-            let key: Vec<HashableValue> = on_pairs.iter().map(|(li, _)| HashableValue::from(&left_row[*li])).collect();
+            let key: Vec<HashableValue> = on_pairs
+                .iter()
+                .map(|(li, _)| HashableValue::from(&left_row[*li]))
+                .collect();
             if let Some(right_indices) = right_map.get(&key) {
                 for &ri in right_indices {
                     let mut combined = left_row.clone();
@@ -132,7 +139,8 @@ pub fn execute_join(
         if join_type == JoinType::Right || join_type == JoinType::FullOuter {
             for (i, matched) in right_matched.iter().enumerate() {
                 if !matched {
-                    let mut combined: Vec<Value> = std::iter::repeat_n(Value::Null, left_col_count).collect();
+                    let mut combined: Vec<Value> =
+                        std::iter::repeat_n(Value::Null, left_col_count).collect();
                     combined.extend(right_rows[i].iter().cloned());
                     rows.push(combined);
                 }
@@ -161,9 +169,10 @@ pub fn execute_join(
     // so that filters referencing either form can resolve correctly.
     let result_rows = if let Some(f) = filter {
         let filter_col_names: Vec<String> = all_resolved.iter().map(|(_, n)| n.clone()).collect();
-        result_rows.into_iter().filter(|row| {
-            evaluate_join_filter(f, row, &filter_col_names)
-        }).collect()
+        result_rows
+            .into_iter()
+            .filter(|row| evaluate_join_filter(f, row, &filter_col_names))
+            .collect()
     } else {
         result_rows
     };
@@ -218,7 +227,11 @@ pub fn execute_multi_join(
     let left_result = crate::executor::execute(db_root, left_plan)?;
     let (left_col_names, left_rows) = match left_result {
         QueryResult::Rows { columns, rows } => (columns, rows),
-        _ => return Err(ExchangeDbError::Query("left side of multi-join did not produce rows".into())),
+        _ => {
+            return Err(ExchangeDbError::Query(
+                "left side of multi-join did not produce rows".into(),
+            ));
+        }
     };
 
     // Read right table.
@@ -229,7 +242,8 @@ pub fn execute_multi_join(
     let right_meta = exchange_core::table::TableMeta::load(&right_dir.join("_meta"))?;
     let right_label = right_alias.unwrap_or(right_table);
     let right_resolved = resolve_columns(&right_meta, &[SelectColumn::Wildcard])?;
-    let right_rows = crate::parallel::parallel_scan_partitions(&right_dir, &right_meta, &right_resolved, None)?;
+    let right_rows =
+        crate::parallel::parallel_scan_partitions(&right_dir, &right_meta, &right_resolved, None)?;
 
     // Handle NATURAL JOIN: auto-detect common columns.
     let resolved_on_columns: Vec<(String, String)>;
@@ -237,7 +251,10 @@ pub fn execute_multi_join(
         && on_columns[0].0 == "__natural__"
         && on_columns[0].1 == "__natural__"
     {
-        let right_col_names: Vec<String> = right_resolved.iter().map(|(_, name)| name.clone()).collect();
+        let right_col_names: Vec<String> = right_resolved
+            .iter()
+            .map(|(_, name)| name.clone())
+            .collect();
         resolved_on_columns = left_col_names
             .iter()
             .filter(|n| right_col_names.contains(n))
@@ -281,22 +298,33 @@ pub fn execute_multi_join(
     } else {
         let mut right_map: HashMap<Vec<HashableValue>, Vec<usize>> = HashMap::new();
         for (i, row) in right_rows.iter().enumerate() {
-            let key: Vec<HashableValue> = on_pairs.iter().map(|(_, ri)| HashableValue::from(&row[*ri])).collect();
+            let key: Vec<HashableValue> = on_pairs
+                .iter()
+                .map(|(_, ri)| HashableValue::from(&row[*ri]))
+                .collect();
             right_map.entry(key).or_default().push(i);
         }
         let mut rows: Vec<Vec<Value>> = Vec::new();
-        let mut right_matched = if join_type == JoinType::Right || join_type == JoinType::FullOuter {
+        let mut right_matched = if join_type == JoinType::Right || join_type == JoinType::FullOuter
+        {
             vec![false; right_rows.len()]
-        } else { Vec::new() };
+        } else {
+            Vec::new()
+        };
 
         for left_row in &left_rows {
-            let key: Vec<HashableValue> = on_pairs.iter().map(|(li, _)| HashableValue::from(&left_row[*li])).collect();
+            let key: Vec<HashableValue> = on_pairs
+                .iter()
+                .map(|(li, _)| HashableValue::from(&left_row[*li]))
+                .collect();
             if let Some(right_indices) = right_map.get(&key) {
                 for &ri in right_indices {
                     let mut combined = left_row.clone();
                     combined.extend(right_rows[ri].iter().cloned());
                     rows.push(combined);
-                    if !right_matched.is_empty() { right_matched[ri] = true; }
+                    if !right_matched.is_empty() {
+                        right_matched[ri] = true;
+                    }
                 }
             } else if join_type == JoinType::Left || join_type == JoinType::FullOuter {
                 let mut combined = left_row.clone();
@@ -308,7 +336,8 @@ pub fn execute_multi_join(
         if join_type == JoinType::Right || join_type == JoinType::FullOuter {
             for (i, matched) in right_matched.iter().enumerate() {
                 if !matched {
-                    let mut combined: Vec<Value> = std::iter::repeat_n(Value::Null, left_col_count).collect();
+                    let mut combined: Vec<Value> =
+                        std::iter::repeat_n(Value::Null, left_col_count).collect();
                     combined.extend(right_rows[i].iter().cloned());
                     rows.push(combined);
                 }
@@ -324,37 +353,56 @@ pub fn execute_multi_join(
         .map(|(i, n)| (i, n.clone()))
         .collect();
     all_resolved.extend(
-        right_resolved.iter().enumerate()
-            .map(|(i, (_, n))| (left_col_count + i, format!("{right_label}.{n}")))
+        right_resolved
+            .iter()
+            .enumerate()
+            .map(|(i, (_, n))| (left_col_count + i, format!("{right_label}.{n}"))),
     );
 
     // Apply WHERE filter on the combined rows.
     let result_rows = if let Some(f) = filter {
         let filter_col_names: Vec<String> = all_resolved.iter().map(|(_, n)| n.clone()).collect();
-        result_rows.into_iter().filter(|row| {
-            evaluate_join_filter(f, row, &filter_col_names)
-        }).collect()
+        result_rows
+            .into_iter()
+            .filter(|row| evaluate_join_filter(f, row, &filter_col_names))
+            .collect()
     } else {
         result_rows
     };
 
     // For project_join_columns we need left_resolved and right_resolved.
     // Since left came from a sub-query, its "resolved" is just column names.
-    let _left_resolved_fake: Vec<(usize, String)> = left_col_names.iter().enumerate().map(|(i, n)| (i, n.clone())).collect();
+    let _left_resolved_fake: Vec<(usize, String)> = left_col_names
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (i, n.clone()))
+        .collect();
     let _left_label = ""; // multi-join left has no single label
 
     let (col_names, mut output_rows) = project_join_columns_multi(
-        columns, &all_resolved, &result_rows, &left_col_names, right_label, &right_resolved,
+        columns,
+        &all_resolved,
+        &result_rows,
+        &left_col_names,
+        right_label,
+        &right_resolved,
     )?;
 
     if !order_by.is_empty() {
-        let fake_resolved: Vec<(usize, String)> = col_names.iter().enumerate().map(|(i, n)| (i, n.clone())).collect();
+        let fake_resolved: Vec<(usize, String)> = col_names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (i, n.clone()))
+            .collect();
         apply_order_by(&mut output_rows, &fake_resolved, order_by);
     }
     if let Some(lim) = limit {
         output_rows.truncate(lim as usize);
     }
-    Ok(QueryResult::Rows { columns: col_names, rows: output_rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows: output_rows,
+    })
 }
 
 /// Resolve a column reference in a virtual result set (from a sub-query).
@@ -366,11 +414,16 @@ fn resolve_on_col_virtual(col_ref: &str, col_names: &[String]) -> Result<usize> 
     // Try suffix match: "alias.col" matches "...alias.col" or just "col".
     if let Some(dot_pos) = col_ref.find('.') {
         let col_name = &col_ref[dot_pos + 1..];
-        if let Some(i) = col_names.iter().position(|n| n.ends_with(&format!(".{col_name}")) || n == col_name) {
+        if let Some(i) = col_names
+            .iter()
+            .position(|n| n.ends_with(&format!(".{col_name}")) || n == col_name)
+        {
             return Ok(i);
         }
     }
-    Err(ExchangeDbError::Query(format!("multi-join column not found: {col_ref}")))
+    Err(ExchangeDbError::Query(format!(
+        "multi-join column not found: {col_ref}"
+    )))
 }
 
 /// Project output columns for multi-join results.
@@ -417,36 +470,60 @@ fn project_join_columns_multi(
                     output_indices.push(i);
                     output_names.push(col_name.clone());
                 } else {
-                    return Err(ExchangeDbError::Query(format!("column {table}.{col_name} not found in multi-join result")));
+                    return Err(ExchangeDbError::Query(format!(
+                        "column {table}.{col_name} not found in multi-join result"
+                    )));
                 }
             }
             JoinSelectColumn::Unqualified(col_name) => {
-                if let Some(i) = all_resolved.iter().position(|(_, n)| n.ends_with(&format!(".{col_name}")) || n == col_name) {
+                if let Some(i) = all_resolved
+                    .iter()
+                    .position(|(_, n)| n.ends_with(&format!(".{col_name}")) || n == col_name)
+                {
                     output_indices.push(i);
                     output_names.push(col_name.clone());
                 } else {
-                    return Err(ExchangeDbError::Query(format!("column {col_name} not found in multi-join result")));
+                    return Err(ExchangeDbError::Query(format!(
+                        "column {col_name} not found in multi-join result"
+                    )));
                 }
             }
             JoinSelectColumn::QualifiedAlias(table, col_name, alias) => {
-                let prefixed = if table.is_empty() { col_name.clone() } else { format!("{table}.{col_name}") };
-                if let Some(i) = all_resolved.iter().position(|(_, n)| *n == prefixed || n.ends_with(&format!(".{col_name}"))) {
+                let prefixed = if table.is_empty() {
+                    col_name.clone()
+                } else {
+                    format!("{table}.{col_name}")
+                };
+                if let Some(i) = all_resolved
+                    .iter()
+                    .position(|(_, n)| *n == prefixed || n.ends_with(&format!(".{col_name}")))
+                {
                     output_indices.push(i);
                     output_names.push(alias.clone());
                 } else {
-                    return Err(ExchangeDbError::Query(format!("column {prefixed} not found in multi-join result")));
+                    return Err(ExchangeDbError::Query(format!(
+                        "column {prefixed} not found in multi-join result"
+                    )));
                 }
             }
-            JoinSelectColumn::Expression { .. } | JoinSelectColumn::Aggregate { .. } | JoinSelectColumn::CaseWhen { .. } => {
+            JoinSelectColumn::Expression { .. }
+            | JoinSelectColumn::Aggregate { .. }
+            | JoinSelectColumn::CaseWhen { .. } => {
                 output_indices.push(0); // placeholder
                 output_names.push("expr".to_string());
             }
         }
     }
 
-    let output_rows: Vec<Vec<Value>> = rows.iter().map(|row| {
-        output_indices.iter().map(|&i| row.get(i).cloned().unwrap_or(Value::Null)).collect()
-    }).collect();
+    let output_rows: Vec<Vec<Value>> = rows
+        .iter()
+        .map(|row| {
+            output_indices
+                .iter()
+                .map(|&i| row.get(i).cloned().unwrap_or(Value::Null))
+                .collect()
+        })
+        .collect();
 
     Ok((output_names, output_rows))
 }
@@ -515,12 +592,8 @@ impl PartialEq for HashableValue {
             (HashableValue::Str(a), HashableValue::Str(b)) => a == b,
             (HashableValue::Timestamp(a), HashableValue::Timestamp(b)) => a == b,
             // Cross-type: Timestamp vs Numeric (both are numeric-like).
-            (HashableValue::Timestamp(a), HashableValue::Numeric(b)) => {
-                (*a as f64).to_bits() == *b
-            }
-            (HashableValue::Numeric(a), HashableValue::Timestamp(b)) => {
-                *a == (*b as f64).to_bits()
-            }
+            (HashableValue::Timestamp(a), HashableValue::Numeric(b)) => (*a as f64).to_bits() == *b,
+            (HashableValue::Numeric(a), HashableValue::Timestamp(b)) => *a == (*b as f64).to_bits(),
             _ => false,
         }
     }
@@ -558,45 +631,81 @@ fn evaluate_join_filter(filter: &Filter, row: &[Value], col_names: &[String]) ->
     // Use evaluate_filter_virtual but with a wrapper for PlanExpr-based filters
     // that does suffix matching. For simple column-based filters, also do suffix matching.
     match filter {
-        Filter::Eq(col, expected) => {
-            get_join_value(col, row, col_names).as_ref().map(|v| v.eq_coerce(expected)).unwrap_or(false)
-        }
-        Filter::Gt(col, expected) => {
-            get_join_value(col, row, col_names).as_ref().map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater)).unwrap_or(false)
-        }
-        Filter::Lt(col, expected) => {
-            get_join_value(col, row, col_names).as_ref().map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less)).unwrap_or(false)
-        }
-        Filter::Gte(col, expected) => {
-            get_join_value(col, row, col_names).as_ref().map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))).unwrap_or(false)
-        }
-        Filter::Lte(col, expected) => {
-            get_join_value(col, row, col_names).as_ref().map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal))).unwrap_or(false)
-        }
-        Filter::And(parts) => parts.iter().all(|p| evaluate_join_filter(p, row, col_names)),
-        Filter::Or(parts) => parts.iter().any(|p| evaluate_join_filter(p, row, col_names)),
+        Filter::Eq(col, expected) => get_join_value(col, row, col_names)
+            .as_ref()
+            .map(|v| v.eq_coerce(expected))
+            .unwrap_or(false),
+        Filter::Gt(col, expected) => get_join_value(col, row, col_names)
+            .as_ref()
+            .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater))
+            .unwrap_or(false),
+        Filter::Lt(col, expected) => get_join_value(col, row, col_names)
+            .as_ref()
+            .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less))
+            .unwrap_or(false),
+        Filter::Gte(col, expected) => get_join_value(col, row, col_names)
+            .as_ref()
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(expected),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::Lte(col, expected) => get_join_value(col, row, col_names)
+            .as_ref()
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(expected),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::And(parts) => parts
+            .iter()
+            .all(|p| evaluate_join_filter(p, row, col_names)),
+        Filter::Or(parts) => parts
+            .iter()
+            .any(|p| evaluate_join_filter(p, row, col_names)),
         Filter::IsNull(col) => {
-            matches!(get_join_value(col, row, col_names).as_ref(), None | Some(Value::Null))
+            matches!(
+                get_join_value(col, row, col_names).as_ref(),
+                None | Some(Value::Null)
+            )
         }
         Filter::IsNotNull(col) => {
             matches!(get_join_value(col, row, col_names).as_ref(), Some(v) if *v != Value::Null)
         }
-        Filter::In(col, list) => {
-            get_join_value(col, row, col_names).as_ref().map(|v| list.iter().any(|item| v.eq_coerce(item))).unwrap_or(false)
-        }
-        Filter::NotIn(col, list) => {
-            get_join_value(col, row, col_names).as_ref().map(|v| !list.iter().any(|item| v.eq_coerce(item))).unwrap_or(true)
-        }
-        Filter::Between(col, low, high) => {
-            get_join_value(col, row, col_names)
-                .as_ref()
-                .map(|v| matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                      && matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)))
-                .unwrap_or(false)
-        }
-        Filter::Like(col, pattern) => {
-            get_join_value(col, row, col_names).as_ref().map(|v| if let Value::Str(s) = v { crate::executor::like_match(s, pattern, false) } else { false }).unwrap_or(false)
-        }
+        Filter::In(col, list) => get_join_value(col, row, col_names)
+            .as_ref()
+            .map(|v| list.iter().any(|item| v.eq_coerce(item)))
+            .unwrap_or(false),
+        Filter::NotIn(col, list) => get_join_value(col, row, col_names)
+            .as_ref()
+            .map(|v| !list.iter().any(|item| v.eq_coerce(item)))
+            .unwrap_or(true),
+        Filter::Between(col, low, high) => get_join_value(col, row, col_names)
+            .as_ref()
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(low),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    v.cmp_coerce(high),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::Like(col, pattern) => get_join_value(col, row, col_names)
+            .as_ref()
+            .map(|v| {
+                if let Value::Str(s) = v {
+                    crate::executor::like_match(s, pattern, false)
+                } else {
+                    false
+                }
+            })
+            .unwrap_or(false),
         Filter::Expression { left, op, right } => {
             let lv = evaluate_plan_expr_join(left, row, col_names);
             let rv = evaluate_plan_expr_join(right, row, col_names);
@@ -605,8 +714,14 @@ fn evaluate_join_filter(filter: &Filter, row: &[Value], col_names: &[String]) ->
                 CompareOp::NotEq => !lv.eq_coerce(&rv),
                 CompareOp::Gt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Greater),
                 CompareOp::Lt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Less),
-                CompareOp::Gte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)),
-                CompareOp::Lte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)),
+                CompareOp::Gte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ),
+                CompareOp::Lte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                ),
             }
         }
         _ => evaluate_filter_virtual(filter, row, col_names),
@@ -637,9 +752,14 @@ fn evaluate_plan_expr_join(expr: &PlanExpr, row: &[Value], col_names: &[String])
             *op,
             &evaluate_plan_expr_join(right, row, col_names),
         ),
-        PlanExpr::UnaryOp { op, expr } => crate::executor::apply_unary_op(*op, &evaluate_plan_expr_join(expr, row, col_names)),
+        PlanExpr::UnaryOp { op, expr } => {
+            crate::executor::apply_unary_op(*op, &evaluate_plan_expr_join(expr, row, col_names))
+        }
         PlanExpr::Function { name, args } => {
-            let func_args: Vec<Value> = args.iter().map(|a| evaluate_plan_expr_join(a, row, col_names)).collect();
+            let func_args: Vec<Value> = args
+                .iter()
+                .map(|a| evaluate_plan_expr_join(a, row, col_names))
+                .collect();
             crate::scalar::evaluate_scalar(name, &func_args).unwrap_or(Value::Null)
         }
     }
@@ -679,7 +799,12 @@ fn project_join_columns(
                         output_names.push(name.clone());
                     }
                 } else if table == right_label {
-                    for (i, (_, name)) in all_resolved.iter().enumerate().skip(left_count).take(right_resolved.len()) {
+                    for (i, (_, name)) in all_resolved
+                        .iter()
+                        .enumerate()
+                        .skip(left_count)
+                        .take(right_resolved.len())
+                    {
                         output_cols.push(OutputCol::Index(i));
                         output_names.push(name.clone());
                     }
@@ -699,17 +824,24 @@ fn project_join_columns(
             JoinSelectColumn::QualifiedAlias(table, col_name, alias) => {
                 if table.is_empty() {
                     // Unqualified with alias
-                    if let Some(i) = all_resolved.iter().position(|(_, n)| n.ends_with(&format!(".{col_name}"))) {
+                    if let Some(i) = all_resolved
+                        .iter()
+                        .position(|(_, n)| n.ends_with(&format!(".{col_name}")))
+                    {
                         output_cols.push(OutputCol::Index(i));
                     } else {
-                        return Err(ExchangeDbError::Query(format!("column {col_name} not found in join result")));
+                        return Err(ExchangeDbError::Query(format!(
+                            "column {col_name} not found in join result"
+                        )));
                     }
                 } else {
                     let prefixed = format!("{table}.{col_name}");
                     if let Some(i) = all_resolved.iter().position(|(_, n)| *n == prefixed) {
                         output_cols.push(OutputCol::Index(i));
                     } else {
-                        return Err(ExchangeDbError::Query(format!("column {table}.{col_name} not found in join result")));
+                        return Err(ExchangeDbError::Query(format!(
+                            "column {table}.{col_name} not found in join result"
+                        )));
                     }
                 }
                 output_names.push(alias.clone());
@@ -731,10 +863,19 @@ fn project_join_columns(
                 output_cols.push(OutputCol::Expr(expr.clone()));
                 output_names.push(alias.clone().unwrap_or_else(|| "expr".to_string()));
             }
-            JoinSelectColumn::Aggregate { function, column, alias, .. } => {
+            JoinSelectColumn::Aggregate {
+                function,
+                column,
+                alias,
+                ..
+            } => {
                 // Aggregates in JOIN are handled during GROUP BY/HAVING; pass through as placeholder.
                 let func_name = format!("{function:?}").to_ascii_lowercase();
-                output_names.push(alias.clone().unwrap_or_else(|| format!("{func_name}({column})")));
+                output_names.push(
+                    alias
+                        .clone()
+                        .unwrap_or_else(|| format!("{func_name}({column})")),
+                );
                 output_cols.push(OutputCol::Index(0)); // placeholder
             }
             JoinSelectColumn::CaseWhen { alias, .. } => {
@@ -751,7 +892,9 @@ fn project_join_columns(
                 .iter()
                 .map(|oc| match oc {
                     OutputCol::Index(i) => row.get(*i).cloned().unwrap_or(Value::Null),
-                    OutputCol::Expr(expr) => crate::executor::evaluate_plan_expr_by_name(expr, row, &col_names),
+                    OutputCol::Expr(expr) => {
+                        crate::executor::evaluate_plan_expr_by_name(expr, row, &col_names)
+                    }
                 })
                 .collect()
         })
@@ -772,12 +915,18 @@ mod tests {
     ) -> Vec<Vec<Value>> {
         let mut right_map: HashMap<Vec<HashableValue>, Vec<usize>> = HashMap::new();
         for (i, row) in right.iter().enumerate() {
-            let key: Vec<HashableValue> = right_keys.iter().map(|&k| HashableValue::from(&row[k])).collect();
+            let key: Vec<HashableValue> = right_keys
+                .iter()
+                .map(|&k| HashableValue::from(&row[k]))
+                .collect();
             right_map.entry(key).or_default().push(i);
         }
         let mut result = Vec::new();
         for left_row in left {
-            let key: Vec<HashableValue> = left_keys.iter().map(|&k| HashableValue::from(&left_row[k])).collect();
+            let key: Vec<HashableValue> = left_keys
+                .iter()
+                .map(|&k| HashableValue::from(&left_row[k]))
+                .collect();
             if let Some(indices) = right_map.get(&key) {
                 for &ri in indices {
                     let mut combined = left_row.clone();
@@ -798,12 +947,18 @@ mod tests {
     ) -> Vec<Vec<Value>> {
         let mut right_map: HashMap<Vec<HashableValue>, Vec<usize>> = HashMap::new();
         for (i, row) in right.iter().enumerate() {
-            let key: Vec<HashableValue> = right_keys.iter().map(|&k| HashableValue::from(&row[k])).collect();
+            let key: Vec<HashableValue> = right_keys
+                .iter()
+                .map(|&k| HashableValue::from(&row[k]))
+                .collect();
             right_map.entry(key).or_default().push(i);
         }
         let mut result = Vec::new();
         for left_row in left {
-            let key: Vec<HashableValue> = left_keys.iter().map(|&k| HashableValue::from(&left_row[k])).collect();
+            let key: Vec<HashableValue> = left_keys
+                .iter()
+                .map(|&k| HashableValue::from(&left_row[k]))
+                .collect();
             if let Some(indices) = right_map.get(&key) {
                 for &ri in indices {
                     let mut combined = left_row.clone();
@@ -870,13 +1025,19 @@ mod tests {
     ) -> Vec<Vec<Value>> {
         let mut right_map: HashMap<Vec<HashableValue>, Vec<usize>> = HashMap::new();
         for (i, row) in right.iter().enumerate() {
-            let key: Vec<HashableValue> = right_keys.iter().map(|&k| HashableValue::from(&row[k])).collect();
+            let key: Vec<HashableValue> = right_keys
+                .iter()
+                .map(|&k| HashableValue::from(&row[k]))
+                .collect();
             right_map.entry(key).or_default().push(i);
         }
         let mut result = Vec::new();
         let mut right_matched = vec![false; right.len()];
         for left_row in left {
-            let key: Vec<HashableValue> = left_keys.iter().map(|&k| HashableValue::from(&left_row[k])).collect();
+            let key: Vec<HashableValue> = left_keys
+                .iter()
+                .map(|&k| HashableValue::from(&left_row[k]))
+                .collect();
             if let Some(indices) = right_map.get(&key) {
                 for &ri in indices {
                     let mut combined = left_row.clone();
@@ -889,7 +1050,9 @@ mod tests {
         // Emit unmatched right rows with NULLs on left side.
         for (i, matched) in right_matched.iter().enumerate() {
             if !matched {
-                let mut combined: Vec<Value> = std::iter::repeat(Value::Null).take(left_col_count).collect();
+                let mut combined: Vec<Value> = std::iter::repeat(Value::Null)
+                    .take(left_col_count)
+                    .collect();
                 combined.extend(right[i].iter().cloned());
                 result.push(combined);
             }
@@ -908,13 +1071,19 @@ mod tests {
     ) -> Vec<Vec<Value>> {
         let mut right_map: HashMap<Vec<HashableValue>, Vec<usize>> = HashMap::new();
         for (i, row) in right.iter().enumerate() {
-            let key: Vec<HashableValue> = right_keys.iter().map(|&k| HashableValue::from(&row[k])).collect();
+            let key: Vec<HashableValue> = right_keys
+                .iter()
+                .map(|&k| HashableValue::from(&row[k]))
+                .collect();
             right_map.entry(key).or_default().push(i);
         }
         let mut result = Vec::new();
         let mut right_matched = vec![false; right.len()];
         for left_row in left {
-            let key: Vec<HashableValue> = left_keys.iter().map(|&k| HashableValue::from(&left_row[k])).collect();
+            let key: Vec<HashableValue> = left_keys
+                .iter()
+                .map(|&k| HashableValue::from(&left_row[k]))
+                .collect();
             if let Some(indices) = right_map.get(&key) {
                 for &ri in indices {
                     let mut combined = left_row.clone();
@@ -930,7 +1099,9 @@ mod tests {
         }
         for (i, matched) in right_matched.iter().enumerate() {
             if !matched {
-                let mut combined: Vec<Value> = std::iter::repeat(Value::Null).take(left_col_count).collect();
+                let mut combined: Vec<Value> = std::iter::repeat(Value::Null)
+                    .take(left_col_count)
+                    .collect();
                 combined.extend(right[i].iter().cloned());
                 result.push(combined);
             }
@@ -1010,10 +1181,7 @@ mod tests {
 
     #[test]
     fn test_cross_join() {
-        let left = vec![
-            vec![Value::Str("1m".into())],
-            vec![Value::Str("5m".into())],
-        ];
+        let left = vec![vec![Value::Str("1m".into())], vec![Value::Str("5m".into())]];
         let right = vec![
             vec![Value::Str("BTC".into())],
             vec![Value::Str("ETH".into())],

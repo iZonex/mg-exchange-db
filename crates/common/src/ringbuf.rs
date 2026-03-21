@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::cell::UnsafeCell;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Single-Producer Single-Consumer lock-free ring buffer.
 /// Optimized for low-latency message passing between threads.

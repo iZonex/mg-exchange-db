@@ -64,9 +64,8 @@ impl RecordCursor for LimitCursor {
                             break;
                         }
 
-                        let row: Vec<Value> = (0..b.columns.len())
-                            .map(|c| b.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> =
+                            (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                         result.append_row(&row);
                         self.rows_emitted += 1;
 

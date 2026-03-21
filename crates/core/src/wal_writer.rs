@@ -14,7 +14,7 @@ use crate::replication::ReplicationManager;
 use crate::sync::SyncMode;
 use crate::table::TableMeta;
 use crate::wal::merge::WalMergeJob;
-use crate::wal::row_codec::{encode_row, OwnedColumnValue};
+use crate::wal::row_codec::{OwnedColumnValue, encode_row};
 use crate::wal::writer::{CommitMode, WalWriter, WalWriterConfig};
 
 /// Configuration for the WAL table writer.
@@ -89,11 +89,7 @@ impl WalTableWriter {
     /// - `db_root`: root data directory
     /// - `table_name`: name of the table (subdirectory of `db_root`)
     /// - `config`: writer configuration
-    pub fn open(
-        db_root: &Path,
-        table_name: &str,
-        config: WalTableWriterConfig,
-    ) -> Result<Self> {
+    pub fn open(db_root: &Path, table_name: &str, config: WalTableWriterConfig) -> Result<Self> {
         let table_dir = db_root.join(table_name);
         let meta = TableMeta::load(&table_dir.join("_meta"))?;
         let wal_dir = table_dir.join("wal");
@@ -114,11 +110,7 @@ impl WalTableWriter {
                 .map(|entries| {
                     entries
                         .filter_map(|e| e.ok())
-                        .any(|e| {
-                            e.file_name()
-                                .to_string_lossy()
-                                .ends_with(".wal")
-                        })
+                        .any(|e| e.file_name().to_string_lossy().ends_with(".wal"))
                 })
                 .unwrap_or(false);
 
@@ -243,11 +235,15 @@ impl WalTableWriter {
                         if let Ok(handle) = rt {
                             handle.spawn(async move {
                                 // Ensure schema is synced first.
-                                if let Err(e) = mgr.ensure_schema_synced(&table_name, &table_dir).await {
+                                if let Err(e) =
+                                    mgr.ensure_schema_synced(&table_name, &table_dir).await
+                                {
                                     tracing::warn!(error = %e, "failed to sync schema");
                                 }
                                 // Ship the pre-read segment bytes.
-                                if let Err(e) = mgr.ship_segment_bytes(&table_name, &segment_bytes).await {
+                                if let Err(e) =
+                                    mgr.ship_segment_bytes(&table_name, &segment_bytes).await
+                                {
                                     tracing::error!(error = %e, "failed to ship WAL segment");
                                 }
                             });
@@ -261,8 +257,7 @@ impl WalTableWriter {
         }
 
         // Run the merge job only when configured and interval has elapsed.
-        let should_merge = self.merge_on_commit
-            && self.last_merge.elapsed() >= self.merge_interval;
+        let should_merge = self.merge_on_commit && self.last_merge.elapsed() >= self.merge_interval;
 
         if should_merge {
             self.run_merge()?;
@@ -431,12 +426,13 @@ fn find_latest_wal_segment(wal_dir: &Path) -> Option<PathBuf> {
         let name = name.to_string_lossy();
         if let Some(rest) = name.strip_prefix("wal-")
             && let Some(id_str) = rest.strip_suffix(".wal")
-                && let Ok(id) = id_str.parse::<u32>() {
-                    match &best {
-                        Some((best_id, _)) if id <= *best_id => {}
-                        _ => best = Some((id, entry.path())),
-                    }
-                }
+            && let Ok(id) = id_str.parse::<u32>()
+        {
+            match &best {
+                Some((best_id, _)) if id <= *best_id => {}
+                _ => best = Some((id, entry.path())),
+            }
+        }
     }
 
     best.map(|(_, path)| path)
@@ -467,9 +463,9 @@ impl WalTableWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::column::FixedColumnReader;
     use crate::table::TableBuilder;
     use crate::txn::TxnFile;
-    use crate::column::FixedColumnReader;
     use exchange_common::types::{ColumnType, PartitionBy};
     use tempfile::tempdir;
 

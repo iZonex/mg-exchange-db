@@ -34,9 +34,7 @@ fn verify_snapshot_valid() {
 
     let mut writer = TableWriter::open(db_root, "trades").unwrap();
     let ts = Timestamp::from_secs(1710513000);
-    writer
-        .write_row(ts, &[ColumnValue::F64(100.0)])
-        .unwrap();
+    writer.write_row(ts, &[ColumnValue::F64(100.0)]).unwrap();
     writer.flush().unwrap();
     drop(writer);
 

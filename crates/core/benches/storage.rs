@@ -1,9 +1,11 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkGroup, Criterion, Throughput};
+use criterion::{
+    BenchmarkGroup, Criterion, Throughput, black_box, criterion_group, criterion_main,
+};
+use exchange_common::ringbuf::SpscRingBuffer;
 use exchange_common::types::ColumnType;
 use exchange_core::column::{FixedColumnReader, FixedColumnWriter, VarColumnWriter};
 use exchange_core::index::symbol_map::SymbolMap;
 use exchange_core::mmap::MmapFile;
-use exchange_common::ringbuf::SpscRingBuffer;
 use tempfile::tempdir;
 
 const MILLION: u64 = 1_000_000;

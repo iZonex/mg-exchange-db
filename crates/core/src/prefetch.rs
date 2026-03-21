@@ -107,11 +107,8 @@ impl PrefetchScheduler {
             {
                 // memmap2 does not expose DONTNEED directly in all versions;
                 // we use Sequential as a reasonable hint that we are done.
-                let _ = inner.advise_range(
-                    memmap2::Advice::Sequential,
-                    offset as usize,
-                    len as usize,
-                );
+                let _ =
+                    inner.advise_range(memmap2::Advice::Sequential, offset as usize, len as usize);
             }
             #[cfg(not(unix))]
             {

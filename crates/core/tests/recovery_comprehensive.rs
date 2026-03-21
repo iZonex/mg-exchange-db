@@ -49,11 +49,7 @@ fn create_table_3col(db_root: &Path, name: &str) -> TableMeta {
 }
 
 /// Helper: write rows to WAL and flush (no commit = simulated crash).
-fn write_and_flush(
-    db_root: &Path,
-    table_name: &str,
-    rows: &[(i64, f64)],
-) {
+fn write_and_flush(db_root: &Path, table_name: &str, rows: &[(i64, f64)]) {
     let config = WalTableWriterConfig::default();
     let mut writer = WalTableWriter::open(db_root, table_name, config).unwrap();
     for &(ts, price) in rows {
@@ -72,11 +68,7 @@ fn write_and_flush(
 }
 
 /// Helper: write rows to WAL and commit (normal operation).
-fn write_and_commit(
-    db_root: &Path,
-    table_name: &str,
-    rows: &[(i64, f64)],
-) {
+fn write_and_commit(db_root: &Path, table_name: &str, rows: &[(i64, f64)]) {
     let config = WalTableWriterConfig::default();
     let mut writer = WalTableWriter::open(db_root, table_name, config).unwrap();
     for &(ts, price) in rows {
@@ -131,11 +123,9 @@ mod basic_recovery {
         assert_eq!(stats.tables_recovered, 1);
         assert_eq!(stats.rows_recovered, 1);
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.row_count(), 1);
         assert_eq!(reader.read_f64(0), 42000.0);
     }
@@ -148,20 +138,15 @@ mod basic_recovery {
         write_and_flush(
             db_root,
             "t",
-            &[
-                (TS_DAY1, 65000.0),
-                (TS_DAY1 + 1_000_000_000, 65100.0),
-            ],
+            &[(TS_DAY1, 65000.0), (TS_DAY1 + 1_000_000_000, 65100.0)],
         );
 
         let stats = RecoveryManager::recover_all(db_root).unwrap();
         assert_eq!(stats.rows_recovered, 2);
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.row_count(), 2);
         assert_eq!(reader.read_f64(0), 65000.0);
         assert_eq!(reader.read_f64(1), 65100.0);
@@ -212,11 +197,9 @@ mod basic_recovery {
 
         RecoveryManager::recover_all(db_root).unwrap();
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.row_count(), 3);
         assert_eq!(reader.read_f64(0), 100.0);
         assert_eq!(reader.read_f64(1), 200.0);
@@ -233,11 +216,9 @@ mod basic_recovery {
         let stats = RecoveryManager::recover_all(db_root).unwrap();
         assert_eq!(stats.rows_recovered, 0);
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.row_count(), 1);
     }
 }
@@ -261,11 +242,9 @@ mod idempotent_recovery {
         let stats2 = RecoveryManager::recover_all(db_root).unwrap();
         assert_eq!(stats2.rows_recovered, 0);
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.row_count(), 1);
     }
 
@@ -281,11 +260,9 @@ mod idempotent_recovery {
         let stats3 = RecoveryManager::recover_all(db_root).unwrap();
         assert_eq!(stats3.rows_recovered, 0);
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.row_count(), 1);
         assert_eq!(reader.read_f64(0), 50000.0);
     }
@@ -321,7 +298,11 @@ mod multi_table_recovery {
         create_table_2col(db_root, "c");
 
         write_and_flush(db_root, "a", &[(TS_DAY1, 1.0)]);
-        write_and_flush(db_root, "b", &[(TS_DAY1, 2.0), (TS_DAY1 + 1_000_000_000, 3.0)]);
+        write_and_flush(
+            db_root,
+            "b",
+            &[(TS_DAY1, 2.0), (TS_DAY1 + 1_000_000_000, 3.0)],
+        );
         write_and_flush(db_root, "c", &[(TS_DAY1, 4.0)]);
 
         let stats = RecoveryManager::recover_all(db_root).unwrap();
@@ -381,18 +362,14 @@ mod multi_table_recovery {
 
         RecoveryManager::recover_all(db_root).unwrap();
 
-        let btc_reader = FixedColumnReader::open(
-            &db_root.join("btc/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let btc_reader =
+            FixedColumnReader::open(&db_root.join("btc/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(btc_reader.read_f64(0), 65000.0);
 
-        let eth_reader = FixedColumnReader::open(
-            &db_root.join("eth/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let eth_reader =
+            FixedColumnReader::open(&db_root.join("eth/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(eth_reader.read_f64(0), 3500.0);
     }
 }
@@ -431,18 +408,14 @@ mod three_col_recovery {
         let stats = RecoveryManager::recover_all(db_root).unwrap();
         assert_eq!(stats.rows_recovered, 1);
 
-        let price_reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let price_reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(price_reader.read_f64(0), 100.0);
 
-        let vol_reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/volume.d"),
-            ColumnType::I64,
-        )
-        .unwrap();
+        let vol_reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/volume.d"), ColumnType::I64)
+                .unwrap();
         assert_eq!(vol_reader.read_i64(0), 500);
     }
 
@@ -473,28 +446,21 @@ mod three_col_recovery {
         write_3col_and_flush(
             db_root,
             "t",
-            &[
-                (TS_DAY1, 42.5, 100),
-                (TS_DAY1 + 1_000_000_000, 85.0, 200),
-            ],
+            &[(TS_DAY1, 42.5, 100), (TS_DAY1 + 1_000_000_000, 85.0, 200)],
         );
 
         RecoveryManager::recover_all(db_root).unwrap();
 
-        let price_reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let price_reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(price_reader.row_count(), 2);
         assert_eq!(price_reader.read_f64(0), 42.5);
         assert_eq!(price_reader.read_f64(1), 85.0);
 
-        let vol_reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/volume.d"),
-            ColumnType::I64,
-        )
-        .unwrap();
+        let vol_reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/volume.d"), ColumnType::I64)
+                .unwrap();
         assert_eq!(vol_reader.row_count(), 2);
         assert_eq!(vol_reader.read_i64(0), 100);
         assert_eq!(vol_reader.read_i64(1), 200);
@@ -516,11 +482,9 @@ mod various_values {
 
         RecoveryManager::recover_all(db_root).unwrap();
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.read_f64(0), 0.0);
     }
 
@@ -533,11 +497,9 @@ mod various_values {
 
         RecoveryManager::recover_all(db_root).unwrap();
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.read_f64(0), -42.5);
     }
 
@@ -550,11 +512,9 @@ mod various_values {
 
         RecoveryManager::recover_all(db_root).unwrap();
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.read_f64(0), 1e15);
     }
 
@@ -567,11 +527,9 @@ mod various_values {
 
         RecoveryManager::recover_all(db_root).unwrap();
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert!((reader.read_f64(0) - 0.000001).abs() < 1e-10);
     }
 
@@ -587,11 +545,9 @@ mod various_values {
 
         RecoveryManager::recover_all(db_root).unwrap();
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.row_count(), 10);
         for i in 0..10 {
             assert_eq!(reader.read_f64(i), i as f64 * 1000.0);
@@ -610,11 +566,9 @@ mod various_values {
 
         RecoveryManager::recover_all(db_root).unwrap();
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.row_count(), 10);
         assert_eq!(reader.read_f64(0), 10000.0);
         assert_eq!(reader.read_f64(9), 1000.0);
@@ -632,11 +586,9 @@ mod various_values {
 
         RecoveryManager::recover_all(db_root).unwrap();
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.row_count(), 5);
         for i in 0..5 {
             assert_eq!(reader.read_f64(i), 42.0);
@@ -665,11 +617,9 @@ mod mixed_commit_crash {
         let stats = RecoveryManager::recover_all(db_root).unwrap();
         assert_eq!(stats.rows_recovered, 1); // only the crashed row
 
-        let reader = FixedColumnReader::open(
-            &db_root.join("t/2024-03-15/price.d"),
-            ColumnType::F64,
-        )
-        .unwrap();
+        let reader =
+            FixedColumnReader::open(&db_root.join("t/2024-03-15/price.d"), ColumnType::F64)
+                .unwrap();
         assert_eq!(reader.row_count(), 2);
     }
 

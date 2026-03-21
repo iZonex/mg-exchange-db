@@ -32,7 +32,12 @@ fn query_count(db_root: &Path, sql: &str) -> usize {
 
 fn query_single_i64(db_root: &Path, sql: &str) -> i64 {
     let (_, rows) = query_rows(db_root, sql);
-    assert_eq!(rows.len(), 1, "expected 1 row for `{sql}`, got {}", rows.len());
+    assert_eq!(
+        rows.len(),
+        1,
+        "expected 1 row for `{sql}`, got {}",
+        rows.len()
+    );
     match &rows[0][0] {
         Value::I64(v) => *v,
         other => panic!("expected I64, got {other:?} for `{sql}`"),
@@ -41,7 +46,12 @@ fn query_single_i64(db_root: &Path, sql: &str) -> i64 {
 
 fn query_single_f64(db_root: &Path, sql: &str) -> f64 {
     let (_, rows) = query_rows(db_root, sql);
-    assert_eq!(rows.len(), 1, "expected 1 row for `{sql}`, got {}", rows.len());
+    assert_eq!(
+        rows.len(),
+        1,
+        "expected 1 row for `{sql}`, got {}",
+        rows.len()
+    );
     match &rows[0][0] {
         Value::F64(v) => *v,
         Value::I64(v) => *v as f64,
@@ -104,8 +114,8 @@ fn setup_tiered_table() -> (TempDir, PathBuf) {
 
 /// Compress all .d files in a partition directory to .d.lz4 (Warm tier).
 fn tier_partition_to_warm(table_dir: &Path, partition_name: &str) {
-    use exchange_core::tiered::policy::{StorageTier, TierAction, TieringManager, TieringPolicy};
     use exchange_common::types::PartitionBy;
+    use exchange_core::tiered::policy::{StorageTier, TierAction, TieringManager, TieringPolicy};
 
     let policy = TieringPolicy {
         hot_retention: std::time::Duration::from_secs(1),
@@ -136,8 +146,8 @@ fn tier_partition_to_warm(table_dir: &Path, partition_name: &str) {
 
 /// Convert a partition to Cold tier (XPQT file).
 fn tier_partition_to_cold(table_dir: &Path, partition_name: &str) {
-    use exchange_core::tiered::policy::{StorageTier, TierAction, TieringManager, TieringPolicy};
     use exchange_common::types::PartitionBy;
+    use exchange_core::tiered::policy::{StorageTier, TierAction, TieringManager, TieringPolicy};
 
     let cold_dir = table_dir.join("_cold");
 
@@ -165,7 +175,10 @@ fn tier_partition_to_cold(table_dir: &Path, partition_name: &str) {
     // The cold files should exist (either .xpqt or .parquet in _cold/).
     let has_cold_file = cold_dir.join(format!("{partition_name}.xpqt")).exists()
         || cold_dir.join(format!("{partition_name}.parquet")).exists();
-    assert!(has_cold_file, "cold storage file not found after cold transition");
+    assert!(
+        has_cold_file,
+        "cold storage file not found after cold transition"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +189,10 @@ fn tier_partition_to_cold(table_dir: &Path, partition_name: &str) {
 fn tiered_select_star_returns_all_rows() {
     let (_dir, db_root) = setup_tiered_table();
     let count = query_count(&db_root, "SELECT * FROM trades");
-    assert_eq!(count, 30, "SELECT * must return all 30 rows across all tiers");
+    assert_eq!(
+        count, 30,
+        "SELECT * must return all 30 rows across all tiers"
+    );
 }
 
 #[test]
@@ -191,10 +207,7 @@ fn tiered_filter_spans_warm_and_hot() {
     let (_dir, db_root) = setup_tiered_table();
 
     // Day 2 (cold, price 1100..1109) + Day 3 (hot, price 2100..2109) = 20 rows with price >= 1100
-    let count = query_count(
-        &db_root,
-        "SELECT * FROM trades WHERE price >= 1100.0",
-    );
+    let count = query_count(&db_root, "SELECT * FROM trades WHERE price >= 1100.0");
     assert_eq!(
         count, 20,
         "filter spanning cold+hot tiers should return 20 rows, got {count}"
@@ -207,9 +220,7 @@ fn tiered_filter_timestamp_range() {
 
     // Day 2 starts at 2024-03-16 00:00:00 UTC = 1710547200 * 1e9
     let day2_start_nanos: i64 = 1710547200_000_000_000;
-    let sql = format!(
-        "SELECT * FROM trades WHERE timestamp >= {day2_start_nanos}"
-    );
+    let sql = format!("SELECT * FROM trades WHERE timestamp >= {day2_start_nanos}");
     let count = query_count(&db_root, &sql);
     assert_eq!(
         count, 20,
@@ -268,9 +279,8 @@ fn tiered_only_warm_partition() {
     // Select only from the warm partition (day 1 = 2024-03-15).
     let day1_start: i64 = 1710460800_000_000_000;
     let day1_end: i64 = day1_start + 86400_000_000_000;
-    let sql = format!(
-        "SELECT * FROM trades WHERE timestamp >= {day1_start} AND timestamp < {day1_end}"
-    );
+    let sql =
+        format!("SELECT * FROM trades WHERE timestamp >= {day1_start} AND timestamp < {day1_end}");
     let count = query_count(&db_root, &sql);
     assert_eq!(
         count, 10,
@@ -285,9 +295,8 @@ fn tiered_only_cold_partition() {
     // Select only from the cold partition (day 2 = 2024-03-16).
     let day2_start: i64 = 1710547200_000_000_000;
     let day2_end: i64 = day2_start + 86400_000_000_000;
-    let sql = format!(
-        "SELECT * FROM trades WHERE timestamp >= {day2_start} AND timestamp < {day2_end}"
-    );
+    let sql =
+        format!("SELECT * FROM trades WHERE timestamp >= {day2_start} AND timestamp < {day2_end}");
     let count = query_count(&db_root, &sql);
     assert_eq!(
         count, 10,
@@ -302,9 +311,8 @@ fn tiered_only_hot_partition() {
     // Select only from the hot partition (day 3 = 2024-03-17).
     let day3_start: i64 = 1710633600_000_000_000;
     let day3_end: i64 = day3_start + 86400_000_000_000;
-    let sql = format!(
-        "SELECT * FROM trades WHERE timestamp >= {day3_start} AND timestamp < {day3_end}"
-    );
+    let sql =
+        format!("SELECT * FROM trades WHERE timestamp >= {day3_start} AND timestamp < {day3_end}");
     let count = query_count(&db_root, &sql);
     assert_eq!(
         count, 10,
@@ -316,10 +324,7 @@ fn tiered_only_hot_partition() {
 fn tiered_order_by_preserves_all_rows() {
     let (_dir, db_root) = setup_tiered_table();
 
-    let (_, rows) = query_rows(
-        &db_root,
-        "SELECT price FROM trades ORDER BY price ASC",
-    );
+    let (_, rows) = query_rows(&db_root, "SELECT price FROM trades ORDER BY price ASC");
     assert_eq!(rows.len(), 30, "ORDER BY should return all 30 rows");
 
     // Verify ordering.

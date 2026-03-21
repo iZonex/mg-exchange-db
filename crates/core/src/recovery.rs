@@ -108,8 +108,7 @@ impl RecoveryManager {
         let merge_stats = merge_job.run()?;
 
         Ok(RecoveryStats {
-            tables_recovered: if merge_stats.rows_merged > 0 || merge_stats.segments_processed > 0
-            {
+            tables_recovered: if merge_stats.rows_merged > 0 || merge_stats.segments_processed > 0 {
                 1
             } else {
                 0
@@ -142,11 +141,11 @@ impl RecoveryManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::column::FixedColumnReader;
     use crate::table::TableBuilder;
     use crate::txn::TxnFile;
-    use crate::wal::row_codec::{encode_row, OwnedColumnValue};
+    use crate::wal::row_codec::{OwnedColumnValue, encode_row};
     use crate::wal::writer::{CommitMode, WalWriter, WalWriterConfig};
-    use crate::column::FixedColumnReader;
     use exchange_common::types::{ColumnType, PartitionBy};
     use tempfile::tempdir;
 
@@ -213,8 +212,7 @@ mod tests {
 
         // Verify data IS now in column files.
         assert!(part_dir.exists());
-        let reader =
-            FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
+        let reader = FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
         assert_eq!(reader.row_count(), 1);
         assert_eq!(reader.read_f64(0), 65000.0);
     }
@@ -229,7 +227,11 @@ mod tests {
 
         let ts = 1_710_513_000_000_000_000i64;
         write_wal_rows(&db_root.join("trades1"), &[ts], &[100.0]);
-        write_wal_rows(&db_root.join("trades2"), &[ts, ts + 1_000_000_000], &[200.0, 300.0]);
+        write_wal_rows(
+            &db_root.join("trades2"),
+            &[ts, ts + 1_000_000_000],
+            &[200.0, 300.0],
+        );
 
         let stats = RecoveryManager::recover_all(db_root).unwrap();
         assert_eq!(stats.tables_recovered, 2);

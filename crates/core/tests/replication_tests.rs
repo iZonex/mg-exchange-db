@@ -7,15 +7,13 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 
-use exchange_core::replication::config::{
-    ReplicationConfig, ReplicationRole, ReplicationSyncMode,
-};
+use exchange_core::replication::AutoFailover;
+use exchange_core::replication::config::{ReplicationConfig, ReplicationRole, ReplicationSyncMode};
 use exchange_core::replication::failover::FailoverManager;
 use exchange_core::replication::protocol::{self, ReplicationMessage};
 use exchange_core::replication::s3_shipper::{S3WalReceiver, S3WalShipper};
 use exchange_core::replication::wal_receiver::{ReplicaPosition, WalReceiver};
 use exchange_core::replication::wal_shipper::WalShipper;
-use exchange_core::replication::AutoFailover;
 use exchange_core::tiered::MemoryObjectStore;
 
 // ---------------------------------------------------------------------------
@@ -405,7 +403,9 @@ mod wal_receiver_tests {
             "version": 1
         }"#;
 
-        receiver.apply_schema_sync("test_table", meta_json, 1).unwrap();
+        receiver
+            .apply_schema_sync("test_table", meta_json, 1)
+            .unwrap();
 
         let meta_path = dir.path().join("test_table").join("_meta");
         assert!(meta_path.exists(), "_meta should be created");
@@ -552,10 +552,7 @@ mod failover_tests {
         mgr.promote_to_primary().unwrap();
         mgr.demote_to_replica("10.0.0.99:9100").unwrap();
         assert_eq!(*mgr.current_role(), ReplicationRole::Replica);
-        assert_eq!(
-            mgr.config().primary_addr.as_deref(),
-            Some("10.0.0.99:9100")
-        );
+        assert_eq!(mgr.config().primary_addr.as_deref(), Some("10.0.0.99:9100"));
     }
 
     #[test]
@@ -600,10 +597,7 @@ mod failover_tests {
     async fn health_check_reachable() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
-        let mgr = FailoverManager::new(
-            replica_config(&addr.to_string()),
-            Duration::from_secs(2),
-        );
+        let mgr = FailoverManager::new(replica_config(&addr.to_string()), Duration::from_secs(2));
         assert!(mgr.check_primary_health().await);
     }
 }
@@ -663,8 +657,12 @@ mod s3_shipper_tests {
     fn ship_and_list() {
         let store = Box::new(MemoryObjectStore::new());
         let shipper = S3WalShipper::new(store, "repl");
-        shipper.ship_segment_data("trades", "wal-000001.wal", b"seg1").unwrap();
-        shipper.ship_segment_data("trades", "wal-000002.wal", b"seg2").unwrap();
+        shipper
+            .ship_segment_data("trades", "wal-000001.wal", b"seg1")
+            .unwrap();
+        shipper
+            .ship_segment_data("trades", "wal-000002.wal", b"seg2")
+            .unwrap();
         let segs = shipper.list_segments("trades").unwrap();
         assert_eq!(segs.len(), 2);
     }
@@ -673,8 +671,12 @@ mod s3_shipper_tests {
     fn ship_different_tables() {
         let store = Box::new(MemoryObjectStore::new());
         let shipper = S3WalShipper::new(store, "repl");
-        shipper.ship_segment_data("trades", "wal-000001.wal", b"t1").unwrap();
-        shipper.ship_segment_data("quotes", "wal-000001.wal", b"q1").unwrap();
+        shipper
+            .ship_segment_data("trades", "wal-000001.wal", b"t1")
+            .unwrap();
+        shipper
+            .ship_segment_data("quotes", "wal-000001.wal", b"q1")
+            .unwrap();
         assert_eq!(shipper.list_segments("trades").unwrap().len(), 1);
         assert_eq!(shipper.list_segments("quotes").unwrap().len(), 1);
     }
@@ -683,7 +685,9 @@ mod s3_shipper_tests {
     fn ship_empty_prefix() {
         let store = Box::new(MemoryObjectStore::new());
         let shipper = S3WalShipper::new(store, "");
-        shipper.ship_segment_data("tbl", "wal-000001.wal", b"data").unwrap();
+        shipper
+            .ship_segment_data("tbl", "wal-000001.wal", b"data")
+            .unwrap();
         assert_eq!(shipper.list_segments("tbl").unwrap().len(), 1);
     }
 
@@ -695,11 +699,7 @@ mod s3_shipper_tests {
         store.put("repl/trades/wal-000003.wal", b"s3").unwrap();
 
         let tmpdir = tempfile::tempdir().unwrap();
-        let receiver = S3WalReceiver::new(
-            Box::new(store),
-            "repl",
-            tmpdir.path().to_path_buf(),
-        );
+        let receiver = S3WalReceiver::new(Box::new(store), "repl", tmpdir.path().to_path_buf());
         let max = receiver.sync("trades", 1).unwrap();
         assert_eq!(max, 3);
         assert!(tmpdir.path().join("trades/wal-000002.wal").exists());
@@ -712,11 +712,7 @@ mod s3_shipper_tests {
         store.put("repl/trades/wal-000001.wal", b"s1").unwrap();
 
         let tmpdir = tempfile::tempdir().unwrap();
-        let receiver = S3WalReceiver::new(
-            Box::new(store),
-            "repl",
-            tmpdir.path().to_path_buf(),
-        );
+        let receiver = S3WalReceiver::new(Box::new(store), "repl", tmpdir.path().to_path_buf());
         let max = receiver.sync("trades", 5).unwrap();
         assert_eq!(max, 5);
     }
@@ -728,11 +724,7 @@ mod s3_shipper_tests {
         store.put("wal/orders/wal-000002.wal", b"data-two").unwrap();
 
         let tmpdir = tempfile::tempdir().unwrap();
-        let receiver = S3WalReceiver::new(
-            Box::new(store),
-            "wal",
-            tmpdir.path().to_path_buf(),
-        );
+        let receiver = S3WalReceiver::new(Box::new(store), "wal", tmpdir.path().to_path_buf());
         let max = receiver.sync("orders", 0).unwrap();
         assert_eq!(max, 2);
         let c1 = std::fs::read(tmpdir.path().join("orders/wal-000001.wal")).unwrap();

@@ -222,8 +222,8 @@ impl TableMeta {
         }
 
         let json = std::fs::read_to_string(path)?;
-        let meta: TableMeta = serde_json::from_str(&json)
-            .map_err(|e| ExchangeDbError::Corruption(e.to_string()))?;
+        let meta: TableMeta =
+            serde_json::from_str(&json).map_err(|e| ExchangeDbError::Corruption(e.to_string()))?;
         cache.insert(path.to_path_buf(), meta.clone());
         Ok(meta)
     }
@@ -269,9 +269,7 @@ impl TableMeta {
             .columns
             .iter()
             .position(|c| c.name == name)
-            .ok_or_else(|| {
-                ExchangeDbError::ColumnNotFound(name.to_string(), self.name.clone())
-            })?;
+            .ok_or_else(|| ExchangeDbError::ColumnNotFound(name.to_string(), self.name.clone()))?;
 
         // Disallow dropping the designated timestamp column.
         if idx == self.timestamp_column {
@@ -319,9 +317,7 @@ impl TableMeta {
             .columns
             .iter_mut()
             .find(|c| c.name == name)
-            .ok_or_else(|| {
-                ExchangeDbError::ColumnNotFound(name.to_string(), self.name.clone())
-            })?;
+            .ok_or_else(|| ExchangeDbError::ColumnNotFound(name.to_string(), self.name.clone()))?;
         col.col_type = new_type.into();
         self.version += 1;
         Ok(())
@@ -574,15 +570,13 @@ impl TableWriter {
                         };
                         writer.append_i32(ival)?;
                     }
-                    _ => {
-                        match value {
-                            ColumnValue::I64(v) => writer.append_i64(*v)?,
-                            ColumnValue::F64(v) => writer.append_f64(*v)?,
-                            ColumnValue::I32(v) => writer.append_i32(*v)?,
-                            ColumnValue::Timestamp(t) => writer.append_i64(t.as_nanos())?,
-                            _ => writer.append_i64(0)?,
-                        }
-                    }
+                    _ => match value {
+                        ColumnValue::I64(v) => writer.append_i64(*v)?,
+                        ColumnValue::F64(v) => writer.append_f64(*v)?,
+                        ColumnValue::I32(v) => writer.append_i32(*v)?,
+                        ColumnValue::Timestamp(t) => writer.append_i64(t.as_nanos())?,
+                        _ => writer.append_i64(0)?,
+                    },
                 }
             }
         }
@@ -601,11 +595,7 @@ impl TableWriter {
     ///
     /// This avoids all per-row overhead: no HashMap lookups, no partition
     /// name formatting, no per-value type coercion -- just memcpy.
-    pub fn write_batch(
-        &mut self,
-        timestamps: &[i64],
-        columns: &[(&str, &[u8])],
-    ) -> Result<u64> {
+    pub fn write_batch(&mut self, timestamps: &[i64], columns: &[(&str, &[u8])]) -> Result<u64> {
         if timestamps.is_empty() {
             return Ok(0);
         }
@@ -633,10 +623,7 @@ impl TableWriter {
         let ts_col = self.meta.timestamp_column;
         if let Some(ref mut writer) = pw.fixed_columns[ts_col] {
             let ts_bytes = unsafe {
-                std::slice::from_raw_parts(
-                    timestamps.as_ptr() as *const u8,
-                    timestamps.len() * 8,
-                )
+                std::slice::from_raw_parts(timestamps.as_ptr() as *const u8, timestamps.len() * 8)
             };
             writer.append_bulk(ts_bytes)?;
         }
@@ -701,12 +688,8 @@ impl TableWriter {
         // Write timestamp column
         let ts_col = self.meta.timestamp_column;
         if let Some(ref mut writer) = pw.fixed_columns[ts_col] {
-            let ts_bytes = unsafe {
-                std::slice::from_raw_parts(
-                    timestamps.as_ptr() as *const u8,
-                    n * 8,
-                )
-            };
+            let ts_bytes =
+                unsafe { std::slice::from_raw_parts(timestamps.as_ptr() as *const u8, n * 8) };
             writer.append_bulk(ts_bytes)?;
         }
 
@@ -742,7 +725,8 @@ impl TableWriter {
 
     fn open_partition(&mut self, partition_path: &Path) -> Result<()> {
         let num_cols = self.meta.columns.len();
-        let mut fixed_columns: Vec<Option<FixedColumnWriter>> = (0..num_cols).map(|_| None).collect();
+        let mut fixed_columns: Vec<Option<FixedColumnWriter>> =
+            (0..num_cols).map(|_| None).collect();
         let mut var_columns: Vec<Option<VarColumnWriter>> = (0..num_cols).map(|_| None).collect();
 
         for (i, col_def) in self.meta.columns.iter().enumerate() {
@@ -827,8 +811,7 @@ pub enum ColumnValue<'a> {
 
 /// Controls whether writes go through the WAL (durable) or directly to
 /// column files (fastest, but not crash-safe).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum WriteMode {
     /// Write directly to column files (current behavior, fastest).
     Direct,
@@ -836,7 +819,6 @@ pub enum WriteMode {
     #[default]
     Wal,
 }
-
 
 impl<'a> ColumnValue<'a> {
     /// Convert a borrowed `ColumnValue` into an `OwnedColumnValue` for use
@@ -929,11 +911,7 @@ pub fn drop_column_from_partitions(table_dir: &Path, col_name: &str) -> Result<(
 }
 
 /// Rename column files in all existing partitions.
-pub fn rename_column_in_partitions(
-    table_dir: &Path,
-    old_name: &str,
-    new_name: &str,
-) -> Result<()> {
+pub fn rename_column_in_partitions(table_dir: &Path, old_name: &str, new_name: &str) -> Result<()> {
     let partition_dirs = list_partition_dirs(table_dir)?;
     for partition_path in &partition_dirs {
         let old_data = partition_path.join(format!("{old_name}.d"));
@@ -978,23 +956,25 @@ fn list_partition_dirs(table_dir: &Path) -> Result<Vec<PathBuf>> {
     // Also discover cold partitions in _cold/ subdirectory.
     let cold_dir = table_dir.join("_cold");
     if cold_dir.exists()
-        && let Ok(entries) = std::fs::read_dir(&cold_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                let pname = if name.ends_with(".parquet") {
-                    Some(name.trim_end_matches(".parquet").to_string())
-                } else if name.ends_with(".xpqt") {
-                    Some(name.trim_end_matches(".xpqt").to_string())
-                } else {
-                    None
-                };
-                if let Some(partition_name) = pname
-                    && !seen_names.contains(&partition_name) {
-                        dirs.push(entry.path());
-                        seen_names.insert(partition_name);
-                    }
+        && let Ok(entries) = std::fs::read_dir(&cold_dir)
+    {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let pname = if name.ends_with(".parquet") {
+                Some(name.trim_end_matches(".parquet").to_string())
+            } else if name.ends_with(".xpqt") {
+                Some(name.trim_end_matches(".xpqt").to_string())
+            } else {
+                None
+            };
+            if let Some(partition_name) = pname
+                && !seen_names.contains(&partition_name)
+            {
+                dirs.push(entry.path());
+                seen_names.insert(partition_name);
             }
         }
+    }
 
     dirs.sort();
     Ok(dirs)
@@ -1110,7 +1090,10 @@ pub fn rewrite_partition(
                             };
                             writer.append_i64(ival)?;
                         }
-                        ColumnType::I32 | ColumnType::Symbol | ColumnType::Date | ColumnType::IPv4 => {
+                        ColumnType::I32
+                        | ColumnType::Symbol
+                        | ColumnType::Date
+                        | ColumnType::IPv4 => {
                             let ival = match &row[col_idx] {
                                 ColumnValue::I32(v) => *v,
                                 ColumnValue::I64(v) => *v as i32,
@@ -1119,15 +1102,13 @@ pub fn rewrite_partition(
                             };
                             writer.append_i32(ival)?;
                         }
-                        _ => {
-                            match &row[col_idx] {
-                                ColumnValue::I64(v) => writer.append_i64(*v)?,
-                                ColumnValue::F64(v) => writer.append_f64(*v)?,
-                                ColumnValue::I32(v) => writer.append_i32(*v)?,
-                                ColumnValue::Timestamp(t) => writer.append_i64(t.as_nanos())?,
-                                _ => writer.append_i64(0)?,
-                            }
-                        }
+                        _ => match &row[col_idx] {
+                            ColumnValue::I64(v) => writer.append_i64(*v)?,
+                            ColumnValue::F64(v) => writer.append_f64(*v)?,
+                            ColumnValue::I32(v) => writer.append_i32(*v)?,
+                            ColumnValue::Timestamp(t) => writer.append_i64(t.as_nanos())?,
+                            _ => writer.append_i64(0)?,
+                        },
                     }
                 } else {
                     writer.append_i64(0)?;
@@ -1145,8 +1126,9 @@ pub fn rewrite_partition(
 /// `_`.
 pub fn list_partitions(table_dir: &Path) -> Result<Vec<PathBuf>> {
     // Cache partition lists to avoid repeated readdir() syscalls (~33µs each).
-    static PART_CACHE: std::sync::OnceLock<dashmap::DashMap<std::path::PathBuf, (std::time::Instant, Vec<PathBuf>)>> =
-        std::sync::OnceLock::new();
+    static PART_CACHE: std::sync::OnceLock<
+        dashmap::DashMap<std::path::PathBuf, (std::time::Instant, Vec<PathBuf>)>,
+    > = std::sync::OnceLock::new();
     let cache = PART_CACHE.get_or_init(dashmap::DashMap::new);
 
     // Cache with 5-second TTL (partitions change rarely during reads).
@@ -1158,7 +1140,10 @@ pub fn list_partitions(table_dir: &Path) -> Result<Vec<PathBuf>> {
     }
 
     let parts = list_partition_dirs(table_dir)?;
-    cache.insert(table_dir.to_path_buf(), (std::time::Instant::now(), parts.clone()));
+    cache.insert(
+        table_dir.to_path_buf(),
+        (std::time::Instant::now(), parts.clone()),
+    );
     Ok(parts)
 }
 
@@ -1242,14 +1227,22 @@ fn read_partition_rows_inner(
 
         for (col_idx, reader, col_type) in &fixed_readers {
             let val = match col_type {
-                ColumnType::Timestamp => ColumnValue::Timestamp(Timestamp(reader.read_i64(row_idx))),
+                ColumnType::Timestamp => {
+                    ColumnValue::Timestamp(Timestamp(reader.read_i64(row_idx)))
+                }
                 ColumnType::I64 => ColumnValue::I64(reader.read_i64(row_idx)),
                 ColumnType::F64 => {
                     let v = reader.read_f64(row_idx);
-                    if v.is_nan() { ColumnValue::Null } else { ColumnValue::F64(v) }
+                    if v.is_nan() {
+                        ColumnValue::Null
+                    } else {
+                        ColumnValue::F64(v)
+                    }
                 }
                 ColumnType::I32 | ColumnType::Symbol => ColumnValue::I32(reader.read_i32(row_idx)),
-                ColumnType::F32 => ColumnValue::F64(f32::from_le_bytes(reader.read_raw(row_idx).try_into().unwrap()) as f64),
+                ColumnType::F32 => ColumnValue::F64(f32::from_le_bytes(
+                    reader.read_raw(row_idx).try_into().unwrap(),
+                ) as f64),
                 _ => ColumnValue::I64(reader.read_i64(row_idx)),
             };
             row[*col_idx] = val;
@@ -1344,9 +1337,7 @@ mod tests {
         // Write a row
         let mut writer = TableWriter::open(db_root, "trades").unwrap();
         let ts = Timestamp::from_secs(1710513000);
-        writer
-            .write_row(ts, &[ColumnValue::F64(100.0)])
-            .unwrap();
+        writer.write_row(ts, &[ColumnValue::F64(100.0)]).unwrap();
         writer.flush().unwrap();
         drop(writer);
 
@@ -1422,9 +1413,7 @@ mod tests {
         // Write a row
         let mut writer = TableWriter::open(db_root, "trades").unwrap();
         let ts = Timestamp::from_secs(1710513000);
-        writer
-            .write_row(ts, &[ColumnValue::F64(100.0)])
-            .unwrap();
+        writer.write_row(ts, &[ColumnValue::F64(100.0)]).unwrap();
         writer.flush().unwrap();
         drop(writer);
 
@@ -1548,15 +1537,12 @@ mod tests {
         let prices: Vec<f64> = (0..n).map(|i| 50_000.0 + i as f64 * 0.5).collect();
         let volumes: Vec<f64> = (0..n).map(|i| 1.0 + i as f64 * 0.01).collect();
 
-        let sym_bytes = unsafe {
-            std::slice::from_raw_parts(symbols.as_ptr() as *const u8, symbols.len() * 4)
-        };
-        let price_bytes = unsafe {
-            std::slice::from_raw_parts(prices.as_ptr() as *const u8, prices.len() * 8)
-        };
-        let vol_bytes = unsafe {
-            std::slice::from_raw_parts(volumes.as_ptr() as *const u8, volumes.len() * 8)
-        };
+        let sym_bytes =
+            unsafe { std::slice::from_raw_parts(symbols.as_ptr() as *const u8, symbols.len() * 4) };
+        let price_bytes =
+            unsafe { std::slice::from_raw_parts(prices.as_ptr() as *const u8, prices.len() * 8) };
+        let vol_bytes =
+            unsafe { std::slice::from_raw_parts(volumes.as_ptr() as *const u8, volumes.len() * 8) };
 
         let written = writer
             .write_batch(

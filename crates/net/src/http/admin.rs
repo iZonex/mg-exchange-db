@@ -4,10 +4,10 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use super::handlers::AppState;
@@ -141,9 +141,7 @@ pub struct AdminStatusResponse {
 // ---------------------------------------------------------------------------
 
 /// `GET /admin/config` -- Current server configuration.
-pub async fn get_config(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn get_config(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let uptime = state.start_time.elapsed().as_secs_f64();
     Json(ConfigResponse {
         data_dir: state.db_root.display().to_string(),
@@ -318,7 +316,7 @@ pub async fn create_role(
                     return Err(ErrorResponse::new(
                         StatusCode::BAD_REQUEST,
                         format!("unknown permission: {perm_str}"),
-                    ))
+                    ));
                 }
             };
             permissions.push(perm);
@@ -348,9 +346,7 @@ pub async fn create_role(
 }
 
 /// `GET /admin/cluster` -- Cluster status.
-pub async fn cluster_status(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn cluster_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let role = if state.read_only {
         "replica"
     } else if state.replication_manager.is_some() {
@@ -367,9 +363,7 @@ pub async fn cluster_status(
 }
 
 /// `GET /admin/replication` -- Replication status.
-pub async fn replication_status(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn replication_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let role = if state.read_only {
         "replica"
     } else if state.replication_manager.is_some() {
@@ -382,16 +376,17 @@ pub async fn replication_status(
     Json(ReplicationStatusResponse {
         role: role.to_string(),
         lag_bytes: state.metrics.replication_lag_bytes.load(Ordering::Relaxed),
-        lag_seconds: state.metrics.replication_lag_seconds.load(Ordering::Relaxed),
+        lag_seconds: state
+            .metrics
+            .replication_lag_seconds
+            .load(Ordering::Relaxed),
         segments_shipped: state.metrics.wal_segments_shipped.load(Ordering::Relaxed),
         segments_applied: state.metrics.wal_segments_applied.load(Ordering::Relaxed),
     })
 }
 
 /// `GET /admin/wal` -- WAL status.
-pub async fn wal_status(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn wal_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     use std::sync::atomic::Ordering;
     Json(WalStatusResponse {
         wal_enabled: true,
@@ -433,7 +428,9 @@ pub async fn partitions(
                             if let Ok(meta) = f.metadata() {
                                 size += meta.len();
                                 // Estimate rows from any .d file (assume 8 bytes per row).
-                                if f.path().extension().and_then(|e| e.to_str()) == Some("d") && rows == 0 {
+                                if f.path().extension().and_then(|e| e.to_str()) == Some("d")
+                                    && rows == 0
+                                {
                                     rows = meta.len() / 8;
                                 }
                             }
@@ -480,9 +477,7 @@ pub async fn vacuum(
 }
 
 /// `POST /admin/checkpoint` -- Trigger checkpoint.
-pub async fn checkpoint(
-    State(_state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn checkpoint(State(_state): State<Arc<AppState>>) -> impl IntoResponse {
     // Checkpoint is a no-op placeholder in this implementation.
     Json(CheckpointResponse {
         status: "completed".to_string(),
@@ -490,9 +485,7 @@ pub async fn checkpoint(
 }
 
 /// `GET /admin/slow-queries` -- Recent slow queries from the in-memory ring buffer.
-pub async fn slow_queries(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn slow_queries(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let queries = match state.slow_query_log {
         Some(ref log) => log
             .recent_queries()
@@ -510,9 +503,7 @@ pub async fn slow_queries(
 }
 
 /// `GET /admin/jobs` -- Background job status.
-pub async fn jobs(
-    State(_state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn jobs(State(_state): State<Arc<AppState>>) -> impl IntoResponse {
     // Return placeholder job statuses.
     Json(JobsResponse {
         jobs: vec![
@@ -573,8 +564,7 @@ pub async fn audit_log(
     let action_filter = params.action;
 
     let entries = tokio::task::spawn_blocking(move || {
-        let audit = exchange_core::audit::AuditLog::open(&db_root)
-            .map_err(|e| e.to_string())?;
+        let audit = exchange_core::audit::AuditLog::open(&db_root).map_err(|e| e.to_string())?;
         let all = audit.query_log(from, to).map_err(|e| e.to_string())?;
 
         // Apply filters
@@ -582,9 +572,10 @@ pub async fn audit_log(
             .into_iter()
             .filter(|e| {
                 if let Some(ref u) = user_filter
-                    && !e.user.eq_ignore_ascii_case(u) {
-                        return false;
-                    }
+                    && !e.user.eq_ignore_ascii_case(u)
+                {
+                    return false;
+                }
                 if let Some(ref a) = action_filter {
                     let action_str = format!("{:?}", e.action);
                     if !action_str.eq_ignore_ascii_case(a) {
@@ -599,7 +590,9 @@ pub async fn audit_log(
         Ok::<_, String>(filtered)
     })
     .await
-    .map_err(|e| super::response::ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .map_err(|e| {
+        super::response::ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?
     .map_err(|e| super::response::ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
     Ok(Json(serde_json::json!({
@@ -613,18 +606,28 @@ pub async fn audit_log(
 // ---------------------------------------------------------------------------
 
 /// `GET /admin/replicas` — list connected replicas with their status.
-pub async fn replicas(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn replicas(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let replication = state.replication_manager.as_ref();
 
     let replicas_info = if let Some(_mgr) = replication {
         // Build replica info from metrics (replicas don't register themselves
         // in the current architecture — we report aggregate stats).
-        let lag_bytes = state.metrics.replication_lag_bytes.load(std::sync::atomic::Ordering::Relaxed);
-        let lag_seconds = state.metrics.replication_lag_seconds.load(std::sync::atomic::Ordering::Relaxed);
-        let shipped = state.metrics.wal_segments_shipped.load(std::sync::atomic::Ordering::Relaxed);
-        let applied = state.metrics.wal_segments_applied.load(std::sync::atomic::Ordering::Relaxed);
+        let lag_bytes = state
+            .metrics
+            .replication_lag_bytes
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let lag_seconds = state
+            .metrics
+            .replication_lag_seconds
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let shipped = state
+            .metrics
+            .wal_segments_shipped
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let applied = state
+            .metrics
+            .wal_segments_applied
+            .load(std::sync::atomic::Ordering::Relaxed);
 
         serde_json::json!({
             "role": if state.read_only { "replica" } else { "primary" },
@@ -653,9 +656,7 @@ pub async fn replicas(
 // ---------------------------------------------------------------------------
 
 /// `GET /admin/connections` — active connection summary by protocol.
-pub async fn connections(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn connections(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     use std::sync::atomic::Ordering::Relaxed;
 
     let m = &state.metrics;
@@ -709,9 +710,9 @@ pub fn admin_router() -> axum::Router<Arc<AppState>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::Router;
     use axum::body::Body;
     use axum::http::Request;
-    use axum::Router;
     use tower::ServiceExt;
 
     fn test_state() -> Arc<AppState> {
@@ -731,12 +732,7 @@ mod tests {
     async fn get_json(app: &Router, path: &str) -> (StatusCode, serde_json::Value) {
         let resp = app
             .clone()
-            .oneshot(
-                Request::builder()
-                    .uri(path)
-                    .body(Body::empty())
-                    .unwrap(),
-            )
+            .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
             .await
             .unwrap();
         let status = resp.status();
@@ -807,8 +803,12 @@ mod tests {
     async fn test_post_config() {
         let state = test_state();
         let app = admin_app(state);
-        let (status, json) =
-            post_json(&app, "/admin/config", serde_json::json!({"log_level": "debug"})).await;
+        let (status, json) = post_json(
+            &app,
+            "/admin/config",
+            serde_json::json!({"log_level": "debug"}),
+        )
+        .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(json["status"], "ok");
     }
@@ -915,12 +915,8 @@ mod tests {
     async fn test_vacuum_not_found() {
         let state = test_state();
         let app = admin_app(state);
-        let (status, _json) = post_json(
-            &app,
-            "/admin/vacuum/nonexistent",
-            serde_json::json!({}),
-        )
-        .await;
+        let (status, _json) =
+            post_json(&app, "/admin/vacuum/nonexistent", serde_json::json!({})).await;
         // vacuum sends empty body but we need to match the handler
         let resp = app
             .clone()
@@ -999,11 +995,7 @@ mod tests {
 
         for endpoint in &get_endpoints {
             let (status, json) = get_json(&app, endpoint).await;
-            assert_eq!(
-                status,
-                StatusCode::OK,
-                "GET {endpoint} returned {status}"
-            );
+            assert_eq!(status, StatusCode::OK, "GET {endpoint} returned {status}");
             // Verify it's valid JSON (the get_json helper already parses it).
             assert!(
                 json.is_object() || json.is_array(),
@@ -1012,8 +1004,7 @@ mod tests {
         }
 
         // POST config should work.
-        let (status, json) =
-            post_json(&app, "/admin/config", serde_json::json!({})).await;
+        let (status, json) = post_json(&app, "/admin/config", serde_json::json!({})).await;
         assert_eq!(status, StatusCode::OK);
         assert!(json.is_object());
 

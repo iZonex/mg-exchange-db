@@ -11,8 +11,7 @@ use std::path::{Path, PathBuf};
 use crate::mmap::MmapReadOnly;
 
 /// Available I/O backends.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IoBackend {
     /// Memory-mapped files (default, best for large sequential scans).
     #[default]
@@ -23,7 +22,6 @@ pub enum IoBackend {
     #[cfg(target_os = "linux")]
     IoUring,
 }
-
 
 /// Trait for reading column data from storage.
 ///
@@ -124,10 +122,7 @@ impl AsyncColumnReader for StdColumnReader {
 }
 
 /// Open a column reader for the given path using the specified backend.
-pub fn open_column_reader(
-    path: &Path,
-    backend: IoBackend,
-) -> Result<Box<dyn AsyncColumnReader>> {
+pub fn open_column_reader(path: &Path, backend: IoBackend) -> Result<Box<dyn AsyncColumnReader>> {
     match backend {
         IoBackend::Mmap => Ok(Box::new(MmapColumnReader::open(path)?)),
         IoBackend::StdIo => Ok(Box::new(StdColumnReader::open(path)?)),
@@ -208,7 +203,10 @@ mod tests {
         let std_reader = StdColumnReader::open(&path).unwrap();
 
         assert_eq!(mmap_reader.len(), std_reader.len());
-        assert_eq!(mmap_reader.read_all().unwrap(), std_reader.read_all().unwrap());
+        assert_eq!(
+            mmap_reader.read_all().unwrap(),
+            std_reader.read_all().unwrap()
+        );
 
         // Compare range reads
         for offset in (0..data.len()).step_by(800) {

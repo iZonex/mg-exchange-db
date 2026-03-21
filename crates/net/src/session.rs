@@ -112,7 +112,8 @@ impl SessionManager {
     pub fn cleanup_expired(&self) -> usize {
         let timeout = self.session_timeout;
         let before = self.sessions.len();
-        self.sessions.retain(|_, session| !session.is_expired(timeout));
+        self.sessions
+            .retain(|_, session| !session.is_expired(timeout));
         before - self.sessions.len()
     }
 

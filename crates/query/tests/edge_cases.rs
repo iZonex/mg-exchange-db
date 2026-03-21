@@ -134,7 +134,11 @@ mod null_handling {
 
         let (_, rows) = db.query("SELECT grp, count(*) FROM t GROUP BY grp");
         // Should have groups: A, B, and possibly NULL as its own group
-        assert!(rows.len() >= 2, "should have at least 2 groups, got {}", rows.len());
+        assert!(
+            rows.len() >= 2,
+            "should have at least 2 groups, got {}",
+            rows.len()
+        );
     }
 
     #[test]
@@ -200,13 +204,18 @@ mod null_handling {
     fn coalesce_first_non_null() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, a VARCHAR, b VARCHAR, c VARCHAR)");
-        db.exec_ok("INSERT INTO t (timestamp, a, b, c) VALUES (1000000000000, NULL, 'hello', 'world')");
+        db.exec_ok(
+            "INSERT INTO t (timestamp, a, b, c) VALUES (1000000000000, NULL, 'hello', 'world')",
+        );
 
         let val = db.query_scalar("SELECT coalesce(a, b, c) FROM t");
         // If NULL is stored as empty string, coalesce returns it; otherwise 'hello'
         match val {
             Value::Str(s) => {
-                assert!(s.is_empty() || s == "hello", "expected '' or 'hello', got '{s}'");
+                assert!(
+                    s.is_empty() || s == "hello",
+                    "expected '' or 'hello', got '{s}'"
+                );
             }
             _ => panic!("expected Str, got {val:?}"),
         }
@@ -404,7 +413,10 @@ mod type_coercion {
         db.exec_ok("INSERT INTO t (timestamp, v) VALUES (1000000000000, 'not_a_number')");
 
         let result = db.exec("SELECT cast_int(v) FROM t");
-        assert!(result.is_err(), "casting 'not_a_number' to int should error");
+        assert!(
+            result.is_err(),
+            "casting 'not_a_number' to int should error"
+        );
     }
 
     #[test]
@@ -414,7 +426,11 @@ mod type_coercion {
         db.exec_ok("INSERT INTO t (timestamp, v) VALUES (1000000000000, 'abc')");
 
         let val = db.query_scalar("SELECT safe_cast_int(v) FROM t");
-        assert_eq!(val, Value::Null, "safe_cast_int should return NULL for invalid input");
+        assert_eq!(
+            val,
+            Value::Null,
+            "safe_cast_int should return NULL for invalid input"
+        );
     }
 }
 
@@ -519,7 +535,11 @@ mod empty_tables {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, grp VARCHAR, v DOUBLE)");
         let (_, rows) = db.query("SELECT grp, count(*) FROM t GROUP BY grp");
-        assert_eq!(rows.len(), 0, "GROUP BY on empty table should produce 0 groups");
+        assert_eq!(
+            rows.len(),
+            0,
+            "GROUP BY on empty table should produce 0 groups"
+        );
     }
 
     #[test]
@@ -537,9 +557,7 @@ mod empty_tables {
         db.exec_ok("CREATE TABLE right_t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok("INSERT INTO right_t (timestamp, v) VALUES (1000000000000, 1.0)");
 
-        let (_, rows) = db.query(
-            "SELECT * FROM left_t INNER JOIN right_t ON left_t.v = right_t.v",
-        );
+        let (_, rows) = db.query("SELECT * FROM left_t INNER JOIN right_t ON left_t.v = right_t.v");
         assert_eq!(rows.len(), 0);
     }
 
@@ -550,9 +568,7 @@ mod empty_tables {
         db.exec_ok("CREATE TABLE right_t (timestamp TIMESTAMP, k BIGINT, w DOUBLE)");
         db.exec_ok("INSERT INTO left_t (timestamp, k, v) VALUES (1000000000000, 1, 10.0)");
 
-        let (_, rows) = db.query(
-            "SELECT * FROM left_t INNER JOIN right_t ON left_t.k = right_t.k",
-        );
+        let (_, rows) = db.query("SELECT * FROM left_t INNER JOIN right_t ON left_t.k = right_t.k");
         assert_eq!(rows.len(), 0);
     }
 
@@ -576,7 +592,7 @@ mod empty_tables {
         let result = db.exec("UPDATE t SET v = 42.0 WHERE v > 0");
         match result {
             Ok(QueryResult::Ok { affected_rows }) => assert_eq!(affected_rows, 0),
-            Ok(_) => {} // Any OK response is fine
+            Ok(_) => {}  // Any OK response is fine
             Err(_) => {} // May not support update on empty
         }
     }
@@ -647,10 +663,13 @@ mod large_data {
         let db = make_large_db(1000);
         let (_, rows) = db.query("SELECT grp, count(*), sum(val), avg(val) FROM big GROUP BY grp");
         assert_eq!(rows.len(), 5);
-        let total: i64 = rows.iter().filter_map(|r| match &r[1] {
-            Value::I64(n) => Some(*n),
-            _ => None,
-        }).sum();
+        let total: i64 = rows
+            .iter()
+            .filter_map(|r| match &r[1] {
+                Value::I64(n) => Some(*n),
+                _ => None,
+            })
+            .sum();
         assert_eq!(total, 1000);
     }
 
@@ -676,9 +695,7 @@ mod large_data {
         let (_, rows) = db.query("SELECT val FROM big ORDER BY val DESC LIMIT 10");
         assert_eq!(rows.len(), 10);
         for i in 1..rows.len() {
-            assert!(
-                rows[i - 1][0].cmp_coerce(&rows[i][0]) != Some(std::cmp::Ordering::Less),
-            );
+            assert!(rows[i - 1][0].cmp_coerce(&rows[i][0]) != Some(std::cmp::Ordering::Less),);
         }
     }
 
@@ -722,9 +739,7 @@ mod large_data {
     #[test]
     fn large_having_1000() {
         let db = make_large_db(1000);
-        let (_, rows) = db.query(
-            "SELECT grp, count(*) AS c FROM big GROUP BY grp HAVING c > 100",
-        );
+        let (_, rows) = db.query("SELECT grp, count(*) AS c FROM big GROUP BY grp HAVING c > 100");
         assert_eq!(rows.len(), 5); // Each group has 200 rows
     }
 }
@@ -868,7 +883,10 @@ mod error_handling {
     fn nonexistent_table() {
         let db = TestDb::new();
         let result = db.exec("SELECT * FROM nonexistent");
-        assert!(result.is_err(), "selecting from nonexistent table should error");
+        assert!(
+            result.is_err(),
+            "selecting from nonexistent table should error"
+        );
     }
 
     #[test]
@@ -879,7 +897,8 @@ mod error_handling {
     }
 
     #[test]
-    #[ignore] fn syntax_error_missing_from() {
+    #[ignore]
+    fn syntax_error_missing_from() {
         let db = TestDb::new();
         let result = db.exec("SELECT WHERE");
         assert!(result.is_err(), "syntax error should produce error");
@@ -1169,9 +1188,8 @@ mod complex_queries {
     #[test]
     fn where_and_order_and_limit() {
         let db = TestDb::with_trades(50);
-        let (_, rows) = db.query(
-            "SELECT price FROM trades WHERE symbol = 'BTC/USD' ORDER BY price DESC LIMIT 5",
-        );
+        let (_, rows) = db
+            .query("SELECT price FROM trades WHERE symbol = 'BTC/USD' ORDER BY price DESC LIMIT 5");
         assert_eq!(rows.len(), 5);
         for i in 1..rows.len() {
             assert!(rows[i - 1][0].cmp_coerce(&rows[i][0]) != Some(std::cmp::Ordering::Less));
@@ -1219,9 +1237,8 @@ mod complex_queries {
     #[test]
     fn multiple_functions_in_select() {
         let db = TestDb::with_trades(5);
-        let (cols, rows) = db.query(
-            "SELECT length(symbol), upper(symbol), abs(price), round(price) FROM trades",
-        );
+        let (cols, rows) =
+            db.query("SELECT length(symbol), upper(symbol), abs(price), round(price) FROM trades");
         assert_eq!(cols.len(), 4);
         assert_eq!(rows.len(), 5);
     }
@@ -1235,8 +1252,11 @@ mod complex_queries {
         match result {
             Ok(QueryResult::Rows { rows, .. }) => {
                 // If supported, all 20 rows match; if not, may return 0
-                assert!(rows.len() == 20 || rows.len() == 0,
-                    "expected 20 or 0 rows, got {}", rows.len());
+                assert!(
+                    rows.len() == 20 || rows.len() == 0,
+                    "expected 20 or 0 rows, got {}",
+                    rows.len()
+                );
             }
             Err(_) => {
                 // Function in WHERE not supported at all -- acceptable
@@ -1266,7 +1286,10 @@ mod complex_queries {
     #[test]
     fn delete_then_count() {
         let db = TestDb::with_trades(30);
-        assert_eq!(db.query_scalar("SELECT count(*) FROM trades"), Value::I64(30));
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM trades"),
+            Value::I64(30)
+        );
 
         db.exec_ok("DELETE FROM trades WHERE symbol = 'SOL/USD'");
         let remaining = db.query_scalar("SELECT count(*) FROM trades");
@@ -1332,9 +1355,7 @@ mod complex_queries {
     #[test]
     fn latest_on_basic() {
         let db = TestDb::with_trades(30);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol",
-        );
+        let (_, rows) = db.query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol");
         assert_eq!(rows.len(), 3, "one row per symbol");
     }
 
@@ -1489,9 +1510,7 @@ mod boolean_predicates {
     #[test]
     fn where_in_list() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD')",
-        );
+        let (_, rows) = db.query("SELECT * FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD')");
         for row in &rows {
             let sym = &row[1];
             assert!(
@@ -1504,9 +1523,7 @@ mod boolean_predicates {
     #[test]
     fn where_not_in_list() {
         let db = TestDb::with_trades(20);
-        let result = db.exec(
-            "SELECT * FROM trades WHERE symbol NOT IN ('BTC/USD')",
-        );
+        let result = db.exec("SELECT * FROM trades WHERE symbol NOT IN ('BTC/USD')");
         match result {
             Ok(QueryResult::Rows { rows, .. }) => {
                 for row in &rows {
@@ -1552,9 +1569,7 @@ mod boolean_predicates {
     #[test]
     fn where_and() {
         let db = TestDb::with_trades(30);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy'",
-        );
+        let (_, rows) = db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy'");
         for row in &rows {
             assert_eq!(row[1], Value::Str("BTC/USD".into()));
             assert_eq!(row[4], Value::Str("buy".into()));
@@ -1564,14 +1579,11 @@ mod boolean_predicates {
     #[test]
     fn where_or() {
         let db = TestDb::with_trades(30);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'SOL/USD'",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'SOL/USD'");
         for row in &rows {
             let sym = &row[1];
-            assert!(
-                *sym == Value::Str("BTC/USD".into()) || *sym == Value::Str("SOL/USD".into()),
-            );
+            assert!(*sym == Value::Str("BTC/USD".into()) || *sym == Value::Str("SOL/USD".into()),);
         }
     }
 

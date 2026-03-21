@@ -1,9 +1,15 @@
 //! Converts parsed SQL (sqlparser AST) into our internal `QueryPlan`.
 
-use crate::parser::{parse_duration, parse_sql, AsofJoinInfo, LatestOnInfo, MergeInfo, PartitionCommand, PivotInfo, RbacCommand, ShowCommand};
+use crate::parser::{
+    AsofJoinInfo, LatestOnInfo, MergeInfo, PartitionCommand, PivotInfo, RbacCommand, ShowCommand,
+    parse_duration, parse_sql,
+};
 use crate::plan::*;
 use exchange_common::error::{ExchangeDbError, Result};
-use sqlparser::ast::{self, AssignmentTarget, CopyTarget, CopyOption, Expr, FromTable, JoinConstraint, JoinOperator, SelectItem, SetExpr, SetOperator, Statement, TableFactor};
+use sqlparser::ast::{
+    self, AssignmentTarget, CopyOption, CopyTarget, Expr, FromTable, JoinConstraint, JoinOperator,
+    SelectItem, SetExpr, SetOperator, Statement, TableFactor,
+};
 use std::path::PathBuf;
 
 /// Plan a SQL string into a `QueryPlan`.
@@ -37,9 +43,15 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
             PartitionCommand::Attach { table, partition } => {
                 Ok(QueryPlan::AttachPartition { table, partition })
             }
-            PartitionCommand::Squash { table, partition1, partition2 } => {
-                Ok(QueryPlan::SquashPartitions { table, partition1, partition2 })
-            }
+            PartitionCommand::Squash {
+                table,
+                partition1,
+                partition2,
+            } => Ok(QueryPlan::SquashPartitions {
+                table,
+                partition1,
+                partition2,
+            }),
         };
     }
 
@@ -108,7 +120,11 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
 
     // Handle CREATE TRIGGER / DROP TRIGGER (pre-processed by parser).
     if let Some((name, table, procedure)) = parsed.create_trigger {
-        return Ok(QueryPlan::CreateTrigger { name, table, procedure });
+        return Ok(QueryPlan::CreateTrigger {
+            name,
+            table,
+            procedure,
+        });
     }
     if let Some((name, table)) = parsed.drop_trigger {
         return Ok(QueryPlan::DropTrigger { name, table });
@@ -121,7 +137,12 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
         } else {
             crate::plan::CommentObjectType::Column
         };
-        return Ok(QueryPlan::CommentOn { object_type, object_name: obj_name, table_name, comment });
+        return Ok(QueryPlan::CommentOn {
+            object_type,
+            object_name: obj_name,
+            table_name,
+            comment,
+        });
     }
 
     if parsed.statements.len() != 1 {
@@ -132,7 +153,11 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
 
     let stmt = &parsed.statements[0];
     match stmt {
-        Statement::CreateTable(ct) => plan_create_table(ct, parsed.designated_timestamp.as_deref(), parsed.partition_by_clause.as_deref()),
+        Statement::CreateTable(ct) => plan_create_table(
+            ct,
+            parsed.designated_timestamp.as_deref(),
+            parsed.partition_by_clause.as_deref(),
+        ),
         Statement::Insert(ins) => plan_insert(ins),
         Statement::Query(q) => {
             if let Some(pivot_info) = parsed.pivot_info {
@@ -141,7 +166,13 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
             if let Some(asof) = parsed.asof_join {
                 plan_asof_join(q, &asof)
             } else {
-                let body_plan = plan_select(q, parsed.sample_by_raw.as_deref(), parsed.sample_by_fill.as_deref(), parsed.sample_by_align_calendar, parsed.latest_on.as_ref())?;
+                let body_plan = plan_select(
+                    q,
+                    parsed.sample_by_raw.as_deref(),
+                    parsed.sample_by_fill.as_deref(),
+                    parsed.sample_by_align_calendar,
+                    parsed.latest_on.as_ref(),
+                )?;
                 // Wrap with CTEs if present.
                 if let Some(with) = &q.with {
                     let is_recursive = with.recursive;
@@ -185,7 +216,9 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
             selection,
             ..
         } => plan_update(table, assignments, selection),
-        Statement::Explain { statement, analyze, .. } => {
+        Statement::Explain {
+            statement, analyze, ..
+        } => {
             let inner_sql = statement.to_string();
             let inner_plan = plan_query(&inner_sql)?;
             if *analyze {
@@ -208,33 +241,57 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
         Statement::StartTransaction { .. } => Ok(QueryPlan::Begin),
         Statement::Commit { .. } => Ok(QueryPlan::Commit),
         Statement::Rollback { .. } => Ok(QueryPlan::Rollback),
-        Statement::SetVariable { variables, value, .. } => {
-            let name = variables.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(".");
-            let val = value.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ");
+        Statement::SetVariable {
+            variables, value, ..
+        } => {
+            let name = variables
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(".");
+            let val = value
+                .iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
             Ok(QueryPlan::Set { name, value: val })
         }
         Statement::ShowVariable { variable } => {
-            let name = variable.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(".");
+            let name = variable
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(".");
             Ok(QueryPlan::Show { name })
         }
         Statement::Truncate { table_names, .. } => {
             if table_names.is_empty() {
-                return Err(ExchangeDbError::Query("TRUNCATE requires a table name".into()));
+                return Err(ExchangeDbError::Query(
+                    "TRUNCATE requires a table name".into(),
+                ));
             }
             let table = table_names[0].name.to_string();
             Ok(QueryPlan::TruncateTable { table })
         }
         Statement::CreateIndex(ci) => {
-            let name = ci.name.as_ref()
+            let name = ci
+                .name
+                .as_ref()
                 .map(|n| n.to_string())
                 .unwrap_or_else(|| "unnamed_index".to_string());
             let table = ci.table_name.to_string();
-            let columns: Vec<String> = ci.columns.iter().map(|c| {
-                c.expr.to_string()
-            }).collect();
-            Ok(QueryPlan::CreateIndex { name, table, columns })
+            let columns: Vec<String> = ci.columns.iter().map(|c| c.expr.to_string()).collect();
+            Ok(QueryPlan::CreateIndex {
+                name,
+                table,
+                columns,
+            })
         }
-        Statement::CreateSequence { name, sequence_options, .. } => {
+        Statement::CreateSequence {
+            name,
+            sequence_options,
+            ..
+        } => {
             let seq_name = name.to_string();
             let mut start = 1i64;
             let mut increment = 1i64;
@@ -242,20 +299,26 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
                 match opt {
                     ast::SequenceOptions::StartWith(expr, _) => {
                         if let Ok(v) = expr_to_value(expr)
-                            && let Value::I64(n) = v {
-                                start = n;
-                            }
+                            && let Value::I64(n) = v
+                        {
+                            start = n;
+                        }
                     }
                     ast::SequenceOptions::IncrementBy(expr, _) => {
                         if let Ok(v) = expr_to_value(expr)
-                            && let Value::I64(n) = v {
-                                increment = n;
-                            }
+                            && let Value::I64(n) = v
+                        {
+                            increment = n;
+                        }
                     }
                     _ => {}
                 }
             }
-            Ok(QueryPlan::CreateSequence { name: seq_name, start, increment })
+            Ok(QueryPlan::CreateSequence {
+                name: seq_name,
+                start,
+                increment,
+            })
         }
         other => Err(ExchangeDbError::Query(format!(
             "unsupported statement: {other}"
@@ -274,7 +337,7 @@ fn plan_copy(
         ast::CopySource::Query(_) => {
             return Err(ExchangeDbError::Query(
                 "COPY from query is not supported, use a table name".into(),
-            ))
+            ));
         }
     };
 
@@ -283,7 +346,7 @@ fn plan_copy(
         _ => {
             return Err(ExchangeDbError::Query(
                 "COPY target must be a file path".into(),
-            ))
+            ));
         }
     };
 
@@ -293,23 +356,21 @@ fn plan_copy(
         match opt {
             CopyOption::Header(b) => copy_opts.header = *b,
             CopyOption::Delimiter(c) => copy_opts.delimiter = *c,
-            CopyOption::Format(ident) => {
-                match ident.value.to_ascii_uppercase().as_str() {
-                    "CSV" => copy_opts.format = CopyFormat::Csv,
-                    "TSV" => {
-                        copy_opts.format = CopyFormat::Tsv;
-                        copy_opts.delimiter = '\t';
-                    }
-                    "PARQUET" => {
-                        copy_opts.format = CopyFormat::Parquet;
-                    }
-                    other => {
-                        return Err(ExchangeDbError::Query(format!(
-                            "unsupported COPY format: {other}"
-                        )))
-                    }
+            CopyOption::Format(ident) => match ident.value.to_ascii_uppercase().as_str() {
+                "CSV" => copy_opts.format = CopyFormat::Csv,
+                "TSV" => {
+                    copy_opts.format = CopyFormat::Tsv;
+                    copy_opts.delimiter = '\t';
                 }
-            }
+                "PARQUET" => {
+                    copy_opts.format = CopyFormat::Parquet;
+                }
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "unsupported COPY format: {other}"
+                    )));
+                }
+            },
             _ => {} // ignore unknown options
         }
     }
@@ -317,18 +378,31 @@ fn plan_copy(
     // Auto-detect parquet format from file extension.
     if copy_opts.format != CopyFormat::Parquet
         && let Some(ext) = path.extension().and_then(|e| e.to_str())
-            && ext.eq_ignore_ascii_case("parquet") {
-                copy_opts.format = CopyFormat::Parquet;
-            }
+        && ext.eq_ignore_ascii_case("parquet")
+    {
+        copy_opts.format = CopyFormat::Parquet;
+    }
 
     if to {
-        Ok(QueryPlan::CopyTo { table, path, options: copy_opts })
+        Ok(QueryPlan::CopyTo {
+            table,
+            path,
+            options: copy_opts,
+        })
     } else {
-        Ok(QueryPlan::CopyFrom { table, path, options: copy_opts })
+        Ok(QueryPlan::CopyFrom {
+            table,
+            path,
+            options: copy_opts,
+        })
     }
 }
 
-fn plan_create_table(ct: &ast::CreateTable, designated_timestamp: Option<&str>, partition_by_clause: Option<&str>) -> Result<QueryPlan> {
+fn plan_create_table(
+    ct: &ast::CreateTable,
+    designated_timestamp: Option<&str>,
+    partition_by_clause: Option<&str>,
+) -> Result<QueryPlan> {
     let name = ct.name.to_string();
 
     // Handle CREATE TABLE ... AS SELECT
@@ -354,14 +428,23 @@ fn plan_create_table(ct: &ast::CreateTable, designated_timestamp: Option<&str>, 
                 }
             });
             // Look for UNIQUE constraint.
-            let unique = c.options.iter().any(|opt| {
-                matches!(&opt.option, ast::ColumnOption::Unique { .. })
-            });
+            let unique = c
+                .options
+                .iter()
+                .any(|opt| matches!(&opt.option, ast::ColumnOption::Unique { .. }));
             // Look for REFERENCES (foreign key) constraint.
             let references = c.options.iter().find_map(|opt| {
-                if let ast::ColumnOption::ForeignKey { foreign_table, referred_columns, .. } = &opt.option {
+                if let ast::ColumnOption::ForeignKey {
+                    foreign_table,
+                    referred_columns,
+                    ..
+                } = &opt.option
+                {
                     let ref_table = foreign_table.to_string();
-                    let ref_col = referred_columns.first().map(|c| c.value.clone()).unwrap_or_default();
+                    let ref_col = referred_columns
+                        .first()
+                        .map(|c| c.value.clone())
+                        .unwrap_or_default();
                     Some((ref_table, ref_col))
                 } else {
                     None
@@ -419,10 +502,7 @@ fn plan_alter_table(
                 column_type,
             })
         }
-        ast::AlterTableOperation::DropColumn {
-            column_name,
-            ..
-        } => Ok(QueryPlan::DropColumn {
+        ast::AlterTableOperation::DropColumn { column_name, .. } => Ok(QueryPlan::DropColumn {
             table,
             column_name: column_name.value.clone(),
         }),
@@ -434,29 +514,22 @@ fn plan_alter_table(
             old_name: old_column_name.value.clone(),
             new_name: new_column_name.value.clone(),
         }),
-        ast::AlterTableOperation::AlterColumn {
-            column_name,
-            op,
-        } => {
-            match op {
-                ast::AlterColumnOperation::SetDataType { data_type, .. } => {
-                    Ok(QueryPlan::SetColumnType {
-                        table,
-                        column_name: column_name.value.clone(),
-                        new_type: data_type.to_string().to_ascii_uppercase(),
-                    })
-                }
-                other => Err(ExchangeDbError::Query(format!(
-                    "unsupported ALTER COLUMN operation: {other}"
-                ))),
+        ast::AlterTableOperation::AlterColumn { column_name, op } => match op {
+            ast::AlterColumnOperation::SetDataType { data_type, .. } => {
+                Ok(QueryPlan::SetColumnType {
+                    table,
+                    column_name: column_name.value.clone(),
+                    new_type: data_type.to_string().to_ascii_uppercase(),
+                })
             }
-        }
-        ast::AlterTableOperation::RenameTable { table_name } => {
-            Ok(QueryPlan::RenameTable {
-                old_name: table,
-                new_name: table_name.to_string(),
-            })
-        }
+            other => Err(ExchangeDbError::Query(format!(
+                "unsupported ALTER COLUMN operation: {other}"
+            ))),
+        },
+        ast::AlterTableOperation::RenameTable { table_name } => Ok(QueryPlan::RenameTable {
+            old_name: table,
+            new_name: table_name.to_string(),
+        }),
         other => Err(ExchangeDbError::Query(format!(
             "unsupported ALTER TABLE operation: {other}"
         ))),
@@ -519,11 +592,7 @@ fn plan_drop(
 fn plan_insert(ins: &ast::Insert) -> Result<QueryPlan> {
     let table = ins.table.to_string();
 
-    let columns: Vec<String> = ins
-        .columns
-        .iter()
-        .map(|c| c.value.clone())
-        .collect();
+    let columns: Vec<String> = ins.columns.iter().map(|c| c.value.clone()).collect();
 
     let source = ins
         .source
@@ -550,7 +619,7 @@ fn plan_insert(ins: &ast::Insert) -> Result<QueryPlan> {
                     Some(ast::ConflictTarget::OnConstraint(_)) => {
                         return Err(ExchangeDbError::Query(
                             "ON CONFLICT ON CONSTRAINT is not supported".into(),
-                        ))
+                        ));
                     }
                     None => Vec::new(),
                 };
@@ -564,7 +633,7 @@ fn plan_insert(ins: &ast::Insert) -> Result<QueryPlan> {
                                 AssignmentTarget::Tuple(_) => {
                                     return Err(ExchangeDbError::Query(
                                         "tuple assignments not supported in ON CONFLICT".into(),
-                                    ))
+                                    ));
                                 }
                             };
                             let value_expr = sql_expr_to_plan_expr(&assign.value)?;
@@ -603,11 +672,9 @@ fn plan_insert(ins: &ast::Insert) -> Result<QueryPlan> {
                 source: Box::new(select_plan),
             })
         }
-        other => {
-            Err(ExchangeDbError::Query(format!(
-                "unsupported INSERT source: {other}"
-            )))
-        }
+        other => Err(ExchangeDbError::Query(format!(
+            "unsupported INSERT source: {other}"
+        ))),
     }
 }
 
@@ -616,14 +683,16 @@ fn plan_delete(del: &ast::Delete) -> Result<QueryPlan> {
     let table = match &del.from {
         FromTable::WithFromKeyword(tables) | FromTable::WithoutKeyword(tables) => {
             if tables.is_empty() {
-                return Err(ExchangeDbError::Query("DELETE requires a FROM clause".into()));
+                return Err(ExchangeDbError::Query(
+                    "DELETE requires a FROM clause".into(),
+                ));
             }
             match &tables[0].relation {
                 TableFactor::Table { name, .. } => name.to_string(),
                 other => {
                     return Err(ExchangeDbError::Query(format!(
                         "unsupported DELETE FROM clause: {other}"
-                    )))
+                    )));
                 }
             }
         }
@@ -648,7 +717,7 @@ fn plan_update(
         other => {
             return Err(ExchangeDbError::Query(format!(
                 "unsupported UPDATE table: {other}"
-            )))
+            )));
         }
     };
 
@@ -659,7 +728,7 @@ fn plan_update(
             AssignmentTarget::Tuple(_) => {
                 return Err(ExchangeDbError::Query(
                     "tuple assignments are not supported in UPDATE".into(),
-                ))
+                ));
             }
         };
         let value_expr = sql_expr_to_plan_expr(&assign.value)?;
@@ -685,20 +754,22 @@ fn plan_asof_join(query: &ast::Query, asof: &AsofJoinInfo) -> Result<QueryPlan> 
         _ => {
             return Err(ExchangeDbError::Query(
                 "only simple SELECT queries are supported for ASOF JOIN".into(),
-            ))
+            ));
         }
     };
 
     // Table name (left table).
     let left_table = if select.from.is_empty() {
-        return Err(ExchangeDbError::Query("ASOF JOIN requires a FROM clause".into()));
+        return Err(ExchangeDbError::Query(
+            "ASOF JOIN requires a FROM clause".into(),
+        ));
     } else {
         match &select.from[0].relation {
             TableFactor::Table { name, .. } => name.to_string(),
             other => {
                 return Err(ExchangeDbError::Query(format!(
                     "unsupported FROM clause: {other}"
-                )))
+                )));
             }
         }
     };
@@ -727,24 +798,22 @@ fn plan_asof_join(query: &ast::Query, asof: &AsofJoinInfo) -> Result<QueryPlan> 
                     left_columns.push(SelectColumn::Wildcard);
                 }
             }
-            SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
-                match expr {
-                    Expr::CompoundIdentifier(parts) if parts.len() == 2 => {
-                        let prefix = &parts[0].value;
-                        let col_name = parts[1].value.clone();
-                        if Some(prefix.as_str()) == left_alias || prefix == &left_table {
-                            left_columns.push(SelectColumn::Name(col_name));
-                        } else if Some(prefix.as_str()) == right_alias || prefix == &right_table {
-                            right_columns.push(SelectColumn::Name(col_name));
-                        } else {
-                            left_columns.push(SelectColumn::Name(col_name));
-                        }
-                    }
-                    _ => {
-                        left_columns.push(select_expr_to_column(expr, None)?);
+            SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => match expr {
+                Expr::CompoundIdentifier(parts) if parts.len() == 2 => {
+                    let prefix = &parts[0].value;
+                    let col_name = parts[1].value.clone();
+                    if Some(prefix.as_str()) == left_alias || prefix == &left_table {
+                        left_columns.push(SelectColumn::Name(col_name));
+                    } else if Some(prefix.as_str()) == right_alias || prefix == &right_table {
+                        right_columns.push(SelectColumn::Name(col_name));
+                    } else {
+                        left_columns.push(SelectColumn::Name(col_name));
                     }
                 }
-            }
+                _ => {
+                    left_columns.push(select_expr_to_column(expr, None)?);
+                }
+            },
         }
     }
 
@@ -774,9 +843,9 @@ fn plan_asof_join(query: &ast::Query, asof: &AsofJoinInfo) -> Result<QueryPlan> 
                     Ok(OrderBy { column, descending })
                 })
                 .collect::<Result<Vec<_>>>(),
-            ast::OrderByKind::All(_) => {
-                Err(ExchangeDbError::Query("ORDER BY ALL is not supported".into()))
-            }
+            ast::OrderByKind::All(_) => Err(ExchangeDbError::Query(
+                "ORDER BY ALL is not supported".into(),
+            )),
         })
         .transpose()?
         .unwrap_or_default();
@@ -805,7 +874,12 @@ fn plan_asof_join(query: &ast::Query, asof: &AsofJoinInfo) -> Result<QueryPlan> 
 
 fn plan_set_expr(set_expr: &SetExpr) -> Result<QueryPlan> {
     match set_expr {
-        SetExpr::SetOperation { left, right, set_quantifier, op } => {
+        SetExpr::SetOperation {
+            left,
+            right,
+            set_quantifier,
+            op,
+        } => {
             let set_op = match op {
                 SetOperator::Union => SetOp::Union,
                 SetOperator::Intersect => SetOp::Intersect,
@@ -832,7 +906,13 @@ fn plan_set_expr(set_expr: &SetExpr) -> Result<QueryPlan> {
     }
 }
 
-fn plan_select(query: &ast::Query, sample_by_raw: Option<&str>, sample_by_fill: Option<&str>, sample_by_align_calendar: bool, latest_on_info: Option<&LatestOnInfo>) -> Result<QueryPlan> {
+fn plan_select(
+    query: &ast::Query,
+    sample_by_raw: Option<&str>,
+    sample_by_fill: Option<&str>,
+    sample_by_align_calendar: bool,
+    latest_on_info: Option<&LatestOnInfo>,
+) -> Result<QueryPlan> {
     // Handle set operations (UNION / INTERSECT / EXCEPT).
     match query.body.as_ref() {
         SetExpr::SetOperation { .. } => {
@@ -856,27 +936,32 @@ fn plan_select(query: &ast::Query, sample_by_raw: Option<&str>, sample_by_fill: 
             }
             // Generate default column names: column1, column2, ...
             let num_cols = rows.first().map(|r| r.len()).unwrap_or(0);
-            let column_names: Vec<String> = (1..=num_cols)
-                .map(|i| format!("column{i}"))
-                .collect();
+            let column_names: Vec<String> = (1..=num_cols).map(|i| format!("column{i}")).collect();
             return Ok(QueryPlan::Values { column_names, rows });
         }
         SetExpr::Select(_) => { /* handled below */ }
         SetExpr::Query(inner_query) => {
             // Parenthesized subquery: (SELECT ... UNION ALL SELECT ...) LIMIT n
-            let mut plan = plan_select(inner_query, sample_by_raw, sample_by_fill, sample_by_align_calendar, latest_on_info)?;
+            let mut plan = plan_select(
+                inner_query,
+                sample_by_raw,
+                sample_by_fill,
+                sample_by_align_calendar,
+                latest_on_info,
+            )?;
             // Apply outer LIMIT if present.
             let outer_limit = extract_limit(query)?;
             if let Some(lim) = outer_limit
-                && let QueryPlan::SetOperation { ref mut limit, .. } = plan {
-                    *limit = Some(lim);
-                }
+                && let QueryPlan::SetOperation { ref mut limit, .. } = plan
+            {
+                *limit = Some(lim);
+            }
             return Ok(plan);
         }
         _ => {
             return Err(ExchangeDbError::Query(
                 "only simple SELECT queries are supported".into(),
-            ))
+            ));
         }
     }
 
@@ -889,7 +974,16 @@ fn plan_select(query: &ast::Query, sample_by_raw: Option<&str>, sample_by_fill: 
     let limit = extract_limit(query)?;
     let offset = extract_offset(query)?;
 
-    plan_select_inner(select, sample_by_raw, sample_by_fill, sample_by_align_calendar, latest_on_info, &order_by, limit, offset)
+    plan_select_inner(
+        select,
+        sample_by_raw,
+        sample_by_fill,
+        sample_by_align_calendar,
+        latest_on_info,
+        &order_by,
+        limit,
+        offset,
+    )
 }
 
 /// Inner helper for planning a SELECT: takes the parsed Select node and
@@ -907,98 +1001,110 @@ fn plan_select_inner(
 ) -> Result<QueryPlan> {
     // Check for sequence functions: nextval('seq'), currval('seq'), setval('seq', N).
     if select.projection.len() == 1
-        && let SelectItem::UnnamedExpr(Expr::Function(func)) = &select.projection[0] {
-            let fname = func.name.to_string().to_ascii_lowercase();
-            if matches!(fname.as_str(), "nextval" | "currval" | "setval")
-                && let ast::FunctionArguments::List(arg_list) = &func.args {
-                    let seq_name = match arg_list.args.first() {
-                        Some(ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr))) => {
-                            expr_to_value(expr).ok().and_then(|v| match v {
-                                Value::Str(s) => Some(s),
+        && let SelectItem::UnnamedExpr(Expr::Function(func)) = &select.projection[0]
+    {
+        let fname = func.name.to_string().to_ascii_lowercase();
+        if matches!(fname.as_str(), "nextval" | "currval" | "setval")
+            && let ast::FunctionArguments::List(arg_list) = &func.args
+        {
+            let seq_name = match arg_list.args.first() {
+                Some(ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr))) => {
+                    expr_to_value(expr).ok().and_then(|v| match v {
+                        Value::Str(s) => Some(s),
+                        _ => None,
+                    })
+                }
+                _ => None,
+            };
+            if let Some(name) = seq_name {
+                let op = match fname.as_str() {
+                    "nextval" => SequenceOpKind::NextVal(name),
+                    "currval" => SequenceOpKind::CurrVal(name),
+                    "setval" => {
+                        let val = arg_list
+                            .args
+                            .get(1)
+                            .and_then(|a| match a {
+                                ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => {
+                                    expr_to_value(expr).ok().and_then(|v| match v {
+                                        Value::I64(n) => Some(n),
+                                        _ => None,
+                                    })
+                                }
                                 _ => None,
                             })
-                        }
-                        _ => None,
-                    };
-                    if let Some(name) = seq_name {
-                        let op = match fname.as_str() {
-                            "nextval" => SequenceOpKind::NextVal(name),
-                            "currval" => SequenceOpKind::CurrVal(name),
-                            "setval" => {
-                                let val = arg_list.args.get(1).and_then(|a| match a {
-                                    ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => {
-                                        expr_to_value(expr).ok().and_then(|v| match v {
-                                            Value::I64(n) => Some(n),
-                                            _ => None,
-                                        })
-                                    }
-                                    _ => None,
-                                }).unwrap_or(1);
-                                SequenceOpKind::SetVal(name, val)
-                            }
-                            _ => unreachable!(),
-                        };
-                        return Ok(QueryPlan::SequenceOp { op });
+                            .unwrap_or(1);
+                        SequenceOpKind::SetVal(name, val)
                     }
-                }
+                    _ => unreachable!(),
+                };
+                return Ok(QueryPlan::SequenceOp { op });
+            }
         }
+    }
 
     // Check for derived table (subquery in FROM).
     if !select.from.is_empty()
-        && let TableFactor::Derived { subquery, alias, .. } = &select.from[0].relation {
-            let sub_plan = plan_select(subquery, None, None, false, None)?;
-            let alias_name = alias.as_ref()
-                .map(|a| a.name.value.clone())
-                .unwrap_or_else(|| "subquery".to_string());
+        && let TableFactor::Derived {
+            subquery, alias, ..
+        } = &select.from[0].relation
+    {
+        let sub_plan = plan_select(subquery, None, None, false, None)?;
+        let alias_name = alias
+            .as_ref()
+            .map(|a| a.name.value.clone())
+            .unwrap_or_else(|| "subquery".to_string());
 
-            // Parse the outer query's columns, filter, etc.
-            let columns = select
-                .projection
-                .iter()
-                .map(|item| match item {
-                    SelectItem::Wildcard(_) => Ok(SelectColumn::Wildcard),
-                    SelectItem::UnnamedExpr(expr) => select_expr_to_column_with_alias(expr, None),
-                    SelectItem::ExprWithAlias { expr, alias } => {
-                        select_expr_to_column_with_alias(expr, Some(alias.value.clone()))
-                    }
-                    other => Err(ExchangeDbError::Query(format!(
-                        "unsupported projection: {other}"
-                    ))),
-                })
-                .collect::<Result<Vec<_>>>()?;
+        // Parse the outer query's columns, filter, etc.
+        let columns = select
+            .projection
+            .iter()
+            .map(|item| match item {
+                SelectItem::Wildcard(_) => Ok(SelectColumn::Wildcard),
+                SelectItem::UnnamedExpr(expr) => select_expr_to_column_with_alias(expr, None),
+                SelectItem::ExprWithAlias { expr, alias } => {
+                    select_expr_to_column_with_alias(expr, Some(alias.value.clone()))
+                }
+                other => Err(ExchangeDbError::Query(format!(
+                    "unsupported projection: {other}"
+                ))),
+            })
+            .collect::<Result<Vec<_>>>()?;
 
-            let filter = if let Some(selection) = &select.selection {
-                Some(expr_to_filter(selection)?)
-            } else {
-                None
-            };
+        let filter = if let Some(selection) = &select.selection {
+            Some(expr_to_filter(selection)?)
+        } else {
+            None
+        };
 
-            let group_by = extract_group_by(select)?;
-            let having = if let Some(having_expr) = &select.having {
-                Some(having_expr_to_filter(having_expr)?)
-            } else {
-                None
-            };
-            let distinct = select.distinct.is_some();
+        let group_by = extract_group_by(select)?;
+        let having = if let Some(having_expr) = &select.having {
+            Some(having_expr_to_filter(having_expr)?)
+        } else {
+            None
+        };
+        let distinct = select.distinct.is_some();
 
-            return Ok(QueryPlan::DerivedScan {
-                subquery: Box::new(sub_plan),
-                alias: alias_name,
-                columns,
-                filter,
-                order_by: order_by.to_vec(),
-                limit,
-                group_by,
-                having,
-                distinct,
-            });
-        }
+        return Ok(QueryPlan::DerivedScan {
+            subquery: Box::new(sub_plan),
+            alias: alias_name,
+            columns,
+            filter,
+            order_by: order_by.to_vec(),
+            limit,
+            group_by,
+            having,
+            distinct,
+        });
+    }
 
     // Check for table-valued functions: long_sequence(N), generate_series(start, stop, step).
     if !select.from.is_empty()
-        && let Some(ls_plan) = try_plan_table_function(&select.from[0].relation, select, order_by, limit)? {
-            return Ok(ls_plan);
-        }
+        && let Some(ls_plan) =
+            try_plan_table_function(&select.from[0].relation, select, order_by, limit)?
+    {
+        return Ok(ls_plan);
+    }
 
     // Table name
     let (table, left_alias) = if select.from.is_empty() {
@@ -1015,35 +1121,41 @@ fn plan_select_inner(
             other => {
                 return Err(ExchangeDbError::Query(format!(
                     "unsupported FROM clause: {other}"
-                )))
+                )));
             }
         }
     };
 
     // Check for LATERAL JOIN: SELECT ... FROM table t, LATERAL (SELECT ...) l
     if select.from.len() == 2
-        && let TableFactor::Derived { lateral: true, subquery, alias } = &select.from[1].relation {
-            let sub_plan = plan_select(subquery, None, None, false, None)?;
-            let sub_alias = alias.as_ref()
-                .map(|a| a.name.value.clone())
-                .unwrap_or_else(|| "lateral".to_string());
-            let columns = extract_join_select_columns_helper(&select.projection)?;
-            let filter = if let Some(selection) = &select.selection {
-                Some(expr_to_filter(selection)?)
-            } else {
-                None
-            };
-            return Ok(QueryPlan::LateralJoin {
-                left_table: table.clone(),
-                left_alias: left_alias.clone(),
-                subquery: Box::new(sub_plan),
-                subquery_alias: sub_alias,
-                columns,
-                filter,
-                order_by: order_by.to_vec(),
-                limit,
-            });
-        }
+        && let TableFactor::Derived {
+            lateral: true,
+            subquery,
+            alias,
+        } = &select.from[1].relation
+    {
+        let sub_plan = plan_select(subquery, None, None, false, None)?;
+        let sub_alias = alias
+            .as_ref()
+            .map(|a| a.name.value.clone())
+            .unwrap_or_else(|| "lateral".to_string());
+        let columns = extract_join_select_columns_helper(&select.projection)?;
+        let filter = if let Some(selection) = &select.selection {
+            Some(expr_to_filter(selection)?)
+        } else {
+            None
+        };
+        return Ok(QueryPlan::LateralJoin {
+            left_table: table.clone(),
+            left_alias: left_alias.clone(),
+            subquery: Box::new(sub_plan),
+            subquery_alias: sub_alias,
+            columns,
+            filter,
+            order_by: order_by.to_vec(),
+            limit,
+        });
+    }
 
     // Implicit cross join: SELECT * FROM a, b  (multiple FROM entries).
     if select.from.len() > 1 {
@@ -1055,13 +1167,20 @@ fn plan_select_inner(
         };
         // Build cross joins from left to right.
         let (second_table, second_alias) = match &select.from[1].relation {
-            TableFactor::Table { name, alias, .. } => {
-                (name.to_string(), alias.as_ref().map(|a| a.name.value.clone()))
-            }
+            TableFactor::Table { name, alias, .. } => (
+                name.to_string(),
+                alias.as_ref().map(|a| a.name.value.clone()),
+            ),
             TableFactor::Derived { .. } => {
-                return Err(ExchangeDbError::Query("non-LATERAL derived tables in FROM must be in the first position".into()));
+                return Err(ExchangeDbError::Query(
+                    "non-LATERAL derived tables in FROM must be in the first position".into(),
+                ));
             }
-            other => return Err(ExchangeDbError::Query(format!("unsupported FROM clause: {other}"))),
+            other => {
+                return Err(ExchangeDbError::Query(format!(
+                    "unsupported FROM clause: {other}"
+                )));
+            }
         };
         let is_last = select.from.len() == 2;
         let mut current_plan = QueryPlan::Join {
@@ -1069,30 +1188,51 @@ fn plan_select_inner(
             right_table: second_table,
             left_alias: left_alias.clone(),
             right_alias: second_alias,
-            columns: if is_last { columns.clone() } else { vec![JoinSelectColumn::Wildcard] },
+            columns: if is_last {
+                columns.clone()
+            } else {
+                vec![JoinSelectColumn::Wildcard]
+            },
             join_type: JoinType::Cross,
             on_columns: Vec::new(),
             filter: if is_last { filter.clone() } else { None },
-            order_by: if is_last { order_by.to_vec() } else { Vec::new() },
+            order_by: if is_last {
+                order_by.to_vec()
+            } else {
+                Vec::new()
+            },
             limit: if is_last { limit } else { None },
         };
         for i in 2..select.from.len() {
             let (rt, ra) = match &select.from[i].relation {
-                TableFactor::Table { name, alias, .. } => {
-                    (name.to_string(), alias.as_ref().map(|a| a.name.value.clone()))
+                TableFactor::Table { name, alias, .. } => (
+                    name.to_string(),
+                    alias.as_ref().map(|a| a.name.value.clone()),
+                ),
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "unsupported FROM clause: {other}"
+                    )));
                 }
-                other => return Err(ExchangeDbError::Query(format!("unsupported FROM clause: {other}"))),
             };
             let is_last_i = i == select.from.len() - 1;
             current_plan = QueryPlan::MultiJoin {
                 left: Box::new(current_plan),
                 right_table: rt,
                 right_alias: ra,
-                columns: if is_last_i { columns.clone() } else { vec![JoinSelectColumn::Wildcard] },
+                columns: if is_last_i {
+                    columns.clone()
+                } else {
+                    vec![JoinSelectColumn::Wildcard]
+                },
                 join_type: JoinType::Cross,
                 on_columns: Vec::new(),
                 filter: if is_last_i { filter.clone() } else { None },
-                order_by: if is_last_i { order_by.to_vec() } else { Vec::new() },
+                order_by: if is_last_i {
+                    order_by.to_vec()
+                } else {
+                    Vec::new()
+                },
                 limit: if is_last_i { limit } else { None },
             };
         }
@@ -1113,22 +1253,30 @@ fn plan_select_inner(
             // Build the JOIN plan with SELECT * (wildcard), no order/limit for the inner join.
             // Keep the filter on the inner join for WHERE conditions.
             let join_plan = plan_standard_join_inner_impl(
-                select, &table, left_alias.as_deref(),
-                &[], None, true,
+                select,
+                &table,
+                left_alias.as_deref(),
+                &[],
+                None,
+                true,
             )?;
 
             // Convert projections to SelectColumns, resolving compound identifiers
             // (e.g., "o.symbol" -> "symbol", "f.filled_qty" -> "filled_qty").
-            let columns = select.projection.iter().map(|item| match item {
-                SelectItem::Wildcard(_) => Ok(SelectColumn::Wildcard),
-                SelectItem::UnnamedExpr(expr) => join_select_expr_to_column(expr, None),
-                SelectItem::ExprWithAlias { expr, alias } => {
-                    join_select_expr_to_column(expr, Some(alias.value.clone()))
-                }
-                other => Err(ExchangeDbError::Query(format!(
-                    "unsupported projection: {other}"
-                ))),
-            }).collect::<Result<Vec<_>>>()?;
+            let columns = select
+                .projection
+                .iter()
+                .map(|item| match item {
+                    SelectItem::Wildcard(_) => Ok(SelectColumn::Wildcard),
+                    SelectItem::UnnamedExpr(expr) => join_select_expr_to_column(expr, None),
+                    SelectItem::ExprWithAlias { expr, alias } => {
+                        join_select_expr_to_column(expr, Some(alias.value.clone()))
+                    }
+                    other => Err(ExchangeDbError::Query(format!(
+                        "unsupported projection: {other}"
+                    ))),
+                })
+                .collect::<Result<Vec<_>>>()?;
 
             // Parse WHERE filter (for post-join filtering in the DerivedScan).
             let filter = if let Some(selection) = &select.selection {
@@ -1213,7 +1361,11 @@ fn plan_select_inner(
         } else {
             AlignMode::FirstObservation
         };
-        Some(SampleBy { interval, fill, align })
+        Some(SampleBy {
+            interval,
+            fill,
+            align,
+        })
     } else {
         None
     };
@@ -1270,13 +1422,15 @@ fn extract_order_by(query: &ast::Query) -> Result<Vec<OrderBy>> {
     let select = query.body.as_select().map(|s| &s.projection);
     let expr_alias_map: Vec<(String, String)> = select
         .map(|proj| {
-            proj.iter().filter_map(|item| {
-                if let SelectItem::ExprWithAlias { expr, alias } = item {
-                    Some((expr.to_string(), alias.value.clone()))
-                } else {
-                    None
-                }
-            }).collect()
+            proj.iter()
+                .filter_map(|item| {
+                    if let SelectItem::ExprWithAlias { expr, alias } = item {
+                        Some((expr.to_string(), alias.value.clone()))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
         })
         .unwrap_or_default();
 
@@ -1286,7 +1440,8 @@ fn extract_order_by(query: &ast::Query) -> Result<Vec<OrderBy>> {
         .map(|ob| {
             match &ob.kind {
                 ast::OrderByKind::Expressions(exprs) => {
-                    exprs.iter()
+                    exprs
+                        .iter()
                         .map(|o| {
                             let column = match &o.expr {
                                 Expr::Identifier(ident) => ident.value.clone(),
@@ -1296,7 +1451,9 @@ fn extract_order_by(query: &ast::Query) -> Result<Vec<OrderBy>> {
                                 other => {
                                     let expr_str = other.to_string();
                                     // Check if this expression matches a SELECT alias.
-                                    if let Some((_, alias)) = expr_alias_map.iter().find(|(e, _)| *e == expr_str) {
+                                    if let Some((_, alias)) =
+                                        expr_alias_map.iter().find(|(e, _)| *e == expr_str)
+                                    {
                                         alias.clone()
                                     } else {
                                         expr_str
@@ -1308,9 +1465,9 @@ fn extract_order_by(query: &ast::Query) -> Result<Vec<OrderBy>> {
                         })
                         .collect::<Result<Vec<_>>>()
                 }
-                ast::OrderByKind::All(_) => {
-                    Err(ExchangeDbError::Query("ORDER BY ALL is not supported".into()))
-                }
+                ast::OrderByKind::All(_) => Err(ExchangeDbError::Query(
+                    "ORDER BY ALL is not supported".into(),
+                )),
             }
         })
         .transpose()
@@ -1352,17 +1509,18 @@ fn extract_offset(query: &ast::Query) -> Result<Option<u64>> {
 
 fn extract_group_by(select: &ast::Select) -> Result<Vec<String>> {
     match &select.group_by {
-        ast::GroupByExpr::Expressions(exprs, _) => {
-            exprs.iter().map(|e| match e {
+        ast::GroupByExpr::Expressions(exprs, _) => exprs
+            .iter()
+            .map(|e| match e {
                 Expr::Identifier(ident) => Ok(ident.value.clone()),
                 other => Err(ExchangeDbError::Query(format!(
                     "unsupported GROUP BY expression: {other}"
                 ))),
-            }).collect()
-        }
-        ast::GroupByExpr::All(_) => {
-            Err(ExchangeDbError::Query("GROUP BY ALL is not supported".into()))
-        }
+            })
+            .collect(),
+        ast::GroupByExpr::All(_) => Err(ExchangeDbError::Query(
+            "GROUP BY ALL is not supported".into(),
+        )),
     }
 }
 
@@ -1380,19 +1538,25 @@ fn extract_group_by_mode(select: &ast::Select) -> GroupByMode {
             ast::GroupByWithModifier::Rollup => {
                 // The GROUP BY expressions ARE the rollup columns.
                 if let ast::GroupByExpr::Expressions(exprs, _) = &select.group_by {
-                    let cols: Vec<String> = exprs.iter().filter_map(|e| match e {
-                        Expr::Identifier(ident) => Some(ident.value.clone()),
-                        _ => None,
-                    }).collect();
+                    let cols: Vec<String> = exprs
+                        .iter()
+                        .filter_map(|e| match e {
+                            Expr::Identifier(ident) => Some(ident.value.clone()),
+                            _ => None,
+                        })
+                        .collect();
                     return GroupByMode::Rollup(cols);
                 }
             }
             ast::GroupByWithModifier::Cube => {
                 if let ast::GroupByExpr::Expressions(exprs, _) = &select.group_by {
-                    let cols: Vec<String> = exprs.iter().filter_map(|e| match e {
-                        Expr::Identifier(ident) => Some(ident.value.clone()),
-                        _ => None,
-                    }).collect();
+                    let cols: Vec<String> = exprs
+                        .iter()
+                        .filter_map(|e| match e {
+                            Expr::Identifier(ident) => Some(ident.value.clone()),
+                            _ => None,
+                        })
+                        .collect();
                     return GroupByMode::Cube(cols);
                 }
             }
@@ -1413,20 +1577,20 @@ fn extract_group_by_mode(select: &ast::Select) -> GroupByMode {
 /// Parse a GROUPING SETS expression into a Vec<Vec<String>>.
 fn parse_grouping_sets_expr(expr: &Expr) -> Vec<Vec<String>> {
     match expr {
-        Expr::Tuple(items) => {
-            items.iter().map(|item| {
-                match item {
-                    Expr::Tuple(inner) => {
-                        inner.iter().filter_map(|e| match e {
-                            Expr::Identifier(ident) => Some(ident.value.clone()),
-                            _ => None,
-                        }).collect()
-                    }
-                    Expr::Identifier(ident) => vec![ident.value.clone()],
-                    _ => vec![],
-                }
-            }).collect()
-        }
+        Expr::Tuple(items) => items
+            .iter()
+            .map(|item| match item {
+                Expr::Tuple(inner) => inner
+                    .iter()
+                    .filter_map(|e| match e {
+                        Expr::Identifier(ident) => Some(ident.value.clone()),
+                        _ => None,
+                    })
+                    .collect(),
+                Expr::Identifier(ident) => vec![ident.value.clone()],
+                _ => vec![],
+            })
+            .collect(),
         _ => vec![],
     }
 }
@@ -1465,9 +1629,12 @@ fn having_expr_to_filter(expr: &Expr) -> Result<Filter> {
                     }
                     Ok(Filter::Or(parts))
                 }
-                ast::BinaryOperator::Gt | ast::BinaryOperator::Lt
-                | ast::BinaryOperator::GtEq | ast::BinaryOperator::LtEq
-                | ast::BinaryOperator::Eq | ast::BinaryOperator::NotEq => {
+                ast::BinaryOperator::Gt
+                | ast::BinaryOperator::Lt
+                | ast::BinaryOperator::GtEq
+                | ast::BinaryOperator::LtEq
+                | ast::BinaryOperator::Eq
+                | ast::BinaryOperator::NotEq => {
                     // The left side may be an aggregate function like count(*)
                     // or a complex expression like max(d) - min(d).
                     if let Ok(col) = having_expr_to_col_name(left) {
@@ -1529,7 +1696,9 @@ fn having_expr_to_col_name(expr: &Expr) -> Result<String> {
                 ast::FunctionArguments::List(arg_list) => {
                     if arg_list.args.len() == 1 {
                         match &arg_list.args[0] {
-                            ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Wildcard) => "*".to_string(),
+                            ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Wildcard) => {
+                                "*".to_string()
+                            }
                             ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
                                 Expr::Identifier(ident),
                             )) => ident.value.clone(),
@@ -1582,7 +1751,7 @@ fn having_expr_to_plan_expr(expr: &Expr) -> Result<PlanExpr> {
                 other => {
                     return Err(ExchangeDbError::Query(format!(
                         "unsupported binary operator in HAVING expression: {other}"
-                    )))
+                    )));
                 }
             };
             Ok(PlanExpr::BinaryOp {
@@ -1646,24 +1815,46 @@ fn plan_standard_join_inner_impl(
         };
         // Build first join (no filter/order/limit for intermediate joins).
         let mut current_plan = build_single_join_plan_helper(
-            left_table, left_alias, &joins[0],
-            &[JoinSelectColumn::Wildcard], None, &[], None,
+            left_table,
+            left_alias,
+            &joins[0],
+            &[JoinSelectColumn::Wildcard],
+            None,
+            &[],
+            None,
         )?;
         for i in 1..joins.len() {
             let jn = &joins[i];
             let is_last = i == joins.len() - 1;
             let (rt, ra) = match &jn.relation {
-                TableFactor::Table { name, alias, .. } => (name.to_string(), alias.as_ref().map(|a| a.name.value.clone())),
-                other => return Err(ExchangeDbError::Query(format!("unsupported JOIN table: {other}"))),
+                TableFactor::Table { name, alias, .. } => (
+                    name.to_string(),
+                    alias.as_ref().map(|a| a.name.value.clone()),
+                ),
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "unsupported JOIN table: {other}"
+                    )));
+                }
             };
             let (jt, oc) = extract_join_type_and_on_helper(jn)?;
             current_plan = QueryPlan::MultiJoin {
                 left: Box::new(current_plan),
-                right_table: rt, right_alias: ra,
-                columns: if is_last { columns.clone() } else { vec![JoinSelectColumn::Wildcard] },
-                join_type: jt, on_columns: oc,
+                right_table: rt,
+                right_alias: ra,
+                columns: if is_last {
+                    columns.clone()
+                } else {
+                    vec![JoinSelectColumn::Wildcard]
+                },
+                join_type: jt,
+                on_columns: oc,
                 filter: if is_last { filter.clone() } else { None },
-                order_by: if is_last { order_by.to_vec() } else { Vec::new() },
+                order_by: if is_last {
+                    order_by.to_vec()
+                } else {
+                    Vec::new()
+                },
                 limit: if is_last { limit } else { None },
             };
         }
@@ -1682,27 +1873,22 @@ fn plan_standard_join_inner_impl(
         other => {
             return Err(ExchangeDbError::Query(format!(
                 "unsupported JOIN table: {other}"
-            )))
+            )));
         }
     };
 
     // Determine join type
     let join_type = match &join.join_operator {
-        JoinOperator::Inner(constraint)
-        | JoinOperator::Join(constraint) => {
+        JoinOperator::Inner(constraint) | JoinOperator::Join(constraint) => {
             (JoinType::Inner, constraint)
         }
-        JoinOperator::LeftOuter(constraint)
-        | JoinOperator::Left(constraint) => {
+        JoinOperator::LeftOuter(constraint) | JoinOperator::Left(constraint) => {
             (JoinType::Left, constraint)
         }
-        JoinOperator::RightOuter(constraint)
-        | JoinOperator::Right(constraint) => {
+        JoinOperator::RightOuter(constraint) | JoinOperator::Right(constraint) => {
             (JoinType::Right, constraint)
         }
-        JoinOperator::FullOuter(constraint) => {
-            (JoinType::FullOuter, constraint)
-        }
+        JoinOperator::FullOuter(constraint) => (JoinType::FullOuter, constraint),
         JoinOperator::CrossJoin => {
             return {
                 // CROSS JOIN: no ON columns needed
@@ -1733,7 +1919,7 @@ fn plan_standard_join_inner_impl(
         other => {
             return Err(ExchangeDbError::Query(format!(
                 "unsupported JOIN type: {other:?}"
-            )))
+            )));
         }
     };
 
@@ -1742,10 +1928,12 @@ fn plan_standard_join_inner_impl(
         JoinConstraint::On(expr) => extract_join_on_columns(expr)?,
         JoinConstraint::Using(cols) => {
             // USING(col1, col2) -> ON left.col1 = right.col1 AND left.col2 = right.col2
-            cols.iter().map(|c| {
-                let col_name = c.to_string();
-                (col_name.clone(), col_name)
-            }).collect()
+            cols.iter()
+                .map(|c| {
+                    let col_name = c.to_string();
+                    (col_name.clone(), col_name)
+                })
+                .collect()
         }
         JoinConstraint::Natural => {
             // NATURAL JOIN: empty on_columns signals the executor to auto-detect
@@ -1757,7 +1945,7 @@ fn plan_standard_join_inner_impl(
         other => {
             return Err(ExchangeDbError::Query(format!(
                 "unsupported JOIN constraint: {other:?}"
-            )))
+            )));
         }
     };
 
@@ -1802,12 +1990,20 @@ fn plan_standard_join_inner_impl(
 /// Extract equality column pairs from a JOIN ON expression.
 fn extract_join_on_columns(expr: &Expr) -> Result<Vec<(String, String)>> {
     match expr {
-        Expr::BinaryOp { left, op: ast::BinaryOperator::Eq, right } => {
+        Expr::BinaryOp {
+            left,
+            op: ast::BinaryOperator::Eq,
+            right,
+        } => {
             let left_col = extract_join_col_name(left)?;
             let right_col = extract_join_col_name(right)?;
             Ok(vec![(left_col, right_col)])
         }
-        Expr::BinaryOp { left, op: ast::BinaryOperator::And, right } => {
+        Expr::BinaryOp {
+            left,
+            op: ast::BinaryOperator::And,
+            right,
+        } => {
             let mut cols = extract_join_on_columns(left)?;
             cols.extend(extract_join_on_columns(right)?);
             Ok(cols)
@@ -1840,68 +2036,110 @@ fn extract_join_select_columns(projection: &[SelectItem]) -> Result<Vec<JoinSele
 
 // Helper: extract join select columns for multi-table join support.
 fn extract_join_select_columns_helper(projection: &[SelectItem]) -> Result<Vec<JoinSelectColumn>> {
-    projection.iter().map(|item| match item {
-        SelectItem::Wildcard(_) => Ok(JoinSelectColumn::Wildcard),
-        SelectItem::QualifiedWildcard(name, _) => Ok(JoinSelectColumn::QualifiedWildcard(name.to_string())),
-        SelectItem::ExprWithAlias { expr, alias } => {
-            let alias_str = alias.value.clone();
-            match expr {
-                Expr::CompoundIdentifier(parts) if parts.len() == 2 => {
-                    Ok(JoinSelectColumn::QualifiedAlias(parts[0].value.clone(), parts[1].value.clone(), alias_str))
-                }
-                Expr::Identifier(ident) => {
-                    Ok(JoinSelectColumn::QualifiedAlias(String::new(), ident.value.clone(), alias_str))
-                }
-                _ => {
-                    // Expression or CASE WHEN with alias
-                    let plan_expr = sql_expr_to_plan_expr(expr)?;
-                    Ok(JoinSelectColumn::Expression { expr: plan_expr, alias: Some(alias_str) })
+    projection
+        .iter()
+        .map(|item| match item {
+            SelectItem::Wildcard(_) => Ok(JoinSelectColumn::Wildcard),
+            SelectItem::QualifiedWildcard(name, _) => {
+                Ok(JoinSelectColumn::QualifiedWildcard(name.to_string()))
+            }
+            SelectItem::ExprWithAlias { expr, alias } => {
+                let alias_str = alias.value.clone();
+                match expr {
+                    Expr::CompoundIdentifier(parts) if parts.len() == 2 => {
+                        Ok(JoinSelectColumn::QualifiedAlias(
+                            parts[0].value.clone(),
+                            parts[1].value.clone(),
+                            alias_str,
+                        ))
+                    }
+                    Expr::Identifier(ident) => Ok(JoinSelectColumn::QualifiedAlias(
+                        String::new(),
+                        ident.value.clone(),
+                        alias_str,
+                    )),
+                    _ => {
+                        // Expression or CASE WHEN with alias
+                        let plan_expr = sql_expr_to_plan_expr(expr)?;
+                        Ok(JoinSelectColumn::Expression {
+                            expr: plan_expr,
+                            alias: Some(alias_str),
+                        })
+                    }
                 }
             }
-        }
-        SelectItem::UnnamedExpr(expr) => match expr {
-            Expr::CompoundIdentifier(parts) if parts.len() == 2 => Ok(JoinSelectColumn::Qualified(parts[0].value.clone(), parts[1].value.clone())),
-            Expr::Identifier(ident) => Ok(JoinSelectColumn::Unqualified(ident.value.clone())),
-            Expr::Function(func) => {
-                let func_name = func.name.to_string();
-                if let Some(kind) = AggregateKind::from_name(&func_name) {
-                    // Aggregate function in JOIN select
-                    let (col_name, arg_expr) = match &func.args {
-                        ast::FunctionArguments::List(arg_list) if !arg_list.args.is_empty() => {
-                            match &arg_list.args[0] {
-                                ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(Expr::Identifier(ident))) => (ident.value.clone(), None),
-                                ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(Expr::CompoundIdentifier(parts))) => {
-                                    if parts.len() == 2 { (format!("{}.{}", parts[0].value, parts[1].value), None) } else { ("*".to_string(), None) }
+            SelectItem::UnnamedExpr(expr) => match expr {
+                Expr::CompoundIdentifier(parts) if parts.len() == 2 => Ok(
+                    JoinSelectColumn::Qualified(parts[0].value.clone(), parts[1].value.clone()),
+                ),
+                Expr::Identifier(ident) => Ok(JoinSelectColumn::Unqualified(ident.value.clone())),
+                Expr::Function(func) => {
+                    let func_name = func.name.to_string();
+                    if let Some(kind) = AggregateKind::from_name(&func_name) {
+                        // Aggregate function in JOIN select
+                        let (col_name, arg_expr) = match &func.args {
+                            ast::FunctionArguments::List(arg_list) if !arg_list.args.is_empty() => {
+                                match &arg_list.args[0] {
+                                    ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
+                                        Expr::Identifier(ident),
+                                    )) => (ident.value.clone(), None),
+                                    ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
+                                        Expr::CompoundIdentifier(parts),
+                                    )) => {
+                                        if parts.len() == 2 {
+                                            (format!("{}.{}", parts[0].value, parts[1].value), None)
+                                        } else {
+                                            ("*".to_string(), None)
+                                        }
+                                    }
+                                    ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Wildcard) => {
+                                        ("*".to_string(), None)
+                                    }
+                                    ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => {
+                                        // Complex expression (e.g. f.price * f.filled)
+                                        let plan_expr = sql_expr_to_plan_expr(expr)?;
+                                        ("*".to_string(), Some(plan_expr))
+                                    }
+                                    _ => ("*".to_string(), None),
                                 }
-                                ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Wildcard) => ("*".to_string(), None),
-                                ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => {
-                                    // Complex expression (e.g. f.price * f.filled)
-                                    let plan_expr = sql_expr_to_plan_expr(expr)?;
-                                    ("*".to_string(), Some(plan_expr))
-                                }
-                                _ => ("*".to_string(), None),
                             }
-                        }
-                        _ => ("*".to_string(), None),
-                    };
-                    Ok(JoinSelectColumn::Aggregate { function: kind, column: col_name, alias: None, arg_expr })
-                } else {
-                    // Treat as expression
-                    let plan_expr = sql_expr_to_plan_expr(expr)?;
-                    Ok(JoinSelectColumn::Expression { expr: plan_expr, alias: None })
+                            _ => ("*".to_string(), None),
+                        };
+                        Ok(JoinSelectColumn::Aggregate {
+                            function: kind,
+                            column: col_name,
+                            alias: None,
+                            arg_expr,
+                        })
+                    } else {
+                        // Treat as expression
+                        let plan_expr = sql_expr_to_plan_expr(expr)?;
+                        Ok(JoinSelectColumn::Expression {
+                            expr: plan_expr,
+                            alias: None,
+                        })
+                    }
                 }
-            }
-            Expr::BinaryOp { .. } | Expr::UnaryOp { .. } => {
-                let plan_expr = sql_expr_to_plan_expr(expr)?;
-                Ok(JoinSelectColumn::Expression { expr: plan_expr, alias: None })
-            }
-            Expr::Case { .. } => {
-                let plan_expr = sql_expr_to_plan_expr(expr)?;
-                Ok(JoinSelectColumn::Expression { expr: plan_expr, alias: None })
-            }
-            other => Err(ExchangeDbError::Query(format!("unsupported projection in JOIN: {other}"))),
-        },
-    }).collect::<Result<Vec<_>>>()
+                Expr::BinaryOp { .. } | Expr::UnaryOp { .. } => {
+                    let plan_expr = sql_expr_to_plan_expr(expr)?;
+                    Ok(JoinSelectColumn::Expression {
+                        expr: plan_expr,
+                        alias: None,
+                    })
+                }
+                Expr::Case { .. } => {
+                    let plan_expr = sql_expr_to_plan_expr(expr)?;
+                    Ok(JoinSelectColumn::Expression {
+                        expr: plan_expr,
+                        alias: None,
+                    })
+                }
+                other => Err(ExchangeDbError::Query(format!(
+                    "unsupported projection in JOIN: {other}"
+                ))),
+            },
+        })
+        .collect::<Result<Vec<_>>>()
 }
 
 // Helper: extract join type and ON columns from a join AST node.
@@ -1912,40 +2150,72 @@ fn extract_join_type_and_on_helper(join: &ast::Join) -> Result<(JoinType, Vec<(S
         JoinOperator::RightOuter(c) | JoinOperator::Right(c) => (JoinType::Right, Some(c)),
         JoinOperator::FullOuter(c) => (JoinType::FullOuter, Some(c)),
         JoinOperator::CrossJoin => (JoinType::Cross, None),
-        other => return Err(ExchangeDbError::Query(format!("unsupported JOIN type: {other:?}"))),
+        other => {
+            return Err(ExchangeDbError::Query(format!(
+                "unsupported JOIN type: {other:?}"
+            )));
+        }
     };
     let on_columns = if let Some(c) = constraint {
         match c {
             JoinConstraint::On(expr) => extract_join_on_columns(expr)?,
-            JoinConstraint::Using(cols) => {
-                cols.iter().map(|c| {
+            JoinConstraint::Using(cols) => cols
+                .iter()
+                .map(|c| {
                     let col_name = c.to_string();
                     (col_name.clone(), col_name)
-                }).collect()
-            }
+                })
+                .collect(),
             JoinConstraint::Natural => {
                 vec![("__natural__".to_string(), "__natural__".to_string())]
             }
             JoinConstraint::None => Vec::new(),
             #[allow(unreachable_patterns)]
-            other => return Err(ExchangeDbError::Query(format!("unsupported JOIN constraint: {other:?}"))),
+            other => {
+                return Err(ExchangeDbError::Query(format!(
+                    "unsupported JOIN constraint: {other:?}"
+                )));
+            }
         }
-    } else { Vec::new() };
+    } else {
+        Vec::new()
+    };
     Ok((jt, on_columns))
 }
 
 // Helper: build a single Join plan.
-fn build_single_join_plan_helper(left_table: &str, left_alias: Option<&str>, join: &ast::Join, columns: &[JoinSelectColumn], filter: Option<Filter>, order_by: &[OrderBy], limit: Option<u64>) -> Result<QueryPlan> {
+fn build_single_join_plan_helper(
+    left_table: &str,
+    left_alias: Option<&str>,
+    join: &ast::Join,
+    columns: &[JoinSelectColumn],
+    filter: Option<Filter>,
+    order_by: &[OrderBy],
+    limit: Option<u64>,
+) -> Result<QueryPlan> {
     let (right_table, right_alias) = match &join.relation {
-        TableFactor::Table { name, alias, .. } => (name.to_string(), alias.as_ref().map(|a| a.name.value.clone())),
-        other => return Err(ExchangeDbError::Query(format!("unsupported JOIN table: {other}"))),
+        TableFactor::Table { name, alias, .. } => (
+            name.to_string(),
+            alias.as_ref().map(|a| a.name.value.clone()),
+        ),
+        other => {
+            return Err(ExchangeDbError::Query(format!(
+                "unsupported JOIN table: {other}"
+            )));
+        }
     };
     let (join_type, on_columns) = extract_join_type_and_on_helper(join)?;
     Ok(QueryPlan::Join {
-        left_table: left_table.to_string(), right_table,
-        left_alias: left_alias.map(|s| s.to_string()), right_alias,
-        columns: columns.to_vec(), join_type, on_columns, filter,
-        order_by: order_by.to_vec(), limit,
+        left_table: left_table.to_string(),
+        right_table,
+        left_alias: left_alias.map(|s| s.to_string()),
+        right_alias,
+        columns: columns.to_vec(),
+        join_type,
+        on_columns,
+        filter,
+        order_by: order_by.to_vec(),
+        limit,
     })
 }
 
@@ -1953,9 +2223,10 @@ fn build_single_join_plan_helper(left_table: &str, left_alias: Option<&str>, joi
 fn select_expr_to_column_with_alias(expr: &Expr, alias: Option<String>) -> Result<SelectColumn> {
     // Check for window function (function with OVER clause).
     if let Expr::Function(func) = expr
-        && func.over.is_some() {
-            return plan_window_function(func, alias);
-        }
+        && func.over.is_some()
+    {
+        return plan_window_function(func, alias);
+    }
     select_expr_to_column(expr, alias)
 }
 
@@ -1982,10 +2253,12 @@ fn select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<SelectCol
                 let (col_name, arg_expr_parsed) = match args {
                     ast::FunctionArguments::List(arg_list) => {
                         // Handle count(DISTINCT col) syntax.
-                        if let Some(ast::DuplicateTreatment::Distinct) = arg_list.duplicate_treatment
-                            && matches!(kind, AggregateKind::Count) {
-                                kind = AggregateKind::CountDistinct;
-                            }
+                        if let Some(ast::DuplicateTreatment::Distinct) =
+                            arg_list.duplicate_treatment
+                            && matches!(kind, AggregateKind::Count)
+                        {
+                            kind = AggregateKind::CountDistinct;
+                        }
                         if arg_list.args.len() != 1 {
                             return Err(ExchangeDbError::Query(format!(
                                 "{func_name} expects exactly one argument"
@@ -1995,25 +2268,30 @@ fn select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<SelectCol
                             ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
                                 Expr::Identifier(ident),
                             )) => (ident.value.clone(), None),
-                            ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Wildcard) => ("*".to_string(), None),
+                            ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Wildcard) => {
+                                ("*".to_string(), None)
+                            }
                             ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => {
                                 // Expression argument like sum(d * 2.0) or count(CASE WHEN ...)
                                 let plan_expr = sql_expr_to_plan_expr(expr)?;
                                 let col_refs = plan_expr_column_refs(&plan_expr);
-                                let nominal_col = col_refs.into_iter().next().unwrap_or_else(|| "*".to_string());
+                                let nominal_col = col_refs
+                                    .into_iter()
+                                    .next()
+                                    .unwrap_or_else(|| "*".to_string());
                                 (nominal_col, Some(plan_expr))
                             }
                             other => {
                                 return Err(ExchangeDbError::Query(format!(
                                     "unsupported function argument: {other}"
-                                )))
+                                )));
                             }
                         }
                     }
                     _ => {
                         return Err(ExchangeDbError::Query(format!(
                             "unsupported function arguments for {func_name}"
-                        )))
+                        )));
                     }
                 };
 
@@ -2026,16 +2304,20 @@ fn select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<SelectCol
 
                 // Parse WITHIN GROUP (ORDER BY ...) clause if present.
                 let within_group = if !func.within_group.is_empty() {
-                    let orders = func.within_group.iter().map(|o| {
-                        let col = match &o.expr {
-                            Expr::Identifier(ident) => ident.value.clone(),
-                            other => other.to_string(),
-                        };
-                        OrderBy {
-                            column: col,
-                            descending: o.options.asc.map(|a| !a).unwrap_or(false),
-                        }
-                    }).collect::<Vec<_>>();
+                    let orders = func
+                        .within_group
+                        .iter()
+                        .map(|o| {
+                            let col = match &o.expr {
+                                Expr::Identifier(ident) => ident.value.clone(),
+                                other => other.to_string(),
+                            };
+                            OrderBy {
+                                column: col,
+                                descending: o.options.asc.map(|a| !a).unwrap_or(false),
+                            }
+                        })
+                        .collect::<Vec<_>>();
                     Some(orders)
                 } else {
                     None
@@ -2053,7 +2335,9 @@ fn select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<SelectCol
 
             // Try scalar functions.
             if crate::scalar::evaluate_scalar(&func_name, &[]).is_ok()
-                || crate::scalar::ScalarRegistry::new().get(&func_name).is_some()
+                || crate::scalar::ScalarRegistry::new()
+                    .get(&func_name)
+                    .is_some()
             {
                 // Check if any argument is an aggregate function call.
                 // If so, represent as Expression with PlanExpr::Function
@@ -2094,7 +2378,11 @@ fn select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<SelectCol
                 "unknown function: {func_name}"
             )))
         }
-        Expr::Case { operand, conditions, else_result } => {
+        Expr::Case {
+            operand,
+            conditions,
+            else_result,
+        } => {
             let mut case_conditions = Vec::new();
             let mut expr_conds = Vec::new();
             let mut needs_expr = false;
@@ -2138,21 +2426,33 @@ fn select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<SelectCol
                 expr_else: if needs_expr { expr_else } else { None },
             })
         }
-        Expr::Cast { expr, data_type, .. } => {
+        Expr::Cast {
+            expr, data_type, ..
+        } => {
             // Convert CAST(expr AS type) to a scalar function call.
             let func_name = match data_type {
-                ast::DataType::Integer(_) | ast::DataType::Int(_) | ast::DataType::BigInt(_)
-                | ast::DataType::SmallInt(_) | ast::DataType::TinyInt(_) => "cast_to_int",
-                ast::DataType::Float(_) | ast::DataType::Double(_)
-                | ast::DataType::DoublePrecision | ast::DataType::Real
-                | ast::DataType::Numeric(_) | ast::DataType::Decimal(_)
+                ast::DataType::Integer(_)
+                | ast::DataType::Int(_)
+                | ast::DataType::BigInt(_)
+                | ast::DataType::SmallInt(_)
+                | ast::DataType::TinyInt(_) => "cast_to_int",
+                ast::DataType::Float(_)
+                | ast::DataType::Double(_)
+                | ast::DataType::DoublePrecision
+                | ast::DataType::Real
+                | ast::DataType::Numeric(_)
+                | ast::DataType::Decimal(_)
                 | ast::DataType::Dec(_) => "cast_to_float",
-                ast::DataType::Varchar(_) | ast::DataType::Char(_)
-                | ast::DataType::Text | ast::DataType::String(_) => "cast_to_str",
+                ast::DataType::Varchar(_)
+                | ast::DataType::Char(_)
+                | ast::DataType::Text
+                | ast::DataType::String(_) => "cast_to_str",
                 ast::DataType::Timestamp(_, _) => "cast_to_timestamp",
-                other => return Err(ExchangeDbError::Query(format!(
-                    "unsupported CAST target type: {other}"
-                ))),
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "unsupported CAST target type: {other}"
+                    )));
+                }
             };
             let arg = match expr.as_ref() {
                 Expr::Identifier(ident) => SelectColumnArg::Column(ident.value.clone()),
@@ -2178,7 +2478,10 @@ fn select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<SelectCol
             // Try to parse as a complex expression (arithmetic, concatenation, etc.)
             if is_complex_expr(other) {
                 let plan_expr = sql_expr_to_plan_expr(other)?;
-                return Ok(SelectColumn::Expression { expr: plan_expr, alias });
+                return Ok(SelectColumn::Expression {
+                    expr: plan_expr,
+                    alias,
+                });
             }
             // Scalar subquery: (SELECT count(*) FROM t)
             if let Expr::Subquery(subquery) = other {
@@ -2239,9 +2542,9 @@ fn extract_window_func_args(
                 .args
                 .iter()
                 .map(|arg| match arg {
-                    ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
-                        Expr::Identifier(ident),
-                    )) => Ok(WindowFuncArg::Column(ident.value.clone())),
+                    ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(Expr::Identifier(
+                        ident,
+                    ))) => Ok(WindowFuncArg::Column(ident.value.clone())),
                     ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Wildcard) => {
                         Ok(WindowFuncArg::Wildcard)
                     }
@@ -2271,9 +2574,7 @@ fn extract_window_func_args(
 }
 
 /// Convert a sqlparser `WindowSpec` to our internal `WindowSpec`.
-fn convert_window_spec(
-    spec: &ast::WindowSpec,
-) -> Result<crate::window::WindowSpec> {
+fn convert_window_spec(spec: &ast::WindowSpec) -> Result<crate::window::WindowSpec> {
     use crate::window::{FrameBound, WindowFrame, WindowSpec};
 
     let partition_by: Vec<String> = spec
@@ -2319,9 +2620,7 @@ fn convert_window_spec(
 }
 
 /// Convert a sqlparser `WindowFrameBound` to our internal `FrameBound`.
-fn convert_frame_bound(
-    bound: &ast::WindowFrameBound,
-) -> Result<crate::window::FrameBound> {
+fn convert_frame_bound(bound: &ast::WindowFrameBound) -> Result<crate::window::FrameBound> {
     use crate::window::FrameBound;
 
     match bound {
@@ -2352,15 +2651,13 @@ fn convert_frame_bound(
 /// Check if any function argument is an aggregate function call.
 fn has_aggregate_arg(args: &ast::FunctionArguments) -> bool {
     match args {
-        ast::FunctionArguments::List(arg_list) => {
-            arg_list.args.iter().any(|arg| {
-                if let ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(Expr::Function(f))) = arg {
-                    AggregateKind::from_name(&f.name.to_string()).is_some()
-                } else {
-                    false
-                }
-            })
-        }
+        ast::FunctionArguments::List(arg_list) => arg_list.args.iter().any(|arg| {
+            if let ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(Expr::Function(f))) = arg {
+                AggregateKind::from_name(&f.name.to_string()).is_some()
+            } else {
+                false
+            }
+        }),
         _ => false,
     }
 }
@@ -2368,21 +2665,21 @@ fn has_aggregate_arg(args: &ast::FunctionArguments) -> bool {
 /// Extract function arguments as PlanExpr (for nested aggregate expressions).
 fn extract_plan_expr_args(args: &ast::FunctionArguments) -> Result<Vec<PlanExpr>> {
     match args {
-        ast::FunctionArguments::List(arg_list) => {
-            arg_list.args.iter().map(|arg| {
-                match arg {
-                    ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => {
-                        sql_expr_to_plan_expr(expr)
-                    }
-                    ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Wildcard) => {
-                        Ok(PlanExpr::Column("*".to_string()))
-                    }
-                    other => Err(ExchangeDbError::Query(format!(
-                        "unsupported function argument: {other}"
-                    ))),
+        ast::FunctionArguments::List(arg_list) => arg_list
+            .args
+            .iter()
+            .map(|arg| match arg {
+                ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => {
+                    sql_expr_to_plan_expr(expr)
                 }
-            }).collect()
-        }
+                ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Wildcard) => {
+                    Ok(PlanExpr::Column("*".to_string()))
+                }
+                other => Err(ExchangeDbError::Query(format!(
+                    "unsupported function argument: {other}"
+                ))),
+            })
+            .collect(),
         ast::FunctionArguments::None => Ok(Vec::new()),
         other => Err(ExchangeDbError::Query(format!(
             "unsupported function arguments: {other}"
@@ -2398,9 +2695,9 @@ fn extract_scalar_args(args: &ast::FunctionArguments) -> Result<Vec<SelectColumn
                 .args
                 .iter()
                 .map(|arg| match arg {
-                    ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
-                        Expr::Identifier(ident),
-                    )) => Ok(SelectColumnArg::Column(ident.value.clone())),
+                    ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(Expr::Identifier(
+                        ident,
+                    ))) => Ok(SelectColumnArg::Column(ident.value.clone())),
                     ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => {
                         // Try to evaluate as a literal value.
                         match expr_to_value(expr) {
@@ -2483,9 +2780,18 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                     // If either side is complex (arithmetic, etc.) or both sides
                     // are column references (column-vs-column comparison), use
                     // expression filter.
-                    let right_is_col = matches!(right.as_ref(), Expr::Identifier(_) | Expr::CompoundIdentifier(_));
-                    let left_is_col = matches!(left.as_ref(), Expr::Identifier(_) | Expr::CompoundIdentifier(_));
-                    if is_complex_filter_side(left) || is_complex_filter_side(right) || (left_is_col && right_is_col) {
+                    let right_is_col = matches!(
+                        right.as_ref(),
+                        Expr::Identifier(_) | Expr::CompoundIdentifier(_)
+                    );
+                    let left_is_col = matches!(
+                        left.as_ref(),
+                        Expr::Identifier(_) | Expr::CompoundIdentifier(_)
+                    );
+                    if is_complex_filter_side(left)
+                        || is_complex_filter_side(right)
+                        || (left_is_col && right_is_col)
+                    {
                         let compare_op = match op {
                             ast::BinaryOperator::Eq => CompareOp::Eq,
                             ast::BinaryOperator::NotEq => CompareOp::NotEq,
@@ -2522,9 +2828,20 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                     // Convert regex operators to Expression filters using regexp_match function.
                     let col_expr = sql_expr_to_plan_expr(left)?;
                     let pattern_expr = sql_expr_to_plan_expr(right)?;
-                    let case_insensitive = matches!(op, ast::BinaryOperator::PGRegexIMatch | ast::BinaryOperator::PGRegexNotIMatch);
-                    let negated = matches!(op, ast::BinaryOperator::PGRegexNotMatch | ast::BinaryOperator::PGRegexNotIMatch);
-                    let func_name = if case_insensitive { "regexp_match_ci" } else { "regexp_match" };
+                    let case_insensitive = matches!(
+                        op,
+                        ast::BinaryOperator::PGRegexIMatch | ast::BinaryOperator::PGRegexNotIMatch
+                    );
+                    let negated = matches!(
+                        op,
+                        ast::BinaryOperator::PGRegexNotMatch
+                            | ast::BinaryOperator::PGRegexNotIMatch
+                    );
+                    let func_name = if case_insensitive {
+                        "regexp_match_ci"
+                    } else {
+                        "regexp_match"
+                    };
                     let match_expr = PlanExpr::Function {
                         name: func_name.to_string(),
                         args: vec![col_expr, pattern_expr],
@@ -2532,7 +2849,11 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                     let filter = Filter::Expression {
                         left: match_expr,
                         op: CompareOp::Eq,
-                        right: PlanExpr::Literal(if negated { Value::I64(0) } else { Value::I64(1) }),
+                        right: PlanExpr::Literal(if negated {
+                            Value::I64(0)
+                        } else {
+                            Value::I64(1)
+                        }),
                     };
                     Ok(filter)
                 }
@@ -2559,7 +2880,9 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                             let val = expr_to_value(right)?;
                             match val {
                                 Value::Str(pat) => Ok(Filter::Like(col, pat)),
-                                _ => Err(ExchangeDbError::Query("LIKE pattern must be a string".into())),
+                                _ => Err(ExchangeDbError::Query(
+                                    "LIKE pattern must be a string".into(),
+                                )),
                             }
                         }
                         "=" => {
@@ -2602,33 +2925,44 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
             let col = expr_to_col_name(inner)?;
             Ok(Filter::IsNotNull(col))
         }
-        Expr::InList { expr, list, negated } => {
+        Expr::InList {
+            expr,
+            list,
+            negated,
+        } => {
             let col = expr_to_col_name(expr)?;
-            let values: Vec<Value> = list
-                .iter()
-                .map(expr_to_value)
-                .collect::<Result<Vec<_>>>()?;
+            let values: Vec<Value> = list.iter().map(expr_to_value).collect::<Result<Vec<_>>>()?;
             if *negated {
                 Ok(Filter::NotIn(col, values))
             } else {
                 Ok(Filter::In(col, values))
             }
         }
-        Expr::Like { expr, pattern, negated, escape_char, .. } => {
+        Expr::Like {
+            expr,
+            pattern,
+            negated,
+            escape_char,
+            ..
+        } => {
             let col = expr_to_col_name(expr)?;
             let pat = match pattern.as_ref() {
                 Expr::Value(v) => {
                     let val = sql_value_to_value(v)?;
                     match val {
                         Value::Str(s) => s,
-                        other => return Err(ExchangeDbError::Query(format!(
-                            "LIKE pattern must be a string, got: {other}"
-                        ))),
+                        other => {
+                            return Err(ExchangeDbError::Query(format!(
+                                "LIKE pattern must be a string, got: {other}"
+                            )));
+                        }
                     }
                 }
-                other => return Err(ExchangeDbError::Query(format!(
-                    "unsupported LIKE pattern expression: {other}"
-                ))),
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "unsupported LIKE pattern expression: {other}"
+                    )));
+                }
             };
             let pat = apply_like_escape(&pat, escape_char.as_deref());
             if *negated {
@@ -2637,21 +2971,31 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                 Ok(Filter::Like(col, pat))
             }
         }
-        Expr::ILike { expr, pattern, negated, escape_char, .. } => {
+        Expr::ILike {
+            expr,
+            pattern,
+            negated,
+            escape_char,
+            ..
+        } => {
             let col = expr_to_col_name(expr)?;
             let pat = match pattern.as_ref() {
                 Expr::Value(v) => {
                     let val = sql_value_to_value(v)?;
                     match val {
                         Value::Str(s) => s,
-                        other => return Err(ExchangeDbError::Query(format!(
-                            "ILIKE pattern must be a string, got: {other}"
-                        ))),
+                        other => {
+                            return Err(ExchangeDbError::Query(format!(
+                                "ILIKE pattern must be a string, got: {other}"
+                            )));
+                        }
                     }
                 }
-                other => return Err(ExchangeDbError::Query(format!(
-                    "unsupported ILIKE pattern expression: {other}"
-                ))),
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "unsupported ILIKE pattern expression: {other}"
+                    )));
+                }
             };
             let pat = apply_like_escape(&pat, escape_char.as_deref());
             if *negated {
@@ -2661,12 +3005,18 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                 // Actually, let's just reuse ILike and wrap in a "not" via Or/And trick.
                 // Better approach: add it as NotLike but that's case-sensitive.
                 // For simplicity, we won't support NOT ILIKE for now — report error.
-                Err(ExchangeDbError::Query("NOT ILIKE is not supported yet".into()))
+                Err(ExchangeDbError::Query(
+                    "NOT ILIKE is not supported yet".into(),
+                ))
             } else {
                 Ok(Filter::ILike(col, pat))
             }
         }
-        Expr::InSubquery { expr, subquery, negated } => {
+        Expr::InSubquery {
+            expr,
+            subquery,
+            negated,
+        } => {
             let col = expr_to_col_name(expr)?;
             let sub_plan = plan_select(subquery, None, None, false, None)?;
             Ok(Filter::InSubquery {
@@ -2682,7 +3032,10 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                 negated: *negated,
             })
         }
-        Expr::UnaryOp { op: ast::UnaryOperator::Not, expr } => {
+        Expr::UnaryOp {
+            op: ast::UnaryOperator::Not,
+            expr,
+        } => {
             let inner = expr_to_filter(expr)?;
             Ok(Filter::Not(Box::new(inner)))
         }
@@ -2695,7 +3048,11 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                 right: PlanExpr::Literal(Value::I64(1)),
             })
         }
-        Expr::AllOp { left, compare_op, right } => {
+        Expr::AllOp {
+            left,
+            compare_op,
+            right,
+        } => {
             let col = expr_to_col_name(left)?;
             let compare = match compare_op {
                 ast::BinaryOperator::Eq => CompareOp::Eq,
@@ -2704,19 +3061,32 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                 ast::BinaryOperator::Lt => CompareOp::Lt,
                 ast::BinaryOperator::GtEq => CompareOp::Gte,
                 ast::BinaryOperator::LtEq => CompareOp::Lte,
-                other => return Err(ExchangeDbError::Query(format!(
-                    "unsupported ALL comparison operator: {other}"
-                ))),
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "unsupported ALL comparison operator: {other}"
+                    )));
+                }
             };
             let subquery = match right.as_ref() {
                 Expr::Subquery(q) => plan_select(q, None, None, false, None)?,
-                other => return Err(ExchangeDbError::Query(format!(
-                    "ALL requires a subquery, got: {other}"
-                ))),
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "ALL requires a subquery, got: {other}"
+                    )));
+                }
             };
-            Ok(Filter::All { column: col, op: compare, subquery: Box::new(subquery) })
+            Ok(Filter::All {
+                column: col,
+                op: compare,
+                subquery: Box::new(subquery),
+            })
         }
-        Expr::AnyOp { left, compare_op, right, .. } => {
+        Expr::AnyOp {
+            left,
+            compare_op,
+            right,
+            ..
+        } => {
             let col = expr_to_col_name(left)?;
             let compare = match compare_op {
                 ast::BinaryOperator::Eq => CompareOp::Eq,
@@ -2725,17 +3095,25 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                 ast::BinaryOperator::Lt => CompareOp::Lt,
                 ast::BinaryOperator::GtEq => CompareOp::Gte,
                 ast::BinaryOperator::LtEq => CompareOp::Lte,
-                other => return Err(ExchangeDbError::Query(format!(
-                    "unsupported ANY comparison operator: {other}"
-                ))),
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "unsupported ANY comparison operator: {other}"
+                    )));
+                }
             };
             let subquery = match right.as_ref() {
                 Expr::Subquery(q) => plan_select(q, None, None, false, None)?,
-                other => return Err(ExchangeDbError::Query(format!(
-                    "ANY requires a subquery, got: {other}"
-                ))),
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "ANY requires a subquery, got: {other}"
+                    )));
+                }
             };
-            Ok(Filter::Any { column: col, op: compare, subquery: Box::new(subquery) })
+            Ok(Filter::Any {
+                column: col,
+                op: compare,
+                subquery: Box::new(subquery),
+            })
         }
         other => Err(ExchangeDbError::Query(format!(
             "unsupported filter expression: {other}"
@@ -2791,7 +3169,11 @@ fn expr_to_col_name(expr: &Expr) -> Result<String> {
         Expr::Identifier(ident) => Ok(ident.value.clone()),
         Expr::CompoundIdentifier(parts) => {
             // "t.col" -> "t.col" (keep qualified for join context)
-            Ok(parts.iter().map(|p| p.value.clone()).collect::<Vec<_>>().join("."))
+            Ok(parts
+                .iter()
+                .map(|p| p.value.clone())
+                .collect::<Vec<_>>()
+                .join("."))
         }
         other => Err(ExchangeDbError::Query(format!(
             "expected column name, got: {other}"
@@ -2814,7 +3196,9 @@ fn expr_to_value(expr: &Expr) -> Result<Value> {
             match val {
                 Value::I64(n) => Ok(Value::I64(-n)),
                 Value::F64(n) => Ok(Value::F64(-n)),
-                _ => Err(ExchangeDbError::Query("cannot negate non-numeric value".into())),
+                _ => Err(ExchangeDbError::Query(
+                    "cannot negate non-numeric value".into(),
+                )),
             }
         }
         other => Err(ExchangeDbError::Query(format!(
@@ -2851,9 +3235,10 @@ where
 
     // Numbers
     if (s.contains('.') || s.contains('e') || s.contains('E'))
-        && let Ok(f) = s.parse::<f64>() {
-            return Ok(Value::F64(f));
-        }
+        && let Ok(f) = s.parse::<f64>()
+    {
+        return Ok(Value::F64(f));
+    }
     if let Ok(i) = s.parse::<i64>() {
         return Ok(Value::I64(i));
     }
@@ -2868,13 +3253,22 @@ fn is_complex_expr(expr: &Expr) -> bool {
         Expr::Identifier(_) => false,
         Expr::Function(func) => {
             let name = func.name.to_string();
-            if AggregateKind::from_name(&name).is_some() { return false; }
-            if func.over.is_some() { return false; }
+            if AggregateKind::from_name(&name).is_some() {
+                return false;
+            }
+            if func.over.is_some() {
+                return false;
+            }
             if crate::scalar::evaluate_scalar(&name, &[]).is_ok()
                 || crate::scalar::ScalarRegistry::new().get(&name).is_some()
-            { return false; }
+            {
+                return false;
+            }
             let lower = name.to_ascii_lowercase();
-            if matches!(lower.as_str(), "version" | "current_database" | "current_schema" | "current_schemas") {
+            if matches!(
+                lower.as_str(),
+                "version" | "current_database" | "current_schema" | "current_schemas"
+            ) {
                 return false;
             }
             true
@@ -2887,9 +3281,13 @@ fn is_complex_expr(expr: &Expr) -> bool {
 fn sql_expr_to_plan_expr(expr: &Expr) -> Result<PlanExpr> {
     match expr {
         Expr::Identifier(ident) => Ok(PlanExpr::Column(ident.value.clone())),
-        Expr::CompoundIdentifier(parts) => {
-            Ok(PlanExpr::Column(parts.iter().map(|p| p.value.clone()).collect::<Vec<_>>().join(".")))
-        }
+        Expr::CompoundIdentifier(parts) => Ok(PlanExpr::Column(
+            parts
+                .iter()
+                .map(|p| p.value.clone())
+                .collect::<Vec<_>>()
+                .join("."),
+        )),
         Expr::Value(v) => {
             let val = sql_value_to_value(v)?;
             Ok(PlanExpr::Literal(val))
@@ -2913,7 +3311,7 @@ fn sql_expr_to_plan_expr(expr: &Expr) -> Result<PlanExpr> {
                 other => {
                     return Err(ExchangeDbError::Query(format!(
                         "unsupported binary operator in expression: {other}"
-                    )))
+                    )));
                 }
             };
             Ok(PlanExpr::BinaryOp {
@@ -2929,7 +3327,7 @@ fn sql_expr_to_plan_expr(expr: &Expr) -> Result<PlanExpr> {
                 other => {
                     return Err(ExchangeDbError::Query(format!(
                         "unsupported unary operator in expression: {other}"
-                    )))
+                    )));
                 }
             };
             Ok(PlanExpr::UnaryOp {
@@ -2938,21 +3336,33 @@ fn sql_expr_to_plan_expr(expr: &Expr) -> Result<PlanExpr> {
             })
         }
         Expr::Nested(inner) => sql_expr_to_plan_expr(inner),
-        Expr::Cast { expr, data_type, .. } => {
+        Expr::Cast {
+            expr, data_type, ..
+        } => {
             // Convert CAST(expr AS type) to a function call in expression context.
             let func_name = match data_type {
-                ast::DataType::Integer(_) | ast::DataType::Int(_) | ast::DataType::BigInt(_)
-                | ast::DataType::SmallInt(_) | ast::DataType::TinyInt(_) => "cast_to_int",
-                ast::DataType::Float(_) | ast::DataType::Double(_)
-                | ast::DataType::DoublePrecision | ast::DataType::Real
-                | ast::DataType::Numeric(_) | ast::DataType::Decimal(_)
+                ast::DataType::Integer(_)
+                | ast::DataType::Int(_)
+                | ast::DataType::BigInt(_)
+                | ast::DataType::SmallInt(_)
+                | ast::DataType::TinyInt(_) => "cast_to_int",
+                ast::DataType::Float(_)
+                | ast::DataType::Double(_)
+                | ast::DataType::DoublePrecision
+                | ast::DataType::Real
+                | ast::DataType::Numeric(_)
+                | ast::DataType::Decimal(_)
                 | ast::DataType::Dec(_) => "cast_to_float",
-                ast::DataType::Varchar(_) | ast::DataType::Char(_)
-                | ast::DataType::Text | ast::DataType::String(_) => "cast_to_str",
+                ast::DataType::Varchar(_)
+                | ast::DataType::Char(_)
+                | ast::DataType::Text
+                | ast::DataType::String(_) => "cast_to_str",
                 ast::DataType::Timestamp(_, _) => "cast_to_timestamp",
-                other => return Err(ExchangeDbError::Query(format!(
-                    "unsupported CAST target type in expression: {other}"
-                ))),
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "unsupported CAST target type in expression: {other}"
+                    )));
+                }
             };
             let inner_expr = sql_expr_to_plan_expr(expr)?;
             Ok(PlanExpr::Function {
@@ -2964,9 +3374,11 @@ fn sql_expr_to_plan_expr(expr: &Expr) -> Result<PlanExpr> {
             // Handle array subscript: tags[1] -> split_part(tags, ',', 1)
             let col_name = match root.as_ref() {
                 Expr::Identifier(ident) => ident.value.clone(),
-                other => return Err(ExchangeDbError::Query(format!(
-                    "unsupported compound field access root: {other}"
-                ))),
+                other => {
+                    return Err(ExchangeDbError::Query(format!(
+                        "unsupported compound field access root: {other}"
+                    )));
+                }
             };
             if let Some(first_access) = access_chain.first() {
                 match first_access {
@@ -2993,28 +3405,32 @@ fn sql_expr_to_plan_expr(expr: &Expr) -> Result<PlanExpr> {
         Expr::Function(func) => {
             let name = func.name.to_string().to_ascii_lowercase();
             let args = match &func.args {
-                ast::FunctionArguments::List(arg_list) => {
-                    arg_list.args.iter().map(|arg| {
-                        match arg {
-                            ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(e)) => {
-                                sql_expr_to_plan_expr(e)
-                            }
-                            other => Err(ExchangeDbError::Query(format!(
-                                "unsupported function argument in expression: {other}"
-                            ))),
+                ast::FunctionArguments::List(arg_list) => arg_list
+                    .args
+                    .iter()
+                    .map(|arg| match arg {
+                        ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(e)) => {
+                            sql_expr_to_plan_expr(e)
                         }
-                    }).collect::<Result<Vec<_>>>()?
-                }
+                        other => Err(ExchangeDbError::Query(format!(
+                            "unsupported function argument in expression: {other}"
+                        ))),
+                    })
+                    .collect::<Result<Vec<_>>>()?,
                 ast::FunctionArguments::None => Vec::new(),
                 other => {
                     return Err(ExchangeDbError::Query(format!(
                         "unsupported function arguments in expression: {other}"
-                    )))
+                    )));
                 }
             };
             Ok(PlanExpr::Function { name, args })
         }
-        Expr::Case { operand: _, conditions, else_result } => {
+        Expr::Case {
+            operand: _,
+            conditions,
+            else_result,
+        } => {
             // Build a CASE WHEN expression using nested IIF-like functions.
             // We'll use a simple approach: evaluate condition, return THEN value or ELSE.
             // For now, handle the common "searched CASE" pattern.
@@ -3039,11 +3455,17 @@ fn sql_expr_to_plan_expr(expr: &Expr) -> Result<PlanExpr> {
         }
         Expr::IsNull(expr) => {
             let inner = sql_expr_to_plan_expr(expr)?;
-            Ok(PlanExpr::Function { name: "is_null".to_string(), args: vec![inner] })
+            Ok(PlanExpr::Function {
+                name: "is_null".to_string(),
+                args: vec![inner],
+            })
         }
         Expr::IsNotNull(expr) => {
             let inner = sql_expr_to_plan_expr(expr)?;
-            Ok(PlanExpr::Function { name: "is_not_null".to_string(), args: vec![inner] })
+            Ok(PlanExpr::Function {
+                name: "is_not_null".to_string(),
+                args: vec![inner],
+            })
         }
         other => Err(ExchangeDbError::Query(format!(
             "unsupported expression: {other}"
@@ -3056,9 +3478,10 @@ fn is_complex_filter_side(expr: &Expr) -> bool {
         Expr::Identifier(_) => false,
         Expr::CompoundIdentifier(_) => false,
         Expr::Value(_) => false,
-        Expr::UnaryOp { op: ast::UnaryOperator::Minus, expr } => {
-            !matches!(expr.as_ref(), Expr::Value(_))
-        }
+        Expr::UnaryOp {
+            op: ast::UnaryOperator::Minus,
+            expr,
+        } => !matches!(expr.as_ref(), Expr::Value(_)),
         // CAST expressions (e.g., price::int, CAST(x AS INT)) are complex.
         Expr::Cast { .. } => true,
         // Array subscript is complex.
@@ -3092,18 +3515,24 @@ fn table_func_arg_to_i64(expr: &Expr) -> Option<i64> {
     }
 
     // Handle CAST expressions: '2024-01-01'::timestamp, '1 day'::interval.
-    if let Expr::Cast { expr: inner, data_type, .. } = expr {
+    if let Expr::Cast {
+        expr: inner,
+        data_type,
+        ..
+    } = expr
+    {
         let dt_str = format!("{data_type}").to_ascii_lowercase();
 
         if let Ok(inner_val) = expr_to_value(inner)
-            && let Value::Str(s) = inner_val {
-                if dt_str.contains("timestamp") {
-                    return parse_timestamp_str(&s);
-                }
-                if dt_str.contains("interval") {
-                    return parse_interval_str(&s);
-                }
+            && let Value::Str(s) = inner_val
+        {
+            if dt_str.contains("timestamp") {
+                return parse_timestamp_str(&s);
             }
+            if dt_str.contains("interval") {
+                return parse_interval_str(&s);
+            }
+        }
     }
 
     None
@@ -3193,9 +3622,14 @@ fn try_plan_table_function(
         TableFactor::Function { name, args, .. } => {
             (name.to_string().to_ascii_lowercase(), args.clone())
         }
-        TableFactor::Table { name, args: Some(table_args), .. } => {
-            (name.to_string().to_ascii_lowercase(), table_args.args.clone())
-        }
+        TableFactor::Table {
+            name,
+            args: Some(table_args),
+            ..
+        } => (
+            name.to_string().to_ascii_lowercase(),
+            table_args.args.clone(),
+        ),
         _ => return Ok(None),
     };
 
@@ -3212,7 +3646,9 @@ fn try_plan_table_function(
                 }
                 _ => None,
             })
-            .ok_or_else(|| ExchangeDbError::Query("read_parquet requires a file path argument".into()))?;
+            .ok_or_else(|| {
+                ExchangeDbError::Query("read_parquet requires a file path argument".into())
+            })?;
 
         let columns = select
             .projection
@@ -3248,7 +3684,9 @@ fn try_plan_table_function(
                 }
                 _ => None,
             })
-            .ok_or_else(|| ExchangeDbError::Query("read_csv requires a file path argument".into()))?;
+            .ok_or_else(|| {
+                ExchangeDbError::Query("read_csv requires a file path argument".into())
+            })?;
 
         let columns = select
             .projection
@@ -3278,19 +3716,19 @@ fn try_plan_table_function(
     // Extract argument values, supporting integers, floats, timestamps, and intervals.
     let arg_values: Vec<i64> = args
         .iter()
-        .filter_map(|arg| {
-            match arg {
-                ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => {
-                    table_func_arg_to_i64(expr)
-                }
-                _ => None,
+        .filter_map(|arg| match arg {
+            ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => {
+                table_func_arg_to_i64(expr)
             }
+            _ => None,
         })
         .collect();
 
     // Detect whether any argument is a timestamp or interval cast.
     let has_timestamp_args = args.iter().any(|arg| match arg {
-        ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => is_timestamp_or_interval_cast(expr),
+        ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr)) => {
+            is_timestamp_or_interval_cast(expr)
+        }
         _ => false,
     });
 
@@ -3311,7 +3749,9 @@ fn try_plan_table_function(
 
     if func_name == "long_sequence" {
         if arg_values.is_empty() {
-            return Err(ExchangeDbError::Query("long_sequence requires one argument".into()));
+            return Err(ExchangeDbError::Query(
+                "long_sequence requires one argument".into(),
+            ));
         }
         let count = arg_values[0].max(0) as u64;
         return Ok(Some(QueryPlan::LongSequence { count, columns }));
@@ -3325,7 +3765,11 @@ fn try_plan_table_function(
     }
     let start = arg_values[0];
     let stop = arg_values[1];
-    let step = if arg_values.len() >= 3 { arg_values[2] } else { 1 };
+    let step = if arg_values.len() >= 3 {
+        arg_values[2]
+    } else {
+        1
+    };
     if step == 0 {
         return Err(ExchangeDbError::Query(
             "generate_series step cannot be 0".into(),
@@ -3367,20 +3811,23 @@ fn expr_is_aggregate(expr: &Expr) -> bool {
 fn extract_group_by_for_join(select: &ast::Select) -> Result<Vec<String>> {
     match &select.group_by {
         ast::GroupByExpr::Expressions(exprs, _) => {
-            exprs.iter().map(|e| match e {
-                Expr::Identifier(ident) => Ok(ident.value.clone()),
-                Expr::CompoundIdentifier(parts) if parts.len() == 2 => {
-                    // "alias.column" -> use just the column name for virtual source lookup.
-                    Ok(parts[1].value.clone())
-                }
-                other => Err(ExchangeDbError::Query(format!(
-                    "unsupported GROUP BY expression: {other}"
-                ))),
-            }).collect()
+            exprs
+                .iter()
+                .map(|e| match e {
+                    Expr::Identifier(ident) => Ok(ident.value.clone()),
+                    Expr::CompoundIdentifier(parts) if parts.len() == 2 => {
+                        // "alias.column" -> use just the column name for virtual source lookup.
+                        Ok(parts[1].value.clone())
+                    }
+                    other => Err(ExchangeDbError::Query(format!(
+                        "unsupported GROUP BY expression: {other}"
+                    ))),
+                })
+                .collect()
         }
-        ast::GroupByExpr::All(_) => {
-            Err(ExchangeDbError::Query("GROUP BY ALL is not supported".into()))
-        }
+        ast::GroupByExpr::All(_) => Err(ExchangeDbError::Query(
+            "GROUP BY ALL is not supported".into(),
+        )),
     }
 }
 
@@ -3411,7 +3858,9 @@ fn join_select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<Sele
                             )));
                         }
                         match &arg_list.args[0] {
-                            ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Wildcard) => ("*".to_string(), None),
+                            ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Wildcard) => {
+                                ("*".to_string(), None)
+                            }
                             ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
                                 Expr::Identifier(ident),
                             )) => (ident.value.clone(), None),
@@ -3425,20 +3874,23 @@ fn join_select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<Sele
                                 // Expression argument like sum(f.price * f.filled) or count(CASE WHEN ...)
                                 let plan_expr = sql_expr_to_plan_expr(expr)?;
                                 let col_refs = plan_expr_column_refs(&plan_expr);
-                                let nominal_col = col_refs.into_iter().next().unwrap_or_else(|| "*".to_string());
+                                let nominal_col = col_refs
+                                    .into_iter()
+                                    .next()
+                                    .unwrap_or_else(|| "*".to_string());
                                 (nominal_col, Some(plan_expr))
                             }
                             other => {
                                 return Err(ExchangeDbError::Query(format!(
                                     "unsupported function argument: {other}"
-                                )))
+                                )));
                             }
                         }
                     }
                     _ => {
                         return Err(ExchangeDbError::Query(format!(
                             "unsupported function arguments for {func_name}"
-                        )))
+                        )));
                     }
                 };
                 return Ok(SelectColumn::Aggregate {
@@ -3460,14 +3912,20 @@ fn join_select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<Sele
 /// Plan a PIVOT query from pre-extracted pivot metadata.
 fn plan_pivot(query: &ast::Query, info: &PivotInfo) -> Result<QueryPlan> {
     let source = plan_select(query, None, None, false, None)?;
-    let agg_kind = AggregateKind::from_name(&info.aggregate)
-        .ok_or_else(|| ExchangeDbError::Query(format!(
-            "unsupported aggregate function in PIVOT: {}", info.aggregate
-        )))?;
-    let values = info.values.iter().map(|(v, a)| PivotValue {
-        value: Value::Str(v.clone()),
-        alias: a.clone(),
-    }).collect();
+    let agg_kind = AggregateKind::from_name(&info.aggregate).ok_or_else(|| {
+        ExchangeDbError::Query(format!(
+            "unsupported aggregate function in PIVOT: {}",
+            info.aggregate
+        ))
+    })?;
+    let values = info
+        .values
+        .iter()
+        .map(|(v, a)| PivotValue {
+            value: Value::Str(v.clone()),
+            alias: a.clone(),
+        })
+        .collect();
     Ok(QueryPlan::Pivot {
         source: Box::new(source),
         aggregate: agg_kind,
@@ -3482,22 +3940,25 @@ fn plan_merge(info: &MergeInfo) -> Result<QueryPlan> {
     let mut when_clauses = Vec::new();
 
     if let Some(ref updates) = info.matched_update {
-        let assignments: Vec<(String, PlanExpr)> = updates.iter().map(|(col, expr_str)| {
-            // Try to parse the expression. If it's a qualified name like "source.price",
-            // extract the column name.
-            let trimmed = expr_str.trim();
-            let expr = if trimmed.contains('.') {
-                let parts: Vec<&str> = trimmed.splitn(2, '.').collect();
-                PlanExpr::Column(parts.last().unwrap_or(&trimmed).to_string())
-            } else if let Ok(val) = trimmed.parse::<i64>() {
-                PlanExpr::Literal(Value::I64(val))
-            } else if let Ok(val) = trimmed.parse::<f64>() {
-                PlanExpr::Literal(Value::F64(val))
-            } else {
-                PlanExpr::Column(trimmed.to_string())
-            };
-            (col.clone(), expr)
-        }).collect();
+        let assignments: Vec<(String, PlanExpr)> = updates
+            .iter()
+            .map(|(col, expr_str)| {
+                // Try to parse the expression. If it's a qualified name like "source.price",
+                // extract the column name.
+                let trimmed = expr_str.trim();
+                let expr = if trimmed.contains('.') {
+                    let parts: Vec<&str> = trimmed.splitn(2, '.').collect();
+                    PlanExpr::Column(parts.last().unwrap_or(&trimmed).to_string())
+                } else if let Ok(val) = trimmed.parse::<i64>() {
+                    PlanExpr::Literal(Value::I64(val))
+                } else if let Ok(val) = trimmed.parse::<f64>() {
+                    PlanExpr::Literal(Value::F64(val))
+                } else {
+                    PlanExpr::Column(trimmed.to_string())
+                };
+                (col.clone(), expr)
+            })
+            .collect();
         when_clauses.push(MergeWhen::MatchedUpdate { assignments });
     }
 
@@ -3506,19 +3967,22 @@ fn plan_merge(info: &MergeInfo) -> Result<QueryPlan> {
     }
 
     if let Some(ref vals) = info.not_matched_values {
-        let exprs: Vec<PlanExpr> = vals.iter().map(|v| {
-            let trimmed = v.trim();
-            if trimmed.contains('.') {
-                let parts: Vec<&str> = trimmed.splitn(2, '.').collect();
-                PlanExpr::Column(parts.last().unwrap_or(&trimmed).to_string())
-            } else if let Ok(val) = trimmed.parse::<i64>() {
-                PlanExpr::Literal(Value::I64(val))
-            } else if let Ok(val) = trimmed.parse::<f64>() {
-                PlanExpr::Literal(Value::F64(val))
-            } else {
-                PlanExpr::Column(trimmed.to_string())
-            }
-        }).collect();
+        let exprs: Vec<PlanExpr> = vals
+            .iter()
+            .map(|v| {
+                let trimmed = v.trim();
+                if trimmed.contains('.') {
+                    let parts: Vec<&str> = trimmed.splitn(2, '.').collect();
+                    PlanExpr::Column(parts.last().unwrap_or(&trimmed).to_string())
+                } else if let Ok(val) = trimmed.parse::<i64>() {
+                    PlanExpr::Literal(Value::I64(val))
+                } else if let Ok(val) = trimmed.parse::<f64>() {
+                    PlanExpr::Literal(Value::F64(val))
+                } else {
+                    PlanExpr::Column(trimmed.to_string())
+                }
+            })
+            .collect();
         when_clauses.push(MergeWhen::NotMatchedInsert { values: exprs });
     }
 
@@ -3539,11 +4003,24 @@ fn plan_expr_column_refs(expr: &PlanExpr) -> Vec<String> {
 
 fn collect_plan_expr_cols(expr: &PlanExpr, out: &mut Vec<String>) {
     match expr {
-        PlanExpr::Column(name) => { if !out.contains(name) { out.push(name.clone()); } }
+        PlanExpr::Column(name) => {
+            if !out.contains(name) {
+                out.push(name.clone());
+            }
+        }
         PlanExpr::Literal(_) => {}
-        PlanExpr::BinaryOp { left, right, .. } => { collect_plan_expr_cols(left, out); collect_plan_expr_cols(right, out); }
-        PlanExpr::UnaryOp { expr, .. } => { collect_plan_expr_cols(expr, out); }
-        PlanExpr::Function { args, .. } => { for a in args { collect_plan_expr_cols(a, out); } }
+        PlanExpr::BinaryOp { left, right, .. } => {
+            collect_plan_expr_cols(left, out);
+            collect_plan_expr_cols(right, out);
+        }
+        PlanExpr::UnaryOp { expr, .. } => {
+            collect_plan_expr_cols(expr, out);
+        }
+        PlanExpr::Function { args, .. } => {
+            for a in args {
+                collect_plan_expr_cols(a, out);
+            }
+        }
     }
 }
 
@@ -3579,13 +4056,10 @@ mod tests {
 
     #[test]
     fn plan_insert() {
-        let plan =
-            plan_query("INSERT INTO trades VALUES (1000000, 'BTC', 65000.0, 1.5)").unwrap();
+        let plan = plan_query("INSERT INTO trades VALUES (1000000, 'BTC', 65000.0, 1.5)").unwrap();
 
         match plan {
-            QueryPlan::Insert {
-                table, values, ..
-            } => {
+            QueryPlan::Insert { table, values, .. } => {
                 assert_eq!(table, "trades");
                 assert_eq!(values.len(), 1);
                 assert_eq!(values[0].len(), 4);
@@ -3618,8 +4092,9 @@ mod tests {
 
     #[test]
     fn plan_select_with_where() {
-        let plan = plan_query("SELECT price, volume FROM trades WHERE price > 100 AND volume <= 10")
-            .unwrap();
+        let plan =
+            plan_query("SELECT price, volume FROM trades WHERE price > 100 AND volume <= 10")
+                .unwrap();
 
         match plan {
             QueryPlan::Select {
@@ -3641,8 +4116,7 @@ mod tests {
 
     #[test]
     fn plan_select_with_between() {
-        let plan =
-            plan_query("SELECT * FROM trades WHERE price BETWEEN 100 AND 200").unwrap();
+        let plan = plan_query("SELECT * FROM trades WHERE price BETWEEN 100 AND 200").unwrap();
 
         match plan {
             QueryPlan::Select { filter, .. } => {
@@ -3657,8 +4131,7 @@ mod tests {
 
     #[test]
     fn plan_select_with_order_limit() {
-        let plan =
-            plan_query("SELECT * FROM trades ORDER BY price DESC LIMIT 10").unwrap();
+        let plan = plan_query("SELECT * FROM trades ORDER BY price DESC LIMIT 10").unwrap();
 
         match plan {
             QueryPlan::Select {
@@ -3675,13 +4148,10 @@ mod tests {
 
     #[test]
     fn plan_select_with_offset() {
-        let plan =
-            plan_query("SELECT * FROM trades LIMIT 5 OFFSET 10").unwrap();
+        let plan = plan_query("SELECT * FROM trades LIMIT 5 OFFSET 10").unwrap();
 
         match plan {
-            QueryPlan::Select {
-                limit, offset, ..
-            } => {
+            QueryPlan::Select { limit, offset, .. } => {
                 assert_eq!(limit, Some(5));
                 assert_eq!(offset, Some(10));
             }
@@ -3691,13 +4161,10 @@ mod tests {
 
     #[test]
     fn plan_select_offset_without_limit() {
-        let plan =
-            plan_query("SELECT * FROM trades OFFSET 3").unwrap();
+        let plan = plan_query("SELECT * FROM trades OFFSET 3").unwrap();
 
         match plan {
-            QueryPlan::Select {
-                limit, offset, ..
-            } => {
+            QueryPlan::Select { limit, offset, .. } => {
                 assert_eq!(limit, None);
                 assert_eq!(offset, Some(3));
             }
@@ -3707,10 +4174,9 @@ mod tests {
 
     #[test]
     fn plan_select_with_sample_by() {
-        let plan = plan_query(
-            "SELECT symbol, avg(price) FROM trades SAMPLE BY 1h ORDER BY timestamp",
-        )
-        .unwrap();
+        let plan =
+            plan_query("SELECT symbol, avg(price) FROM trades SAMPLE BY 1h ORDER BY timestamp")
+                .unwrap();
 
         match plan {
             QueryPlan::Select {
@@ -3728,10 +4194,7 @@ mod tests {
                         ..
                     } if column == "price"
                 ));
-                assert_eq!(
-                    sample_by.unwrap().interval,
-                    Duration::from_secs(3600)
-                );
+                assert_eq!(sample_by.unwrap().interval, Duration::from_secs(3600));
                 assert_eq!(order_by.len(), 1);
             }
             other => panic!("expected Select, got {other:?}"),
@@ -3750,15 +4213,24 @@ mod tests {
                 assert_eq!(columns.len(), 6);
                 assert!(matches!(
                     &columns[0],
-                    SelectColumn::Aggregate { function: AggregateKind::Count, .. }
+                    SelectColumn::Aggregate {
+                        function: AggregateKind::Count,
+                        ..
+                    }
                 ));
                 assert!(matches!(
                     &columns[4],
-                    SelectColumn::Aggregate { function: AggregateKind::First, .. }
+                    SelectColumn::Aggregate {
+                        function: AggregateKind::First,
+                        ..
+                    }
                 ));
                 assert!(matches!(
                     &columns[5],
-                    SelectColumn::Aggregate { function: AggregateKind::Last, .. }
+                    SelectColumn::Aggregate {
+                        function: AggregateKind::Last,
+                        ..
+                    }
                 ));
             }
             other => panic!("expected Select, got {other:?}"),
@@ -3767,8 +4239,7 @@ mod tests {
 
     #[test]
     fn plan_negative_value() {
-        let plan =
-            plan_query("SELECT * FROM trades WHERE price > -100").unwrap();
+        let plan = plan_query("SELECT * FROM trades WHERE price > -100").unwrap();
 
         match plan {
             QueryPlan::Select { filter, .. } => {
@@ -3818,13 +4289,13 @@ mod tests {
 
     #[test]
     fn plan_latest_on() {
-        let plan = plan_query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol",
-        )
-        .unwrap();
+        let plan =
+            plan_query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol").unwrap();
 
         match plan {
-            QueryPlan::Select { latest_on, table, .. } => {
+            QueryPlan::Select {
+                latest_on, table, ..
+            } => {
                 assert_eq!(table, "trades");
                 let lo = latest_on.unwrap();
                 assert_eq!(lo.timestamp_col, "timestamp");
@@ -3846,8 +4317,10 @@ mod tests {
                 assert_eq!(table, "trades");
                 assert_eq!(column_name, "exchange");
                 // sqlparser may normalize VARCHAR to CHARACTER VARYING
-                assert!(column_type == "VARCHAR" || column_type == "CHARACTER VARYING",
-                    "unexpected column_type: {column_type}");
+                assert!(
+                    column_type == "VARCHAR" || column_type == "CHARACTER VARYING",
+                    "unexpected column_type: {column_type}"
+                );
             }
             other => panic!("expected AddColumn, got {other:?}"),
         }
@@ -3857,10 +4330,7 @@ mod tests {
     fn plan_alter_table_drop_column() {
         let plan = plan_query("ALTER TABLE trades DROP COLUMN exchange").unwrap();
         match plan {
-            QueryPlan::DropColumn {
-                table,
-                column_name,
-            } => {
+            QueryPlan::DropColumn { table, column_name } => {
                 assert_eq!(table, "trades");
                 assert_eq!(column_name, "exchange");
             }
@@ -3870,8 +4340,7 @@ mod tests {
 
     #[test]
     fn plan_alter_table_rename_column() {
-        let plan =
-            plan_query("ALTER TABLE trades RENAME COLUMN price TO trade_price").unwrap();
+        let plan = plan_query("ALTER TABLE trades RENAME COLUMN price TO trade_price").unwrap();
         match plan {
             QueryPlan::RenameColumn {
                 table,
@@ -3919,12 +4388,11 @@ mod tests {
 
     #[test]
     fn plan_group_by_single_key() {
-        let plan = plan_query(
-            "SELECT symbol, sum(volume) FROM trades GROUP BY symbol",
-        )
-        .unwrap();
+        let plan = plan_query("SELECT symbol, sum(volume) FROM trades GROUP BY symbol").unwrap();
         match plan {
-            QueryPlan::Select { group_by, columns, .. } => {
+            QueryPlan::Select {
+                group_by, columns, ..
+            } => {
                 assert_eq!(group_by, vec!["symbol".to_string()]);
                 assert_eq!(columns.len(), 2);
                 assert!(matches!(&columns[0], SelectColumn::Name(n) if n == "symbol"));
@@ -3940,12 +4408,13 @@ mod tests {
 
     #[test]
     fn plan_group_by_multiple_keys() {
-        let plan = plan_query(
-            "SELECT symbol, exchange, avg(price) FROM trades GROUP BY symbol, exchange",
-        )
-        .unwrap();
+        let plan =
+            plan_query("SELECT symbol, exchange, avg(price) FROM trades GROUP BY symbol, exchange")
+                .unwrap();
         match plan {
-            QueryPlan::Select { group_by, columns, .. } => {
+            QueryPlan::Select {
+                group_by, columns, ..
+            } => {
                 assert_eq!(group_by, vec!["symbol".to_string(), "exchange".to_string()]);
                 assert_eq!(columns.len(), 3);
             }
@@ -3955,12 +4424,13 @@ mod tests {
 
     #[test]
     fn plan_group_by_with_having() {
-        let plan = plan_query(
-            "SELECT symbol, count(*) FROM trades GROUP BY symbol HAVING count(*) > 10",
-        )
-        .unwrap();
+        let plan =
+            plan_query("SELECT symbol, count(*) FROM trades GROUP BY symbol HAVING count(*) > 10")
+                .unwrap();
         match plan {
-            QueryPlan::Select { group_by, having, .. } => {
+            QueryPlan::Select {
+                group_by, having, ..
+            } => {
                 assert_eq!(group_by, vec!["symbol".to_string()]);
                 assert!(having.is_some());
                 let h = having.unwrap();
@@ -3974,7 +4444,9 @@ mod tests {
     fn plan_distinct() {
         let plan = plan_query("SELECT DISTINCT symbol FROM trades").unwrap();
         match plan {
-            QueryPlan::Select { distinct, columns, .. } => {
+            QueryPlan::Select {
+                distinct, columns, ..
+            } => {
                 assert!(distinct);
                 assert_eq!(columns.len(), 1);
                 assert!(matches!(&columns[0], SelectColumn::Name(n) if n == "symbol"));
@@ -4053,7 +4525,10 @@ mod tests {
         match plan {
             QueryPlan::Delete { table, filter } => {
                 assert_eq!(table, "trades");
-                assert_eq!(filter.unwrap(), Filter::Lt("price".into(), Value::I64(50000)));
+                assert_eq!(
+                    filter.unwrap(),
+                    Filter::Lt("price".into(), Value::I64(50000))
+                );
             }
             other => panic!("expected Delete, got {other:?}"),
         }
@@ -4073,17 +4548,18 @@ mod tests {
 
     #[test]
     fn plan_delete_compound_filter() {
-        let plan = plan_query(
-            "DELETE FROM trades WHERE symbol = 'BTC/USD' AND price < 50000",
-        )
-        .unwrap();
+        let plan =
+            plan_query("DELETE FROM trades WHERE symbol = 'BTC/USD' AND price < 50000").unwrap();
         match plan {
             QueryPlan::Delete { table, filter } => {
                 assert_eq!(table, "trades");
                 match filter.unwrap() {
                     Filter::And(parts) => {
                         assert_eq!(parts.len(), 2);
-                        assert_eq!(parts[0], Filter::Eq("symbol".into(), Value::Str("BTC/USD".into())));
+                        assert_eq!(
+                            parts[0],
+                            Filter::Eq("symbol".into(), Value::Str("BTC/USD".into()))
+                        );
                         assert_eq!(parts[1], Filter::Lt("price".into(), Value::I64(50000)));
                     }
                     other => panic!("expected And filter, got {other:?}"),
@@ -4097,12 +4573,19 @@ mod tests {
     fn plan_update_simple() {
         let plan = plan_query("UPDATE trades SET price = 100.0 WHERE symbol = 'BTC/USD'").unwrap();
         match plan {
-            QueryPlan::Update { table, assignments, filter } => {
+            QueryPlan::Update {
+                table,
+                assignments,
+                filter,
+            } => {
                 assert_eq!(table, "trades");
                 assert_eq!(assignments.len(), 1);
                 assert_eq!(assignments[0].0, "price");
                 assert_eq!(assignments[0].1, PlanExpr::Literal(Value::F64(100.0)));
-                assert_eq!(filter.unwrap(), Filter::Eq("symbol".into(), Value::Str("BTC/USD".into())));
+                assert_eq!(
+                    filter.unwrap(),
+                    Filter::Eq("symbol".into(), Value::Str("BTC/USD".into()))
+                );
             }
             other => panic!("expected Update, got {other:?}"),
         }
@@ -4112,7 +4595,11 @@ mod tests {
     fn plan_update_no_filter() {
         let plan = plan_query("UPDATE trades SET price = 0").unwrap();
         match plan {
-            QueryPlan::Update { table, assignments, filter } => {
+            QueryPlan::Update {
+                table,
+                assignments,
+                filter,
+            } => {
                 assert_eq!(table, "trades");
                 assert_eq!(assignments.len(), 1);
                 assert_eq!(assignments[0].0, "price");
@@ -4130,7 +4617,12 @@ mod tests {
         )
         .unwrap();
         match plan {
-            QueryPlan::Insert { table, columns, values, upsert } => {
+            QueryPlan::Insert {
+                table,
+                columns,
+                values,
+                upsert,
+            } => {
                 assert_eq!(table, "trades");
                 assert!(upsert);
                 assert_eq!(columns, vec!["timestamp", "symbol", "price"]);
@@ -4142,10 +4634,8 @@ mod tests {
 
     #[test]
     fn plan_insert_normal_not_upsert() {
-        let plan = plan_query(
-            "INSERT INTO trades VALUES (1710000000, 'BTC/USD', 65000.0)",
-        )
-        .unwrap();
+        let plan =
+            plan_query("INSERT INTO trades VALUES (1710000000, 'BTC/USD', 65000.0)").unwrap();
         match plan {
             QueryPlan::Insert { upsert, .. } => {
                 assert!(!upsert);
@@ -4227,10 +4717,8 @@ mod tests {
 
     #[test]
     fn plan_window_rank_desc() {
-        let plan = plan_query(
-            "SELECT rank() OVER (ORDER BY price DESC) as price_rank FROM trades",
-        )
-        .unwrap();
+        let plan = plan_query("SELECT rank() OVER (ORDER BY price DESC) as price_rank FROM trades")
+            .unwrap();
         match plan {
             QueryPlan::Select { columns, .. } => {
                 assert_eq!(columns.len(), 1);
@@ -4258,7 +4746,8 @@ mod tests {
         let plan = plan_query(
             "WITH active AS (SELECT * FROM trades WHERE volume > 10) \
              SELECT symbol FROM active",
-        ).unwrap();
+        )
+        .unwrap();
         match plan {
             QueryPlan::WithCte { ctes, body } => {
                 assert_eq!(ctes.len(), 1);
@@ -4280,7 +4769,8 @@ mod tests {
             "SELECT symbol FROM trades WHERE symbol = 'BTC' \
              UNION ALL \
              SELECT symbol FROM trades WHERE symbol = 'ETH'",
-        ).unwrap();
+        )
+        .unwrap();
         match plan {
             QueryPlan::SetOperation { op, all, .. } => {
                 assert_eq!(op, SetOp::Union);
@@ -4296,7 +4786,8 @@ mod tests {
             "SELECT symbol FROM trades \
              UNION \
              SELECT symbol FROM trades",
-        ).unwrap();
+        )
+        .unwrap();
         match plan {
             QueryPlan::SetOperation { op, all, .. } => {
                 assert_eq!(op, SetOp::Union);
@@ -4312,7 +4803,8 @@ mod tests {
             "SELECT symbol FROM trades \
              INTERSECT \
              SELECT symbol FROM quotes",
-        ).unwrap();
+        )
+        .unwrap();
         match plan {
             QueryPlan::SetOperation { op, all, .. } => {
                 assert_eq!(op, SetOp::Intersect);
@@ -4328,7 +4820,8 @@ mod tests {
             "SELECT symbol FROM trades \
              EXCEPT \
              SELECT symbol FROM quotes",
-        ).unwrap();
+        )
+        .unwrap();
         match plan {
             QueryPlan::SetOperation { op, all, .. } => {
                 assert_eq!(op, SetOp::Except);
@@ -4340,21 +4833,28 @@ mod tests {
 
     #[test]
     fn plan_scalar_subquery_in_where() {
-        let plan = plan_query(
-            "SELECT * FROM trades WHERE price > (SELECT avg(price) FROM trades)",
-        ).unwrap();
+        let plan = plan_query("SELECT * FROM trades WHERE price > (SELECT avg(price) FROM trades)")
+            .unwrap();
         match plan {
             QueryPlan::Select { filter, .. } => {
                 match filter.unwrap() {
-                    Filter::Subquery { column, op, subquery } => {
+                    Filter::Subquery {
+                        column,
+                        op,
+                        subquery,
+                    } => {
                         assert_eq!(column, "price");
                         assert_eq!(op, CompareOp::Gt);
                         // The subquery should be a Select with avg(price)
                         match subquery.as_ref() {
                             QueryPlan::Select { columns, .. } => {
-                                assert!(matches!(&columns[0], SelectColumn::Aggregate {
-                                    function: AggregateKind::Avg, ..
-                                }));
+                                assert!(matches!(
+                                    &columns[0],
+                                    SelectColumn::Aggregate {
+                                        function: AggregateKind::Avg,
+                                        ..
+                                    }
+                                ));
                             }
                             other => panic!("expected Select subquery, got {other:?}"),
                         }
@@ -4372,9 +4872,15 @@ mod tests {
             "SELECT symbol, avg_price FROM \
              (SELECT symbol, avg(price) as avg_price FROM trades GROUP BY symbol) sub \
              WHERE avg_price > 100",
-        ).unwrap();
+        )
+        .unwrap();
         match plan {
-            QueryPlan::DerivedScan { alias, columns, filter, .. } => {
+            QueryPlan::DerivedScan {
+                alias,
+                columns,
+                filter,
+                ..
+            } => {
                 assert_eq!(alias, "sub");
                 assert_eq!(columns.len(), 2);
                 assert!(filter.is_some());
@@ -4389,7 +4895,10 @@ mod tests {
     fn plan_is_null_filter() {
         let plan = plan_query("SELECT * FROM trades WHERE symbol IS NULL").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::IsNull(col)), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::IsNull(col)),
+                ..
+            } => {
                 assert_eq!(col, "symbol");
             }
             other => panic!("expected Select with IsNull filter, got {other:?}"),
@@ -4400,7 +4909,10 @@ mod tests {
     fn plan_is_not_null_filter() {
         let plan = plan_query("SELECT * FROM trades WHERE price IS NOT NULL").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::IsNotNull(col)), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::IsNotNull(col)),
+                ..
+            } => {
                 assert_eq!(col, "price");
             }
             other => panic!("expected Select with IsNotNull filter, got {other:?}"),
@@ -4411,11 +4923,18 @@ mod tests {
 
     #[test]
     fn plan_in_string_list() {
-        let plan = plan_query("SELECT * FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD')").unwrap();
+        let plan =
+            plan_query("SELECT * FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD')").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::In(col, values)), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::In(col, values)),
+                ..
+            } => {
                 assert_eq!(col, "symbol");
-                assert_eq!(values, vec![Value::Str("BTC/USD".into()), Value::Str("ETH/USD".into())]);
+                assert_eq!(
+                    values,
+                    vec![Value::Str("BTC/USD".into()), Value::Str("ETH/USD".into())]
+                );
             }
             other => panic!("expected Select with In filter, got {other:?}"),
         }
@@ -4425,9 +4944,15 @@ mod tests {
     fn plan_in_numeric_list() {
         let plan = plan_query("SELECT * FROM trades WHERE price IN (100, 200, 300)").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::In(col, values)), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::In(col, values)),
+                ..
+            } => {
                 assert_eq!(col, "price");
-                assert_eq!(values, vec![Value::I64(100), Value::I64(200), Value::I64(300)]);
+                assert_eq!(
+                    values,
+                    vec![Value::I64(100), Value::I64(200), Value::I64(300)]
+                );
             }
             other => panic!("expected Select with In filter, got {other:?}"),
         }
@@ -4437,7 +4962,10 @@ mod tests {
     fn plan_not_in() {
         let plan = plan_query("SELECT * FROM trades WHERE price NOT IN (100, 200)").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::NotIn(col, values)), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::NotIn(col, values)),
+                ..
+            } => {
                 assert_eq!(col, "price");
                 assert_eq!(values, vec![Value::I64(100), Value::I64(200)]);
             }
@@ -4451,7 +4979,10 @@ mod tests {
     fn plan_like_percent() {
         let plan = plan_query("SELECT * FROM trades WHERE symbol LIKE 'BTC%'").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::Like(col, pat)), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::Like(col, pat)),
+                ..
+            } => {
                 assert_eq!(col, "symbol");
                 assert_eq!(pat, "BTC%");
             }
@@ -4463,7 +4994,10 @@ mod tests {
     fn plan_like_underscore() {
         let plan = plan_query("SELECT * FROM trades WHERE symbol LIKE 'BTC_USD'").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::Like(col, pat)), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::Like(col, pat)),
+                ..
+            } => {
                 assert_eq!(col, "symbol");
                 assert_eq!(pat, "BTC_USD");
             }
@@ -4475,7 +5009,10 @@ mod tests {
     fn plan_not_like() {
         let plan = plan_query("SELECT * FROM trades WHERE symbol NOT LIKE 'ETH%'").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::NotLike(col, pat)), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::NotLike(col, pat)),
+                ..
+            } => {
                 assert_eq!(col, "symbol");
                 assert_eq!(pat, "ETH%");
             }
@@ -4487,7 +5024,10 @@ mod tests {
     fn plan_ilike() {
         let plan = plan_query("SELECT * FROM trades WHERE symbol ILIKE '%usd'").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::ILike(col, pat)), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::ILike(col, pat)),
+                ..
+            } => {
                 assert_eq!(col, "symbol");
                 assert_eq!(pat, "%usd");
             }
@@ -4506,7 +5046,11 @@ mod tests {
             QueryPlan::Select { columns, .. } => {
                 assert_eq!(columns.len(), 1);
                 match &columns[0] {
-                    SelectColumn::CaseWhen { conditions, else_value, .. } => {
+                    SelectColumn::CaseWhen {
+                        conditions,
+                        else_value,
+                        ..
+                    } => {
                         assert_eq!(conditions.len(), 2);
                         assert_eq!(conditions[0].1, Value::Str("high".into()));
                         assert_eq!(conditions[1].1, Value::Str("mid".into()));
@@ -4528,12 +5072,22 @@ mod tests {
             QueryPlan::Select { columns, .. } => {
                 assert_eq!(columns.len(), 1);
                 match &columns[0] {
-                    SelectColumn::CaseWhen { conditions, else_value, .. } => {
+                    SelectColumn::CaseWhen {
+                        conditions,
+                        else_value,
+                        ..
+                    } => {
                         assert_eq!(conditions.len(), 2);
                         // Simple CASE is converted to Eq filters
-                        assert_eq!(conditions[0].0, Filter::Eq("symbol".into(), Value::Str("BTC/USD".into())));
+                        assert_eq!(
+                            conditions[0].0,
+                            Filter::Eq("symbol".into(), Value::Str("BTC/USD".into()))
+                        );
                         assert_eq!(conditions[0].1, Value::Str("Bitcoin".into()));
-                        assert_eq!(conditions[1].0, Filter::Eq("symbol".into(), Value::Str("ETH/USD".into())));
+                        assert_eq!(
+                            conditions[1].0,
+                            Filter::Eq("symbol".into(), Value::Str("ETH/USD".into()))
+                        );
                         assert_eq!(conditions[1].1, Value::Str("Ethereum".into()));
                         assert_eq!(*else_value, Some(Value::Str("Other".into())));
                     }
@@ -4593,7 +5147,10 @@ mod tests {
                     SelectColumn::ScalarFunction { name, args } => {
                         assert_eq!(name, "cast_to_timestamp");
                         assert_eq!(args.len(), 1);
-                        assert_eq!(args[0], SelectColumnArg::Literal(Value::Str("2024-01-01".into())));
+                        assert_eq!(
+                            args[0],
+                            SelectColumnArg::Literal(Value::Str("2024-01-01".into()))
+                        );
                     }
                     other => panic!("expected ScalarFunction, got {other:?}"),
                 }
@@ -4606,7 +5163,10 @@ mod tests {
     fn plan_sample_by_fill_null() {
         let plan = plan_query("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(NULL)").unwrap();
         match plan {
-            QueryPlan::Select { sample_by: Some(sb), .. } => {
+            QueryPlan::Select {
+                sample_by: Some(sb),
+                ..
+            } => {
                 assert_eq!(sb.interval, Duration::from_secs(3600));
                 assert_eq!(sb.fill, FillMode::Null);
                 assert_eq!(sb.align, AlignMode::FirstObservation);
@@ -4619,7 +5179,10 @@ mod tests {
     fn plan_sample_by_fill_prev() {
         let plan = plan_query("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(PREV)").unwrap();
         match plan {
-            QueryPlan::Select { sample_by: Some(sb), .. } => {
+            QueryPlan::Select {
+                sample_by: Some(sb),
+                ..
+            } => {
                 assert_eq!(sb.fill, FillMode::Prev);
             }
             other => panic!("expected Select with SampleBy, got {other:?}"),
@@ -4630,7 +5193,10 @@ mod tests {
     fn plan_sample_by_fill_zero() {
         let plan = plan_query("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(0)").unwrap();
         match plan {
-            QueryPlan::Select { sample_by: Some(sb), .. } => {
+            QueryPlan::Select {
+                sample_by: Some(sb),
+                ..
+            } => {
                 assert_eq!(sb.fill, FillMode::Value(Value::I64(0)));
             }
             other => panic!("expected Select with SampleBy, got {other:?}"),
@@ -4641,7 +5207,10 @@ mod tests {
     fn plan_sample_by_fill_linear() {
         let plan = plan_query("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(LINEAR)").unwrap();
         match plan {
-            QueryPlan::Select { sample_by: Some(sb), .. } => {
+            QueryPlan::Select {
+                sample_by: Some(sb),
+                ..
+            } => {
                 assert_eq!(sb.fill, FillMode::Linear);
             }
             other => panic!("expected Select with SampleBy, got {other:?}"),
@@ -4650,9 +5219,13 @@ mod tests {
 
     #[test]
     fn plan_sample_by_align_calendar() {
-        let plan = plan_query("SELECT avg(price) FROM trades SAMPLE BY 1h ALIGN TO CALENDAR").unwrap();
+        let plan =
+            plan_query("SELECT avg(price) FROM trades SAMPLE BY 1h ALIGN TO CALENDAR").unwrap();
         match plan {
-            QueryPlan::Select { sample_by: Some(sb), .. } => {
+            QueryPlan::Select {
+                sample_by: Some(sb),
+                ..
+            } => {
                 assert_eq!(sb.align, AlignMode::Calendar);
             }
             other => panic!("expected Select with SampleBy, got {other:?}"),
@@ -4694,10 +5267,8 @@ mod tests {
 
     #[test]
     fn plan_right_join() {
-        let plan = plan_query(
-            "SELECT * FROM trades t RIGHT JOIN markets m ON t.symbol = m.symbol",
-        )
-        .unwrap();
+        let plan = plan_query("SELECT * FROM trades t RIGHT JOIN markets m ON t.symbol = m.symbol")
+            .unwrap();
         match plan {
             QueryPlan::Join {
                 join_type,
@@ -4715,10 +5286,9 @@ mod tests {
 
     #[test]
     fn plan_full_outer_join() {
-        let plan = plan_query(
-            "SELECT * FROM trades t FULL OUTER JOIN markets m ON t.symbol = m.symbol",
-        )
-        .unwrap();
+        let plan =
+            plan_query("SELECT * FROM trades t FULL OUTER JOIN markets m ON t.symbol = m.symbol")
+                .unwrap();
         match plan {
             QueryPlan::Join {
                 join_type,
@@ -4736,10 +5306,7 @@ mod tests {
 
     #[test]
     fn plan_cross_join() {
-        let plan = plan_query(
-            "SELECT * FROM symbols CROSS JOIN timeframes",
-        )
-        .unwrap();
+        let plan = plan_query("SELECT * FROM symbols CROSS JOIN timeframes").unwrap();
         match plan {
             QueryPlan::Join {
                 join_type,
@@ -4759,10 +5326,7 @@ mod tests {
 
     #[test]
     fn plan_implicit_cross_join() {
-        let plan = plan_query(
-            "SELECT * FROM symbols, timeframes",
-        )
-        .unwrap();
+        let plan = plan_query("SELECT * FROM symbols, timeframes").unwrap();
         match plan {
             QueryPlan::Join {
                 join_type,
@@ -4819,12 +5383,17 @@ mod tests {
 
     #[test]
     fn plan_in_subquery() {
-        let plan = plan_query(
-            "SELECT * FROM trades WHERE symbol IN (SELECT symbol FROM watchlist)",
-        )
-        .unwrap();
+        let plan =
+            plan_query("SELECT * FROM trades WHERE symbol IN (SELECT symbol FROM watchlist)")
+                .unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::InSubquery { column, negated, .. }), .. } => {
+            QueryPlan::Select {
+                filter:
+                    Some(Filter::InSubquery {
+                        column, negated, ..
+                    }),
+                ..
+            } => {
                 assert_eq!(column, "symbol");
                 assert!(!negated);
             }
@@ -4834,12 +5403,17 @@ mod tests {
 
     #[test]
     fn plan_not_in_subquery() {
-        let plan = plan_query(
-            "SELECT * FROM trades WHERE symbol NOT IN (SELECT symbol FROM blacklist)",
-        )
-        .unwrap();
+        let plan =
+            plan_query("SELECT * FROM trades WHERE symbol NOT IN (SELECT symbol FROM blacklist)")
+                .unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::InSubquery { column, negated, .. }), .. } => {
+            QueryPlan::Select {
+                filter:
+                    Some(Filter::InSubquery {
+                        column, negated, ..
+                    }),
+                ..
+            } => {
                 assert_eq!(column, "symbol");
                 assert!(negated);
             }
@@ -4854,7 +5428,10 @@ mod tests {
         )
         .unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::Exists { negated, .. }), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::Exists { negated, .. }),
+                ..
+            } => {
                 assert!(!negated);
             }
             other => panic!("expected Select with Exists filter, got {other:?}"),
@@ -4868,7 +5445,10 @@ mod tests {
         )
         .unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::Exists { negated, .. }), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::Exists { negated, .. }),
+                ..
+            } => {
                 assert!(negated);
             }
             other => panic!("expected Select with Exists (negated) filter, got {other:?}"),
@@ -4879,7 +5459,10 @@ mod tests {
     fn plan_not_eq_operator() {
         let plan = plan_query("SELECT * FROM trades WHERE symbol != 'BTC'").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::NotEq(col, Value::Str(v))), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::NotEq(col, Value::Str(v))),
+                ..
+            } => {
                 assert_eq!(col, "symbol");
                 assert_eq!(v, "BTC");
             }
@@ -4887,7 +5470,10 @@ mod tests {
         }
         let plan2 = plan_query("SELECT * FROM trades WHERE price <> 100").unwrap();
         match plan2 {
-            QueryPlan::Select { filter: Some(Filter::NotEq(col, Value::I64(v))), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::NotEq(col, Value::I64(v))),
+                ..
+            } => {
                 assert_eq!(col, "price");
                 assert_eq!(v, 100);
             }
@@ -4897,9 +5483,15 @@ mod tests {
 
     #[test]
     fn plan_create_table_if_not_exists() {
-        let plan = plan_query("CREATE TABLE IF NOT EXISTS trades (timestamp TIMESTAMP, price DOUBLE)").unwrap();
+        let plan =
+            plan_query("CREATE TABLE IF NOT EXISTS trades (timestamp TIMESTAMP, price DOUBLE)")
+                .unwrap();
         match plan {
-            QueryPlan::CreateTable { name, if_not_exists, .. } => {
+            QueryPlan::CreateTable {
+                name,
+                if_not_exists,
+                ..
+            } => {
                 assert_eq!(name, "trades");
                 assert!(if_not_exists);
             }
@@ -4923,12 +5515,13 @@ mod tests {
     fn plan_not_operator() {
         let plan = plan_query("SELECT * FROM trades WHERE NOT (price > 100)").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::Not(inner)), .. } => {
-                match *inner {
-                    Filter::Gt(col, Value::I64(100)) => assert_eq!(col, "price"),
-                    other => panic!("expected Gt inside Not, got {other:?}"),
-                }
-            }
+            QueryPlan::Select {
+                filter: Some(Filter::Not(inner)),
+                ..
+            } => match *inner {
+                Filter::Gt(col, Value::I64(100)) => assert_eq!(col, "price"),
+                other => panic!("expected Gt inside Not, got {other:?}"),
+            },
             other => panic!("expected Select with Not filter, got {other:?}"),
         }
     }
@@ -4937,7 +5530,11 @@ mod tests {
     fn plan_expression_update() {
         let plan = plan_query("UPDATE trades SET price = price * 1.1 WHERE volume > 100").unwrap();
         match plan {
-            QueryPlan::Update { table, assignments, filter } => {
+            QueryPlan::Update {
+                table,
+                assignments,
+                filter,
+            } => {
                 assert_eq!(table, "trades");
                 assert_eq!(assignments.len(), 1);
                 assert_eq!(assignments[0].0, "price");
@@ -4996,7 +5593,12 @@ mod tests {
             "MERGE INTO target USING source ON target.id = source.id WHEN MATCHED THEN UPDATE SET price = source.price WHEN NOT MATCHED THEN INSERT VALUES (source.id, source.price)"
         ).unwrap();
         match plan {
-            QueryPlan::Merge { target_table, source_table, on_column, when_clauses } => {
+            QueryPlan::Merge {
+                target_table,
+                source_table,
+                on_column,
+                when_clauses,
+            } => {
                 assert_eq!(target_table, "target");
                 assert_eq!(source_table, "source");
                 assert_eq!(on_column.0, "id");
@@ -5013,7 +5615,9 @@ mod tests {
             "INSERT INTO trades (symbol, price) VALUES ('BTC/USD', 65000) ON CONFLICT (symbol) DO NOTHING"
         ).unwrap();
         match plan {
-            QueryPlan::InsertOnConflict { table, on_conflict, .. } => {
+            QueryPlan::InsertOnConflict {
+                table, on_conflict, ..
+            } => {
                 assert_eq!(table, "trades");
                 assert_eq!(on_conflict.columns, vec!["symbol".to_string()]);
                 assert!(matches!(on_conflict.action, OnConflictAction::DoNothing));
@@ -5028,26 +5632,25 @@ mod tests {
             "INSERT INTO trades (symbol, price) VALUES ('BTC/USD', 65000) ON CONFLICT (symbol) DO UPDATE SET price = 70000"
         ).unwrap();
         match plan {
-            QueryPlan::InsertOnConflict { on_conflict, .. } => {
-                match on_conflict.action {
-                    OnConflictAction::DoUpdate { assignments } => {
-                        assert_eq!(assignments.len(), 1);
-                        assert_eq!(assignments[0].0, "price");
-                    }
-                    other => panic!("expected DoUpdate, got {other:?}"),
+            QueryPlan::InsertOnConflict { on_conflict, .. } => match on_conflict.action {
+                OnConflictAction::DoUpdate { assignments } => {
+                    assert_eq!(assignments.len(), 1);
+                    assert_eq!(assignments[0].0, "price");
                 }
-            }
+                other => panic!("expected DoUpdate, got {other:?}"),
+            },
             other => panic!("expected InsertOnConflict, got {other:?}"),
         }
     }
 
     #[test]
     fn plan_cast_in_where() {
-        let plan = plan_query(
-            "SELECT * FROM trades WHERE CAST(price AS INTEGER) > 100"
-        ).unwrap();
+        let plan = plan_query("SELECT * FROM trades WHERE CAST(price AS INTEGER) > 100").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::Expression { .. }), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::Expression { .. }),
+                ..
+            } => {
                 // CAST in WHERE should produce an Expression filter.
             }
             other => panic!("expected Select with Expression filter, got {other:?}"),
@@ -5070,9 +5673,7 @@ mod tests {
 
     #[test]
     fn plan_fetch_first() {
-        let plan = plan_query(
-            "SELECT * FROM trades FETCH FIRST 10 ROWS ONLY"
-        ).unwrap();
+        let plan = plan_query("SELECT * FROM trades FETCH FIRST 10 ROWS ONLY").unwrap();
         match plan {
             QueryPlan::Select { limit, .. } => {
                 assert_eq!(limit, Some(10));
@@ -5083,9 +5684,8 @@ mod tests {
 
     #[test]
     fn plan_fetch_first_with_offset() {
-        let plan = plan_query(
-            "SELECT * FROM trades OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY"
-        ).unwrap();
+        let plan =
+            plan_query("SELECT * FROM trades OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY").unwrap();
         match plan {
             QueryPlan::Select { limit, offset, .. } => {
                 assert_eq!(limit, Some(10));
@@ -5098,11 +5698,13 @@ mod tests {
     #[test]
     fn plan_between_symmetric() {
         // BETWEEN SYMMETRIC 200 AND 100 should be rewritten to work even when low > high.
-        let plan = plan_query(
-            "SELECT * FROM trades WHERE price BETWEEN SYMMETRIC 200 AND 100"
-        ).unwrap();
+        let plan =
+            plan_query("SELECT * FROM trades WHERE price BETWEEN SYMMETRIC 200 AND 100").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::Or(parts)), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::Or(parts)),
+                ..
+            } => {
                 // Should have two BETWEEN clauses ORed together.
                 assert_eq!(parts.len(), 2);
             }
@@ -5116,7 +5718,12 @@ mod tests {
             "SELECT DISTINCT ON (symbol) symbol, price, timestamp FROM trades ORDER BY symbol, timestamp DESC"
         ).unwrap();
         match plan {
-            QueryPlan::Select { distinct, distinct_on, columns, .. } => {
+            QueryPlan::Select {
+                distinct,
+                distinct_on,
+                columns,
+                ..
+            } => {
                 assert!(!distinct);
                 assert_eq!(distinct_on, vec!["symbol".to_string()]);
                 assert_eq!(columns.len(), 3);
@@ -5129,7 +5736,11 @@ mod tests {
     fn plan_create_index() {
         let plan = plan_query("CREATE INDEX idx_trades_symbol ON trades (symbol)").unwrap();
         match plan {
-            QueryPlan::CreateIndex { name, table, columns } => {
+            QueryPlan::CreateIndex {
+                name,
+                table,
+                columns,
+            } => {
                 assert_eq!(name, "idx_trades_symbol");
                 assert_eq!(table, "trades");
                 assert_eq!(columns, vec!["symbol".to_string()]);
@@ -5165,7 +5776,11 @@ mod tests {
     fn plan_create_sequence() {
         let plan = plan_query("CREATE SEQUENCE trade_seq START WITH 1").unwrap();
         match plan {
-            QueryPlan::CreateSequence { name, start, increment } => {
+            QueryPlan::CreateSequence {
+                name,
+                start,
+                increment,
+            } => {
                 assert_eq!(name, "trade_seq");
                 assert_eq!(start, 1);
                 assert_eq!(increment, 1); // default
@@ -5202,7 +5817,9 @@ mod tests {
     fn plan_nextval() {
         let plan = plan_query("SELECT nextval('trade_seq')").unwrap();
         match plan {
-            QueryPlan::SequenceOp { op: SequenceOpKind::NextVal(name) } => {
+            QueryPlan::SequenceOp {
+                op: SequenceOpKind::NextVal(name),
+            } => {
                 assert_eq!(name, "trade_seq");
             }
             other => panic!("expected SequenceOp NextVal, got {other:?}"),
@@ -5213,7 +5830,9 @@ mod tests {
     fn plan_currval() {
         let plan = plan_query("SELECT currval('trade_seq')").unwrap();
         match plan {
-            QueryPlan::SequenceOp { op: SequenceOpKind::CurrVal(name) } => {
+            QueryPlan::SequenceOp {
+                op: SequenceOpKind::CurrVal(name),
+            } => {
                 assert_eq!(name, "trade_seq");
             }
             other => panic!("expected SequenceOp CurrVal, got {other:?}"),
@@ -5236,11 +5855,14 @@ mod tests {
 
     #[test]
     fn plan_all_subquery() {
-        let plan = plan_query(
-            "SELECT * FROM trades WHERE price > ALL (SELECT avg_price FROM benchmarks)"
-        ).unwrap();
+        let plan =
+            plan_query("SELECT * FROM trades WHERE price > ALL (SELECT avg_price FROM benchmarks)")
+                .unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::All { column, op, .. }), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::All { column, op, .. }),
+                ..
+            } => {
                 assert_eq!(column, "price");
                 assert_eq!(op, CompareOp::Gt);
             }
@@ -5250,11 +5872,14 @@ mod tests {
 
     #[test]
     fn plan_any_subquery() {
-        let plan = plan_query(
-            "SELECT * FROM trades WHERE symbol = ANY (SELECT symbol FROM watchlist)"
-        ).unwrap();
+        let plan =
+            plan_query("SELECT * FROM trades WHERE symbol = ANY (SELECT symbol FROM watchlist)")
+                .unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::Any { column, op, .. }), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::Any { column, op, .. }),
+                ..
+            } => {
                 assert_eq!(column, "symbol");
                 assert_eq!(op, CompareOp::Eq);
             }
@@ -5266,11 +5891,14 @@ mod tests {
 
     #[test]
     fn plan_create_table_as_select() {
-        let plan = plan_query(
-            "CREATE TABLE backup AS SELECT * FROM trades WHERE price > 100"
-        ).unwrap();
+        let plan =
+            plan_query("CREATE TABLE backup AS SELECT * FROM trades WHERE price > 100").unwrap();
         match plan {
-            QueryPlan::CreateTableAs { name, source, partition_by } => {
+            QueryPlan::CreateTableAs {
+                name,
+                source,
+                partition_by,
+            } => {
                 assert_eq!(name, "backup");
                 assert!(partition_by.is_none());
                 // Source should be a Select plan
@@ -5302,18 +5930,17 @@ mod tests {
 
     #[test]
     fn plan_not_between() {
-        let plan = plan_query(
-            "SELECT * FROM trades WHERE price NOT BETWEEN 100 AND 200"
-        ).unwrap();
+        let plan = plan_query("SELECT * FROM trades WHERE price NOT BETWEEN 100 AND 200").unwrap();
         match plan {
-            QueryPlan::Select { filter: Some(Filter::Not(inner)), .. } => {
-                match *inner {
-                    Filter::Between(col, Value::I64(100), Value::I64(200)) => {
-                        assert_eq!(col, "price");
-                    }
-                    other => panic!("expected Between inside Not, got {other:?}"),
+            QueryPlan::Select {
+                filter: Some(Filter::Not(inner)),
+                ..
+            } => match *inner {
+                Filter::Between(col, Value::I64(100), Value::I64(200)) => {
+                    assert_eq!(col, "price");
                 }
-            }
+                other => panic!("expected Between inside Not, got {other:?}"),
+            },
             other => panic!("expected Select with Not(Between), got {other:?}"),
         }
     }
@@ -5322,9 +5949,7 @@ mod tests {
 
     #[test]
     fn plan_read_csv() {
-        let plan = plan_query(
-            "SELECT * FROM read_csv('/path/to/data.csv')"
-        ).unwrap();
+        let plan = plan_query("SELECT * FROM read_csv('/path/to/data.csv')").unwrap();
         match plan {
             QueryPlan::ReadCsv { path, .. } => {
                 assert_eq!(path.to_string_lossy(), "/path/to/data.csv");
@@ -5335,9 +5960,7 @@ mod tests {
 
     #[test]
     fn plan_read_csv_columns() {
-        let plan = plan_query(
-            "SELECT name, value FROM read_csv('/data.csv')"
-        ).unwrap();
+        let plan = plan_query("SELECT name, value FROM read_csv('/data.csv')").unwrap();
         match plan {
             QueryPlan::ReadCsv { columns, .. } => {
                 assert_eq!(columns.len(), 2);
@@ -5352,16 +5975,18 @@ mod tests {
 
     #[test]
     fn plan_decimal_with_precision() {
-        let plan = plan_query(
-            "CREATE TABLE prices (ts TIMESTAMP, amount DECIMAL(18, 8))"
-        ).unwrap();
+        let plan = plan_query("CREATE TABLE prices (ts TIMESTAMP, amount DECIMAL(18, 8))").unwrap();
         match plan {
             QueryPlan::CreateTable { columns, .. } => {
                 assert_eq!(columns.len(), 2);
                 // The DECIMAL(18, 8) should be parsed as type containing "DECIMAL"
                 let amount_col = &columns[1];
                 assert_eq!(amount_col.name, "amount");
-                assert!(amount_col.type_name.contains("DECIMAL"), "type_name={}", amount_col.type_name);
+                assert!(
+                    amount_col.type_name.contains("DECIMAL"),
+                    "type_name={}",
+                    amount_col.type_name
+                );
             }
             other => panic!("expected CreateTable, got {other:?}"),
         }

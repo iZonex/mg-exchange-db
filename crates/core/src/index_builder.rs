@@ -80,8 +80,7 @@ pub fn rebuild_index(
         }
 
         // Build new index.
-        let mut index_writer =
-            BitmapIndexWriter::open_default(partition_path, column_name)?;
+        let mut index_writer = BitmapIndexWriter::open_default(partition_path, column_name)?;
 
         for row in 0..row_count {
             let key = reader.read_i32(row);
@@ -134,10 +133,7 @@ mod tests {
             writer
                 .write_row(
                     Timestamp::from_secs(base_ts + i as i64),
-                    &[
-                        ColumnValue::I32(*sym),
-                        ColumnValue::F64(100.0 + i as f64),
-                    ],
+                    &[ColumnValue::I32(*sym), ColumnValue::F64(100.0 + i as f64)],
                 )
                 .unwrap();
         }

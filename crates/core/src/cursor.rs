@@ -41,11 +41,7 @@ impl TableCursor {
     }
 
     /// Create a new cursor reading only specific column indices.
-    pub fn with_columns(
-        meta: TableMeta,
-        partitions: Vec<PathBuf>,
-        columns: Vec<usize>,
-    ) -> Self {
+    pub fn with_columns(meta: TableMeta, partitions: Vec<PathBuf>, columns: Vec<usize>) -> Self {
         Self {
             meta,
             partitions,
@@ -120,19 +116,18 @@ impl TableCursor {
                 ColumnType::I64 => ColumnValue::I64(reader.read_i64(self.current_row)),
                 ColumnType::F64 => {
                     let v = reader.read_f64(self.current_row);
-                    if v.is_nan() { ColumnValue::Null } else { ColumnValue::F64(v) }
+                    if v.is_nan() {
+                        ColumnValue::Null
+                    } else {
+                        ColumnValue::F64(v)
+                    }
                 }
                 ColumnType::I32 | ColumnType::Symbol => {
                     ColumnValue::I32(reader.read_i32(self.current_row))
                 }
-                ColumnType::F32 => ColumnValue::F64(
-                    f32::from_le_bytes(
-                        reader
-                            .read_raw(self.current_row)
-                            .try_into()
-                            .unwrap(),
-                    ) as f64,
-                ),
+                ColumnType::F32 => ColumnValue::F64(f32::from_le_bytes(
+                    reader.read_raw(self.current_row).try_into().unwrap(),
+                ) as f64),
                 _ => ColumnValue::I64(reader.read_i64(self.current_row)),
             };
             row[*col_idx] = val;
@@ -241,12 +236,8 @@ mod tests {
 
         let mut writer = TableWriter::open(db_root, "trades").unwrap();
         let ts = Timestamp::from_secs(1710513000);
-        writer
-            .write_row(ts, &[ColumnValue::F64(100.0)])
-            .unwrap();
-        writer
-            .write_row(ts, &[ColumnValue::F64(200.0)])
-            .unwrap();
+        writer.write_row(ts, &[ColumnValue::F64(100.0)]).unwrap();
+        writer.write_row(ts, &[ColumnValue::F64(200.0)]).unwrap();
         writer.flush().unwrap();
         drop(writer);
 

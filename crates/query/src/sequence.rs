@@ -1,20 +1,28 @@
 //! Sequence support (CREATE SEQUENCE, nextval, currval, setval).
 
-use std::path::Path;
-use exchange_common::error::{ExchangeDbError, Result};
 use crate::plan::{QueryResult, SequenceOpKind, Value};
+use exchange_common::error::{ExchangeDbError, Result};
+use std::path::Path;
 
 /// Create a new sequence.
-pub fn create_sequence(db_root: &Path, name: &str, start: i64, increment: i64) -> Result<QueryResult> {
+pub fn create_sequence(
+    db_root: &Path,
+    name: &str,
+    start: i64,
+    increment: i64,
+) -> Result<QueryResult> {
     let seq_dir = db_root.join("_sequences");
     std::fs::create_dir_all(&seq_dir)?;
     let path = seq_dir.join(format!("{name}.json"));
     if path.exists() {
-        return Err(ExchangeDbError::Query(format!("sequence '{name}' already exists")));
+        return Err(ExchangeDbError::Query(format!(
+            "sequence '{name}' already exists"
+        )));
     }
     // Store start-increment so first nextval returns `start`.
     let initial_current = start - increment;
-    let meta = format!("{{\"start\":{start},\"increment\":{increment},\"current\":{initial_current}}}");
+    let meta =
+        format!("{{\"start\":{start},\"increment\":{increment},\"current\":{initial_current}}}");
     std::fs::write(&path, meta.as_bytes())?;
     Ok(QueryResult::Ok { affected_rows: 0 })
 }
@@ -26,7 +34,9 @@ pub fn drop_sequence(db_root: &Path, name: &str) -> Result<QueryResult> {
         std::fs::remove_file(&path)?;
         Ok(QueryResult::Ok { affected_rows: 0 })
     } else {
-        Err(ExchangeDbError::Query(format!("sequence '{name}' not found")))
+        Err(ExchangeDbError::Query(format!(
+            "sequence '{name}' not found"
+        )))
     }
 }
 
@@ -36,7 +46,9 @@ pub fn execute_sequence_op(db_root: &Path, op: &SequenceOpKind) -> Result<QueryR
         SequenceOpKind::NextVal(name) => {
             let path = db_root.join("_sequences").join(format!("{name}.json"));
             if !path.exists() {
-                return Err(ExchangeDbError::Query(format!("sequence '{name}' not found")));
+                return Err(ExchangeDbError::Query(format!(
+                    "sequence '{name}' not found"
+                )));
             }
             let content = std::fs::read_to_string(&path)?;
             let current = extract_json_i64(&content, "current").unwrap_or(0);
@@ -55,7 +67,9 @@ pub fn execute_sequence_op(db_root: &Path, op: &SequenceOpKind) -> Result<QueryR
         SequenceOpKind::CurrVal(name) => {
             let path = db_root.join("_sequences").join(format!("{name}.json"));
             if !path.exists() {
-                return Err(ExchangeDbError::Query(format!("sequence '{name}' not found")));
+                return Err(ExchangeDbError::Query(format!(
+                    "sequence '{name}' not found"
+                )));
             }
             let content = std::fs::read_to_string(&path)?;
             let current = extract_json_i64(&content, "current").unwrap_or(0);
@@ -67,7 +81,9 @@ pub fn execute_sequence_op(db_root: &Path, op: &SequenceOpKind) -> Result<QueryR
         SequenceOpKind::SetVal(name, val) => {
             let path = db_root.join("_sequences").join(format!("{name}.json"));
             if !path.exists() {
-                return Err(ExchangeDbError::Query(format!("sequence '{name}' not found")));
+                return Err(ExchangeDbError::Query(format!(
+                    "sequence '{name}' not found"
+                )));
             }
             let content = std::fs::read_to_string(&path)?;
             let current = extract_json_i64(&content, "current").unwrap_or(0);
@@ -88,7 +104,9 @@ fn extract_json_i64(json: &str, key: &str) -> Option<i64> {
     let needle = format!("\"{}\":", key);
     let start = json.find(&needle)? + needle.len();
     let rest = &json[start..];
-    let end = rest.find(|c: char| !c.is_ascii_digit() && c != '-').unwrap_or(rest.len());
+    let end = rest
+        .find(|c: char| !c.is_ascii_digit() && c != '-')
+        .unwrap_or(rest.len());
     rest[..end].parse().ok()
 }
 
@@ -106,20 +124,32 @@ mod tests {
 
         // First nextval returns start value (1).
         let r = execute_sequence_op(db, &SequenceOpKind::NextVal("test_seq".into())).unwrap();
-        match r { QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(1)), _ => panic!("expected rows") }
+        match r {
+            QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(1)),
+            _ => panic!("expected rows"),
+        }
 
         // Second nextval returns 2.
         let r = execute_sequence_op(db, &SequenceOpKind::NextVal("test_seq".into())).unwrap();
-        match r { QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(2)), _ => panic!("expected rows") }
+        match r {
+            QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(2)),
+            _ => panic!("expected rows"),
+        }
 
         // Currval returns current value without advancing.
         let r = execute_sequence_op(db, &SequenceOpKind::CurrVal("test_seq".into())).unwrap();
-        match r { QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(2)), _ => panic!("expected rows") }
+        match r {
+            QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(2)),
+            _ => panic!("expected rows"),
+        }
 
         // Setval changes the current value.
         execute_sequence_op(db, &SequenceOpKind::SetVal("test_seq".into(), 100)).unwrap();
         let r = execute_sequence_op(db, &SequenceOpKind::NextVal("test_seq".into())).unwrap();
-        match r { QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(101)), _ => panic!("expected rows") }
+        match r {
+            QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(101)),
+            _ => panic!("expected rows"),
+        }
 
         // Drop.
         drop_sequence(db, "test_seq").unwrap();
@@ -134,10 +164,16 @@ mod tests {
         create_sequence(db, "step_seq", 10, 5).unwrap();
 
         let r = execute_sequence_op(db, &SequenceOpKind::NextVal("step_seq".into())).unwrap();
-        match r { QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(10)), _ => panic!("expected rows") }
+        match r {
+            QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(10)),
+            _ => panic!("expected rows"),
+        }
 
         let r = execute_sequence_op(db, &SequenceOpKind::NextVal("step_seq".into())).unwrap();
-        match r { QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(15)), _ => panic!("expected rows") }
+        match r {
+            QueryResult::Rows { rows, .. } => assert_eq!(rows[0][0], Value::I64(15)),
+            _ => panic!("expected rows"),
+        }
     }
 
     #[test]

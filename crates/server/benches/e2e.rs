@@ -1,11 +1,9 @@
 //! End-to-end benchmarks: full SQL pipeline (parse -> plan -> execute).
 
-use criterion::{
-    black_box, criterion_group, criterion_main, Criterion, Throughput,
-};
+use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::table::{ColumnValue, TableBuilder, TableWriter};
-use exchange_query::{execute, plan_query, QueryResult};
+use exchange_query::{QueryResult, execute, plan_query};
 use std::path::Path;
 use tempfile::TempDir;
 
@@ -78,10 +76,7 @@ fn sql_parse_plan_execute(c: &mut Criterion) {
 
     group.bench_function("select_filter_100K", |b| {
         b.iter(|| {
-            let result = full_pipeline(
-                dir.path(),
-                "SELECT * FROM trades WHERE price > 50000",
-            );
+            let result = full_pipeline(dir.path(), "SELECT * FROM trades WHERE price > 50000");
             black_box(result);
         });
     });

@@ -180,15 +180,27 @@ mod tests {
 
         let s1 = MemoryCursor::from_rows(
             schema.clone(),
-            &[vec![Value::I64(1)], vec![Value::I64(4)], vec![Value::I64(7)]],
+            &[
+                vec![Value::I64(1)],
+                vec![Value::I64(4)],
+                vec![Value::I64(7)],
+            ],
         );
         let s2 = MemoryCursor::from_rows(
             schema.clone(),
-            &[vec![Value::I64(2)], vec![Value::I64(5)], vec![Value::I64(8)]],
+            &[
+                vec![Value::I64(2)],
+                vec![Value::I64(5)],
+                vec![Value::I64(8)],
+            ],
         );
         let s3 = MemoryCursor::from_rows(
             schema.clone(),
-            &[vec![Value::I64(3)], vec![Value::I64(6)], vec![Value::I64(9)]],
+            &[
+                vec![Value::I64(3)],
+                vec![Value::I64(6)],
+                vec![Value::I64(9)],
+            ],
         );
 
         let order_by = vec![OrderBy {
@@ -196,10 +208,8 @@ mod tests {
             descending: false,
         }];
 
-        let mut cursor = MergeSortCursor::new(
-            vec![Box::new(s1), Box::new(s2), Box::new(s3)],
-            order_by,
-        );
+        let mut cursor =
+            MergeSortCursor::new(vec![Box::new(s1), Box::new(s2), Box::new(s3)], order_by);
 
         let mut all_values = Vec::new();
         while let Some(batch) = cursor.next_batch(100).unwrap() {
@@ -219,11 +229,19 @@ mod tests {
 
         let s1 = MemoryCursor::from_rows(
             schema.clone(),
-            &[vec![Value::I64(9)], vec![Value::I64(6)], vec![Value::I64(3)]],
+            &[
+                vec![Value::I64(9)],
+                vec![Value::I64(6)],
+                vec![Value::I64(3)],
+            ],
         );
         let s2 = MemoryCursor::from_rows(
             schema.clone(),
-            &[vec![Value::I64(8)], vec![Value::I64(5)], vec![Value::I64(2)]],
+            &[
+                vec![Value::I64(8)],
+                vec![Value::I64(5)],
+                vec![Value::I64(2)],
+            ],
         );
 
         let order_by = vec![OrderBy {
@@ -231,10 +249,7 @@ mod tests {
             descending: true,
         }];
 
-        let mut cursor = MergeSortCursor::new(
-            vec![Box::new(s1), Box::new(s2)],
-            order_by,
-        );
+        let mut cursor = MergeSortCursor::new(vec![Box::new(s1), Box::new(s2)], order_by);
 
         let mut all_values = Vec::new();
         while let Some(batch) = cursor.next_batch(100).unwrap() {
@@ -253,10 +268,7 @@ mod tests {
         let schema = vec![("val".to_string(), ColumnType::I64)];
 
         let s1 = MemoryCursor::from_rows(schema.clone(), &[]);
-        let s2 = MemoryCursor::from_rows(
-            schema.clone(),
-            &[vec![Value::I64(1)]],
-        );
+        let s2 = MemoryCursor::from_rows(schema.clone(), &[vec![Value::I64(1)]]);
         let s3 = MemoryCursor::from_rows(schema.clone(), &[]);
 
         let order_by = vec![OrderBy {
@@ -264,10 +276,8 @@ mod tests {
             descending: false,
         }];
 
-        let mut cursor = MergeSortCursor::new(
-            vec![Box::new(s1), Box::new(s2), Box::new(s3)],
-            order_by,
-        );
+        let mut cursor =
+            MergeSortCursor::new(vec![Box::new(s1), Box::new(s2), Box::new(s3)], order_by);
 
         let mut all_values = Vec::new();
         while let Some(batch) = cursor.next_batch(100).unwrap() {

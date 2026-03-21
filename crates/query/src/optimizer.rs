@@ -14,9 +14,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::plan::{Filter, JoinType, OrderBy, QueryPlan, Value};
 #[cfg(test)]
 use crate::plan::GroupByMode;
+use crate::plan::{Filter, JoinType, OrderBy, QueryPlan, Value};
 
 // ─── Table Statistics ────────────────────────────────────────────────
 
@@ -87,9 +87,10 @@ pub fn collect_stats(table_dir: &Path, meta: &TableMeta) -> Result<TableStats> {
     let stats_path = table_dir.join(STATS_FILE);
     if stats_path.exists()
         && let Ok(json) = std::fs::read_to_string(&stats_path)
-            && let Ok(cached) = serde_json::from_str::<TableStats>(&json) {
-                return Ok(cached);
-            }
+        && let Ok(cached) = serde_json::from_str::<TableStats>(&json)
+    {
+        return Ok(cached);
+    }
 
     let partitions = list_partition_dirs(table_dir)?;
     let partition_count = partitions.len() as u32;
@@ -136,10 +137,8 @@ pub fn collect_stats(table_dir: &Path, meta: &TableMeta) -> Result<TableStats> {
             continue;
         }
 
-        let ts_reader = exchange_core::column::FixedColumnReader::open(
-            &ts_data_path,
-            ColumnType::Timestamp,
-        )?;
+        let ts_reader =
+            exchange_core::column::FixedColumnReader::open(&ts_data_path, ColumnType::Timestamp)?;
         let n = ts_reader.row_count();
         row_count += n;
 
@@ -174,30 +173,28 @@ pub fn collect_stats(table_dir: &Path, meta: &TableMeta) -> Result<TableStats> {
                 if col_type == ColumnType::Symbol {
                     let key_path = effective_path.join(format!("{}.k", col_def.name));
                     if key_path.exists()
-                        && let Ok(reader) =
-                            exchange_core::index::bitmap::BitmapIndexReader::open(
-                                effective_path,
-                                &col_def.name,
-                            )
-                        {
-                            // The reader exposes count per key; we estimate
-                            // distinct values from the number of keys with non-zero counts.
-                            // We cannot enumerate keys directly so we check a reasonable range.
-                            let mut distinct = 0u64;
-                            for key in 0..1024i32 {
-                                if reader.count(key) > 0 {
-                                    distinct += 1;
-                                } else if key > 0 {
-                                    // If we hit a gap after key 0, stop early
-                                    // (keys are contiguous from the symbol table).
-                                    break;
-                                }
-                            }
-                            if let Some(cs) = column_stats.get_mut(&col_def.name) {
-                                cs.distinct_count =
-                                    cs.distinct_count.max(distinct);
+                        && let Ok(reader) = exchange_core::index::bitmap::BitmapIndexReader::open(
+                            effective_path,
+                            &col_def.name,
+                        )
+                    {
+                        // The reader exposes count per key; we estimate
+                        // distinct values from the number of keys with non-zero counts.
+                        // We cannot enumerate keys directly so we check a reasonable range.
+                        let mut distinct = 0u64;
+                        for key in 0..1024i32 {
+                            if reader.count(key) > 0 {
+                                distinct += 1;
+                            } else if key > 0 {
+                                // If we hit a gap after key 0, stop early
+                                // (keys are contiguous from the symbol table).
+                                break;
                             }
                         }
+                        if let Some(cs) = column_stats.get_mut(&col_def.name) {
+                            cs.distinct_count = cs.distinct_count.max(distinct);
+                        }
+                    }
                 }
             }
         }
@@ -287,13 +284,15 @@ pub fn prune_partitions(
             // Check overlap: partition range [part_start, part_end) must overlap
             // query range [lower_bound, upper_bound].
             if let Some(lower) = lower_bound
-                && part_end <= lower {
-                    return false; // partition entirely before query range
-                }
+                && part_end <= lower
+            {
+                return false; // partition entirely before query range
+            }
             if let Some(upper) = upper_bound
-                && part_start > upper {
-                    return false; // partition entirely after query range
-                }
+                && part_start > upper
+            {
+                return false; // partition entirely after query range
+            }
             true
         })
         .cloned()
@@ -304,50 +303,25 @@ pub fn prune_partitions(
 ///
 /// Returns `(lower_bound_inclusive, upper_bound_inclusive)` as nanosecond
 /// timestamps. `None` means unbounded in that direction.
-fn extract_timestamp_bounds(
-    filter: &Filter,
-    timestamp_col: &str,
-) -> (Option<i64>, Option<i64>) {
+fn extract_timestamp_bounds(filter: &Filter, timestamp_col: &str) -> (Option<i64>, Option<i64>) {
     match filter {
-        Filter::Eq(col, Value::Timestamp(ts)) if col == timestamp_col => {
-            (Some(*ts), Some(*ts))
-        }
-        Filter::Gt(col, Value::Timestamp(ts)) if col == timestamp_col => {
-            (Some(*ts + 1), None)
-        }
-        Filter::Gte(col, Value::Timestamp(ts)) if col == timestamp_col => {
-            (Some(*ts), None)
-        }
-        Filter::Lt(col, Value::Timestamp(ts)) if col == timestamp_col => {
-            (None, Some(*ts - 1))
-        }
-        Filter::Lte(col, Value::Timestamp(ts)) if col == timestamp_col => {
-            (None, Some(*ts))
-        }
+        Filter::Eq(col, Value::Timestamp(ts)) if col == timestamp_col => (Some(*ts), Some(*ts)),
+        Filter::Gt(col, Value::Timestamp(ts)) if col == timestamp_col => (Some(*ts + 1), None),
+        Filter::Gte(col, Value::Timestamp(ts)) if col == timestamp_col => (Some(*ts), None),
+        Filter::Lt(col, Value::Timestamp(ts)) if col == timestamp_col => (None, Some(*ts - 1)),
+        Filter::Lte(col, Value::Timestamp(ts)) if col == timestamp_col => (None, Some(*ts)),
         Filter::Between(col, Value::Timestamp(lo), Value::Timestamp(hi))
             if col == timestamp_col =>
         {
             (Some(*lo), Some(*hi))
         }
         // Also handle I64 values (sometimes timestamps are stored as raw nanos).
-        Filter::Eq(col, Value::I64(ts)) if col == timestamp_col => {
-            (Some(*ts), Some(*ts))
-        }
-        Filter::Gt(col, Value::I64(ts)) if col == timestamp_col => {
-            (Some(*ts + 1), None)
-        }
-        Filter::Gte(col, Value::I64(ts)) if col == timestamp_col => {
-            (Some(*ts), None)
-        }
-        Filter::Lt(col, Value::I64(ts)) if col == timestamp_col => {
-            (None, Some(*ts - 1))
-        }
-        Filter::Lte(col, Value::I64(ts)) if col == timestamp_col => {
-            (None, Some(*ts))
-        }
-        Filter::Between(col, Value::I64(lo), Value::I64(hi))
-            if col == timestamp_col =>
-        {
+        Filter::Eq(col, Value::I64(ts)) if col == timestamp_col => (Some(*ts), Some(*ts)),
+        Filter::Gt(col, Value::I64(ts)) if col == timestamp_col => (Some(*ts + 1), None),
+        Filter::Gte(col, Value::I64(ts)) if col == timestamp_col => (Some(*ts), None),
+        Filter::Lt(col, Value::I64(ts)) if col == timestamp_col => (None, Some(*ts - 1)),
+        Filter::Lte(col, Value::I64(ts)) if col == timestamp_col => (None, Some(*ts)),
+        Filter::Between(col, Value::I64(lo), Value::I64(hi)) if col == timestamp_col => {
             (Some(*lo), Some(*hi))
         }
         Filter::And(parts) => {
@@ -555,14 +529,13 @@ pub fn should_use_index(filter: &Filter, stats: &TableStats) -> Option<IndexScan
 /// remain as post-join filters.
 pub fn push_predicates_to_scan(plan: &QueryPlan) -> QueryPlan {
     match plan {
-        QueryPlan::Select { filter: Some(f), .. } => {
+        QueryPlan::Select {
+            filter: Some(f), ..
+        } => {
             // For simple SELECTs, the filter is already at the scan level.
             // Ensure compound AND filters are flattened for optimal evaluation.
             let mut result = plan.clone();
-            if let QueryPlan::Select {
-                ref mut filter, ..
-            } = result
-            {
+            if let QueryPlan::Select { ref mut filter, .. } = result {
                 *filter = Some(flatten_and(f.clone()));
             }
             result
@@ -795,17 +768,10 @@ pub fn optimize(plan: QueryPlan, db_root: &Path) -> Result<OptimizedPlan> {
 
             // 2. Partition pruning.
             let all_partitions = list_partition_dirs(&table_dir)?;
-            let pruned = prune_partitions(
-                &all_partitions,
-                filter,
-                &ts_col_name,
-                partition_by,
-            );
+            let pruned = prune_partitions(&all_partitions, filter, &ts_col_name, partition_by);
 
             // 3. Index scan selection.
-            let index_scan = filter
-                .as_ref()
-                .and_then(|f| should_use_index(f, &stats));
+            let index_scan = filter.as_ref().and_then(|f| should_use_index(f, &stats));
 
             // 4. Predicate pushdown.
             let optimized_plan = push_predicates_to_scan(&plan);
@@ -868,7 +834,6 @@ impl JoinCostEstimator {
         join_type: &JoinType,
         has_index: bool,
     ) -> f64 {
-        
         match join_type {
             JoinType::Inner | JoinType::Left | JoinType::Right => {
                 if has_index {
@@ -925,11 +890,7 @@ impl JoinCostEstimator {
             let mut best_idx = 0;
             let mut best_cost = f64::MAX;
 
-            let current_rows: u64 = order
-                .iter()
-                .map(|&i| tables[i].1)
-                .sum::<u64>()
-                .max(1);
+            let current_rows: u64 = order.iter().map(|&i| tables[i].1).sum::<u64>().max(1);
 
             for (ri, &table_idx) in remaining.iter().enumerate() {
                 // Check if there's a join condition between any table in
@@ -939,8 +900,7 @@ impl JoinCostEstimator {
                         || (order.contains(&r) && l == table_idx && idx)
                 });
                 let has_condition = join_conditions.iter().any(|&(l, r, _)| {
-                    (order.contains(&l) && r == table_idx)
-                        || (order.contains(&r) && l == table_idx)
+                    (order.contains(&l) && r == table_idx) || (order.contains(&r) && l == table_idx)
                 });
 
                 let cost = if has_condition {
@@ -953,12 +913,7 @@ impl JoinCostEstimator {
                 } else {
                     // No direct join condition — this would be a cross join.
                     // Penalize heavily.
-                    Self::estimate_cost(
-                        current_rows,
-                        tables[table_idx].1,
-                        &JoinType::Cross,
-                        false,
-                    )
+                    Self::estimate_cost(current_rows, tables[table_idx].1, &JoinType::Cross, false)
                 };
 
                 if cost < best_cost {
@@ -1038,10 +993,12 @@ pub fn estimate_plan_cost(plan: &QueryPlan, stats: &TableStats) -> PlanCost {
             let rows_after_agg = if !group_by.is_empty() || sample_by.is_some() {
                 cpu_cost += rows_after_filter as f64 * CPU_COST_PER_ROW_AGG;
                 // Estimate: number of distinct groups.
-                
-                group_by.iter().filter_map(|g| {
-                    stats.column_stats.get(g).map(|cs| cs.distinct_count.max(1))
-                }).min().unwrap_or(rows_after_filter.min(1000))
+
+                group_by
+                    .iter()
+                    .filter_map(|g| stats.column_stats.get(g).map(|cs| cs.distinct_count.max(1)))
+                    .min()
+                    .unwrap_or(rows_after_filter.min(1000))
             } else {
                 rows_after_filter
             };
@@ -1163,7 +1120,12 @@ mod tests {
             PartitionBy::Day,
         );
 
-        assert_eq!(pruned.len(), 1, "expected 1 partition, got {}", pruned.len());
+        assert_eq!(
+            pruned.len(),
+            1,
+            "expected 1 partition, got {}",
+            pruned.len()
+        );
         let dir_name = pruned[0].file_name().unwrap().to_str().unwrap();
         assert_eq!(dir_name, "2024-01-15");
     }
@@ -1191,7 +1153,12 @@ mod tests {
             PartitionBy::Day,
         );
 
-        assert_eq!(pruned.len(), 3, "expected 3 partitions, got {}", pruned.len());
+        assert_eq!(
+            pruned.len(),
+            3,
+            "expected 3 partitions, got {}",
+            pruned.len()
+        );
     }
 
     #[test]
@@ -1202,12 +1169,7 @@ mod tests {
         let table_dir = tmp.path().join("trades_opt");
         let all_partitions = list_partition_dirs(&table_dir).unwrap();
 
-        let pruned = prune_partitions(
-            &all_partitions,
-            &None,
-            "timestamp",
-            PartitionBy::Day,
-        );
+        let pruned = prune_partitions(&all_partitions, &None, "timestamp", PartitionBy::Day);
 
         assert_eq!(pruned.len(), 30);
     }
@@ -1342,7 +1304,11 @@ mod tests {
 
         // Test: high selectivity (only 2 distinct values) should not use index.
         let mut stats_low = stats.clone();
-        stats_low.column_stats.get_mut("symbol").unwrap().distinct_count = 2;
+        stats_low
+            .column_stats
+            .get_mut("symbol")
+            .unwrap()
+            .distinct_count = 2;
         let filter3 = Filter::Eq("symbol".to_string(), Value::I64(0));
         assert!(
             should_use_index(&filter3, &stats_low).is_none(),
@@ -1448,7 +1414,10 @@ mod tests {
         };
 
         let optimized = push_predicates_to_scan(&plan);
-        if let QueryPlan::Select { filter: Some(f), .. } = &optimized {
+        if let QueryPlan::Select {
+            filter: Some(f), ..
+        } = &optimized
+        {
             // Should be flattened to a single And with 3 children.
             match f {
                 Filter::And(parts) => assert_eq!(parts.len(), 3),
@@ -1523,8 +1492,7 @@ mod tests {
 
     #[test]
     fn partition_dir_to_range_month() {
-        let (start, end) =
-            partition_dir_to_timestamp_range("2024-01", PartitionBy::Month).unwrap();
+        let (start, end) = partition_dir_to_timestamp_range("2024-01", PartitionBy::Month).unwrap();
         // Jan 2024 start.
         let expected_start = 1704067200i64 * 1_000_000_000;
         // Feb 2024 start.
@@ -1535,8 +1503,7 @@ mod tests {
 
     #[test]
     fn partition_dir_to_range_year() {
-        let (start, end) =
-            partition_dir_to_timestamp_range("2024", PartitionBy::Year).unwrap();
+        let (start, end) = partition_dir_to_timestamp_range("2024", PartitionBy::Year).unwrap();
         let expected_start = 1704067200i64 * 1_000_000_000;
         // 2025-01-01
         let expected_end = 1735689600i64 * 1_000_000_000;
@@ -1581,10 +1548,8 @@ mod tests {
 
     #[test]
     fn join_cost_hash_cheaper_than_cross() {
-        let hash_cost =
-            JoinCostEstimator::estimate_cost(1000, 1000, &JoinType::Inner, false);
-        let cross_cost =
-            JoinCostEstimator::estimate_cost(1000, 1000, &JoinType::Cross, false);
+        let hash_cost = JoinCostEstimator::estimate_cost(1000, 1000, &JoinType::Inner, false);
+        let cross_cost = JoinCostEstimator::estimate_cost(1000, 1000, &JoinType::Cross, false);
         assert!(hash_cost < cross_cost);
     }
 

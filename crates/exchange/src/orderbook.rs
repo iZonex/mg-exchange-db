@@ -184,11 +184,7 @@ impl OrderBookStore {
             .collect();
 
         // Asks: lowest price first.
-        let asks: Vec<OrderBookLevel> = self
-            .asks
-            .values()
-            .map(InternalLevel::as_level)
-            .collect();
+        let asks: Vec<OrderBookLevel> = self.asks.values().map(InternalLevel::as_level).collect();
 
         OrderBookSnapshot {
             symbol: self.symbol.clone(),
@@ -309,7 +305,13 @@ mod tests {
         assert_eq!(best.order_count, 3);
 
         // Delete the 50.0 level — best bid should become 49.0.
-        store.apply_delta(&make_delta(DeltaAction::Delete, BookSide::Bid, 50.0, 0.0, 0));
+        store.apply_delta(&make_delta(
+            DeltaAction::Delete,
+            BookSide::Bid,
+            50.0,
+            0.0,
+            0,
+        ));
         let best = store.best_bid().unwrap();
         assert_eq!(best.price, 49.0);
         assert_eq!(store.bid_depth(), 1);

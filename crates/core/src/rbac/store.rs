@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 
 use exchange_common::error::{ExchangeDbError, Result};
 
-use super::model::{Role, SecurityContext, User};
 #[cfg(test)]
 use super::model::Permission;
+use super::model::{Role, SecurityContext, User};
 
 /// Manages on-disk persistence of users and roles.
 pub struct RbacStore {
@@ -151,9 +151,7 @@ impl RbacStore {
     pub fn delete_role(&self, name: &str) -> Result<()> {
         let path = self.role_path(name);
         if !path.exists() {
-            return Err(ExchangeDbError::Query(format!(
-                "role '{name}' not found"
-            )));
+            return Err(ExchangeDbError::Query(format!("role '{name}' not found")));
         }
         std::fs::remove_file(&path)?;
         Ok(())
@@ -180,11 +178,7 @@ impl RbacStore {
     ///
     /// Returns the resolved `SecurityContext` on success, or `None` if
     /// the credentials are invalid or the user is disabled.
-    pub fn authenticate(
-        &self,
-        username: &str,
-        password: &str,
-    ) -> Result<Option<SecurityContext>> {
+    pub fn authenticate(&self, username: &str, password: &str) -> Result<Option<SecurityContext>> {
         let user = match self.get_user(username)? {
             Some(u) => u,
             None => return Ok(None),
@@ -229,10 +223,7 @@ impl RbacStore {
     /// accounts, etc.) and we just need their RBAC permissions.
     ///
     /// Returns `None` if the user does not exist or is disabled.
-    pub fn resolve_security_context(
-        &self,
-        username: &str,
-    ) -> Result<Option<SecurityContext>> {
+    pub fn resolve_security_context(&self, username: &str) -> Result<Option<SecurityContext>> {
         let user = match self.get_user(username)? {
             Some(u) => u,
             None => return Ok(None),
@@ -259,7 +250,9 @@ impl RbacStore {
     // ── Helpers ──────────────────────────────────────────────────────
 
     fn user_path(&self, username: &str) -> PathBuf {
-        self.security_dir.join("users").join(format!("{username}.json"))
+        self.security_dir
+            .join("users")
+            .join(format!("{username}.json"))
     }
 
     fn role_path(&self, name: &str) -> PathBuf {

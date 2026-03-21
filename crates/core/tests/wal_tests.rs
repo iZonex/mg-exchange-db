@@ -3,11 +3,11 @@
 //! 80 tests covering segments, events, writer, reader, merge, sequencer, and row codec.
 
 use exchange_common::types::ColumnType;
-use exchange_core::wal::event::{EventType, WalEvent, EVENT_HEADER_SIZE, EVENT_OVERHEAD};
+use exchange_core::wal::event::{EVENT_HEADER_SIZE, EVENT_OVERHEAD, EventType, WalEvent};
 use exchange_core::wal::merge::WalMergeJob;
 use exchange_core::wal::reader::WalReader;
-use exchange_core::wal::row_codec::{decode_row, encode_row, OwnedColumnValue};
-use exchange_core::wal::segment::{WalSegment, SEGMENT_HEADER_SIZE};
+use exchange_core::wal::row_codec::{OwnedColumnValue, decode_row, encode_row};
+use exchange_core::wal::segment::{SEGMENT_HEADER_SIZE, WalSegment};
 use exchange_core::wal::sequencer::Sequencer;
 use exchange_core::wal::writer::{CommitMode, WalWriter, WalWriterConfig};
 use tempfile::tempdir;
@@ -135,9 +135,7 @@ mod wal_segment {
         seg.append_event(&e2).unwrap();
         seg.flush().unwrap();
 
-        let (ev, next) = seg
-            .read_event_at(SEGMENT_HEADER_SIZE as u64)
-            .unwrap();
+        let (ev, next) = seg.read_event_at(SEGMENT_HEADER_SIZE as u64).unwrap();
         assert_eq!(ev, e1);
         let (ev2, _) = seg.read_event_at(next).unwrap();
         assert_eq!(ev2, e2);
@@ -505,7 +503,9 @@ mod wal_reader {
 mod wal_merge {
     use super::*;
     use exchange_core::column::FixedColumnReader;
-    use exchange_core::table::{ColumnDef, ColumnTypeSerializable, PartitionBySerializable, TableMeta};
+    use exchange_core::table::{
+        ColumnDef, ColumnTypeSerializable, PartitionBySerializable, TableMeta,
+    };
     use exchange_core::txn::TxnFile;
 
     fn test_meta() -> TableMeta {
@@ -534,7 +534,9 @@ mod wal_merge {
         std::fs::create_dir_all(&table_dir).unwrap();
         let meta = test_meta();
         meta.save(&table_dir.join("_meta")).unwrap();
-        { let _txn = TxnFile::open(&table_dir).unwrap(); }
+        {
+            let _txn = TxnFile::open(&table_dir).unwrap();
+        }
         (table_dir, meta)
     }
 
@@ -550,7 +552,8 @@ mod wal_merge {
             let payload = encode_row(
                 &col_types,
                 &[OwnedColumnValue::Timestamp(ts), OwnedColumnValue::I64(100)],
-            ).unwrap();
+            )
+            .unwrap();
             w.append_data(ts, payload).unwrap();
             w.flush().unwrap();
         }
@@ -576,7 +579,8 @@ mod wal_merge {
                         OwnedColumnValue::Timestamp(ts + i * 1_000_000_000),
                         OwnedColumnValue::I64(i),
                     ],
-                ).unwrap();
+                )
+                .unwrap();
                 w.append_data(ts + i * 1_000_000_000, payload).unwrap();
             }
             w.flush().unwrap();
@@ -597,12 +601,20 @@ mod wal_merge {
             let ts_day2: i64 = ts_day1 + 86_400_000_000_000;
             let p1 = encode_row(
                 &col_types,
-                &[OwnedColumnValue::Timestamp(ts_day1), OwnedColumnValue::I64(1)],
-            ).unwrap();
+                &[
+                    OwnedColumnValue::Timestamp(ts_day1),
+                    OwnedColumnValue::I64(1),
+                ],
+            )
+            .unwrap();
             let p2 = encode_row(
                 &col_types,
-                &[OwnedColumnValue::Timestamp(ts_day2), OwnedColumnValue::I64(2)],
-            ).unwrap();
+                &[
+                    OwnedColumnValue::Timestamp(ts_day2),
+                    OwnedColumnValue::I64(2),
+                ],
+            )
+            .unwrap();
             w.append_data(ts_day1, p1).unwrap();
             w.append_data(ts_day2, p2).unwrap();
             w.flush().unwrap();
@@ -633,7 +645,8 @@ mod wal_merge {
             let payload = encode_row(
                 &col_types,
                 &[OwnedColumnValue::Timestamp(ts), OwnedColumnValue::I64(1)],
-            ).unwrap();
+            )
+            .unwrap();
             w.append_data(ts, payload).unwrap();
             w.flush().unwrap();
         }
@@ -658,7 +671,8 @@ mod wal_merge {
                         OwnedColumnValue::Timestamp(ts + i * 1_000_000_000),
                         OwnedColumnValue::I64(i),
                     ],
-                ).unwrap();
+                )
+                .unwrap();
                 w.append_data(ts + i * 1_000_000_000, payload).unwrap();
             }
             w.flush().unwrap();
@@ -682,16 +696,14 @@ mod wal_merge {
             let payload = encode_row(
                 &col_types,
                 &[OwnedColumnValue::Timestamp(ts), OwnedColumnValue::I64(42)],
-            ).unwrap();
+            )
+            .unwrap();
             w.append_data(ts, payload).unwrap();
             w.flush().unwrap();
         }
         WalMergeJob::new(table_dir.clone(), meta).run().unwrap();
-        let r = FixedColumnReader::open(
-            &table_dir.join("2024-03-15/val.d"),
-            ColumnType::I64,
-        )
-        .unwrap();
+        let r =
+            FixedColumnReader::open(&table_dir.join("2024-03-15/val.d"), ColumnType::I64).unwrap();
         assert_eq!(r.read_i64(0), 42);
     }
 }
@@ -917,12 +929,20 @@ mod row_codec {
     #[test]
     fn roundtrip_all_null_row() {
         let types = vec![
-            ColumnType::I32, ColumnType::I64, ColumnType::F64,
-            ColumnType::Varchar, ColumnType::Binary, ColumnType::Boolean,
+            ColumnType::I32,
+            ColumnType::I64,
+            ColumnType::F64,
+            ColumnType::Varchar,
+            ColumnType::Binary,
+            ColumnType::Boolean,
         ];
         let values = vec![
-            OwnedColumnValue::Null, OwnedColumnValue::Null, OwnedColumnValue::Null,
-            OwnedColumnValue::Null, OwnedColumnValue::Null, OwnedColumnValue::Null,
+            OwnedColumnValue::Null,
+            OwnedColumnValue::Null,
+            OwnedColumnValue::Null,
+            OwnedColumnValue::Null,
+            OwnedColumnValue::Null,
+            OwnedColumnValue::Null,
         ];
         let encoded = encode_row(&types, &values).unwrap();
         assert_eq!(decode_row(&types, &encoded).unwrap(), values);
@@ -965,8 +985,14 @@ mod row_codec {
     #[test]
     fn multiple_independent_rows() {
         let types = vec![ColumnType::I32, ColumnType::Varchar];
-        let r1 = vec![OwnedColumnValue::I32(1), OwnedColumnValue::Varchar("a".into())];
-        let r2 = vec![OwnedColumnValue::I32(2), OwnedColumnValue::Varchar("bb".into())];
+        let r1 = vec![
+            OwnedColumnValue::I32(1),
+            OwnedColumnValue::Varchar("a".into()),
+        ];
+        let r2 = vec![
+            OwnedColumnValue::I32(2),
+            OwnedColumnValue::Varchar("bb".into()),
+        ];
         let enc1 = encode_row(&types, &r1).unwrap();
         let enc2 = encode_row(&types, &r2).unwrap();
         assert_eq!(decode_row(&types, &enc1).unwrap(), r1);
@@ -1043,10 +1069,7 @@ mod wal_extra {
         use exchange_core::wal::segment::segment_path;
         let dir = std::path::Path::new("/tmp/wal");
         let path = segment_path(dir, 42);
-        assert_eq!(
-            path.to_string_lossy(),
-            "/tmp/wal/wal-000042.wal"
-        );
+        assert_eq!(path.to_string_lossy(), "/tmp/wal/wal-000042.wal");
     }
 
     #[test]

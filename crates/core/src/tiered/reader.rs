@@ -55,9 +55,8 @@ impl TieredPartitionReader {
                 temp_dir: None,
             }),
             StorageTier::Warm => {
-                let temp_dir = TempDir::new().map_err(|e| {
-                    ExchangeDbError::Io(std::io::Error::other(e))
-                })?;
+                let temp_dir =
+                    TempDir::new().map_err(|e| ExchangeDbError::Io(std::io::Error::other(e)))?;
                 let native_path = temp_dir.path().to_path_buf();
 
                 // Copy .lz4 files to temp and decompress them there.
@@ -71,20 +70,18 @@ impl TieredPartitionReader {
                 })
             }
             StorageTier::Cold => {
-                let temp_dir = TempDir::new().map_err(|e| {
-                    ExchangeDbError::Io(std::io::Error::other(e))
-                })?;
+                let temp_dir =
+                    TempDir::new().map_err(|e| ExchangeDbError::Io(std::io::Error::other(e)))?;
                 let native_path = temp_dir.path().to_path_buf();
 
                 // The partition_path for cold is the .xpqt file itself.
-                let xpqt_path = if partition_path.extension().and_then(|e| e.to_str())
-                    == Some("xpqt")
-                {
-                    partition_path.to_path_buf()
-                } else {
-                    // Try to find the XPQT file via _cold/ or tier metadata.
-                    find_cold_xpqt(partition_path, table_dir)?
-                };
+                let xpqt_path =
+                    if partition_path.extension().and_then(|e| e.to_str()) == Some("xpqt") {
+                        partition_path.to_path_buf()
+                    } else {
+                        // Try to find the XPQT file via _cold/ or tier metadata.
+                        find_cold_xpqt(partition_path, table_dir)?
+                    };
 
                 let meta_path = table_dir.join("_meta");
                 let table_meta = TableMeta::load(&meta_path)?;
@@ -256,12 +253,13 @@ fn find_cold_xpqt(partition_path: &Path, table_dir: &Path) -> Result<PathBuf> {
     let tier_infos = load_tier_info(table_dir)?;
     for info in &tier_infos {
         if info.partition_name == partition_name
-            && let Some(ref ppath) = info.parquet_path {
-                let p = PathBuf::from(ppath);
-                if p.exists() {
-                    return Ok(p);
-                }
+            && let Some(ref ppath) = info.parquet_path
+        {
+            let p = PathBuf::from(ppath);
+            if p.exists() {
+                return Ok(p);
             }
+        }
     }
 
     Err(ExchangeDbError::Corruption(format!(
@@ -274,11 +272,7 @@ fn find_cold_xpqt(partition_path: &Path, table_dir: &Path) -> Result<PathBuf> {
 ///
 /// The caller is responsible for cleaning up the output directory when done
 /// (typically via a `TempDir`).
-pub fn recall_cold_partition(
-    xpqt_path: &Path,
-    meta: &TableMeta,
-    output_dir: &Path,
-) -> Result<u64> {
+pub fn recall_cold_partition(xpqt_path: &Path, meta: &TableMeta, output_dir: &Path) -> Result<u64> {
     if !xpqt_path.exists() {
         return Err(ExchangeDbError::Corruption(format!(
             "cold XPQT file not found: {}",
@@ -299,7 +293,7 @@ mod tests {
     use crate::compression::compress_column_file;
     use crate::table::{ColumnDef, ColumnTypeSerializable, PartitionBySerializable, TableMeta};
     use crate::tiered::parquet::partition_to_parquet;
-    use crate::tiered::partition_meta::{save_tier_info, PartitionTierInfo};
+    use crate::tiered::partition_meta::{PartitionTierInfo, save_tier_info};
     use std::fs;
     use tempfile::tempdir;
 
@@ -492,8 +486,7 @@ mod tests {
         .unwrap();
 
         // Open with the partition name path (not the xpqt path)
-        let reader =
-            TieredPartitionReader::open(&root.join("2024-01-15"), root).unwrap();
+        let reader = TieredPartitionReader::open(&root.join("2024-01-15"), root).unwrap();
         assert_eq!(reader.tier(), StorageTier::Cold);
 
         assert!(reader.native_path().join("timestamp.d").exists());

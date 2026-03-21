@@ -100,7 +100,11 @@ struct LogicCase {
 
 impl LogicCase {
     const fn new(sql: &'static str, expected: &'static str, desc: &'static str) -> Self {
-        Self { sql, expected, desc }
+        Self {
+            sql,
+            expected,
+            desc,
+        }
     }
 }
 
@@ -110,47 +114,14 @@ fn sql_logic_suite() {
 
     let cases = vec![
         // --- Aggregate functions ---
-        LogicCase::new(
-            "SELECT count(*) FROM data",
-            "5",
-            "count all rows",
-        ),
-        LogicCase::new(
-            "SELECT sum(x) FROM data",
-            "175",
-            "sum of x column",
-        ),
-        LogicCase::new(
-            "SELECT min(x) FROM data",
-            "10",
-            "minimum x",
-        ),
-        LogicCase::new(
-            "SELECT max(x) FROM data",
-            "70",
-            "maximum x",
-        ),
-        LogicCase::new(
-            "SELECT avg(x) FROM data",
-            "35",
-            "average x",
-        ),
-        LogicCase::new(
-            "SELECT sum(y) FROM data",
-            "225",
-            "sum of y column",
-        ),
-        LogicCase::new(
-            "SELECT min(y) FROM data",
-            "20",
-            "minimum y",
-        ),
-        LogicCase::new(
-            "SELECT max(y) FROM data",
-            "80",
-            "maximum y",
-        ),
-
+        LogicCase::new("SELECT count(*) FROM data", "5", "count all rows"),
+        LogicCase::new("SELECT sum(x) FROM data", "175", "sum of x column"),
+        LogicCase::new("SELECT min(x) FROM data", "10", "minimum x"),
+        LogicCase::new("SELECT max(x) FROM data", "70", "maximum x"),
+        LogicCase::new("SELECT avg(x) FROM data", "35", "average x"),
+        LogicCase::new("SELECT sum(y) FROM data", "225", "sum of y column"),
+        LogicCase::new("SELECT min(y) FROM data", "20", "minimum y"),
+        LogicCase::new("SELECT max(y) FROM data", "80", "maximum y"),
         // --- Filtered aggregates ---
         LogicCase::new(
             "SELECT count(*) FROM data WHERE x > 20",
@@ -177,14 +148,12 @@ fn sql_logic_suite() {
             "2",
             "count alpha rows",
         ),
-
         // --- GROUP BY ---
         LogicCase::new(
             "SELECT count(*) FROM data WHERE label = 'beta'",
             "1",
             "count beta rows",
         ),
-
         // --- LIMIT ---
         LogicCase::new(
             "SELECT count(*) FROM data WHERE x >= 10",
@@ -196,36 +165,17 @@ fn sql_logic_suite() {
             "0",
             "no rows with x > 70",
         ),
-
         // --- DISTINCT via count_distinct ---
         LogicCase::new(
             "SELECT count_distinct(label) FROM data",
             "4",
             "4 distinct labels",
         ),
-
         // --- first/last ---
-        LogicCase::new(
-            "SELECT first(x) FROM data",
-            "10",
-            "first x value",
-        ),
-        LogicCase::new(
-            "SELECT last(x) FROM data",
-            "15",
-            "last x value",
-        ),
-        LogicCase::new(
-            "SELECT first(label) FROM data",
-            "alpha",
-            "first label",
-        ),
-        LogicCase::new(
-            "SELECT last(label) FROM data",
-            "alpha",
-            "last label",
-        ),
-
+        LogicCase::new("SELECT first(x) FROM data", "10", "first x value"),
+        LogicCase::new("SELECT last(x) FROM data", "15", "last x value"),
+        LogicCase::new("SELECT first(label) FROM data", "alpha", "first label"),
+        LogicCase::new("SELECT last(label) FROM data", "alpha", "last label"),
         // --- Arithmetic in filter ---
         LogicCase::new(
             "SELECT count(*) FROM data WHERE x > 15",
@@ -242,7 +192,6 @@ fn sql_logic_suite() {
             "3",
             "count where x >= 30",
         ),
-
         // --- Combined filters ---
         LogicCase::new(
             "SELECT count(*) FROM data WHERE x > 10 AND y < 80",
@@ -254,19 +203,9 @@ fn sql_logic_suite() {
             "3",
             "combined OR filter",
         ),
-
         // --- ORDER BY + LIMIT ---
-        LogicCase::new(
-            "SELECT min(x) FROM data",
-            "10",
-            "min x is 10",
-        ),
-        LogicCase::new(
-            "SELECT max(y) FROM data",
-            "80",
-            "max y is 80",
-        ),
-
+        LogicCase::new("SELECT min(x) FROM data", "10", "min x is 10"),
+        LogicCase::new("SELECT max(y) FROM data", "80", "max y is 80"),
         // --- WHERE with equality ---
         LogicCase::new(
             "SELECT sum(x) FROM data WHERE label = 'gamma'",
@@ -278,7 +217,6 @@ fn sql_logic_suite() {
             "70",
             "sum x for delta",
         ),
-
         // --- Edge: all filtered out ---
         LogicCase::new(
             "SELECT count(*) FROM data WHERE x > 1000",
@@ -355,14 +293,13 @@ fn sql_logic_multi_row() {
     }
 
     // GROUP BY label with count.
-    let result = run_sql(
-        &db,
-        "SELECT label, count(*) FROM data GROUP BY label",
-    );
+    let result = run_sql(&db, "SELECT label, count(*) FROM data GROUP BY label");
     if let QueryResult::Rows { rows, .. } = result {
         assert_eq!(rows.len(), 4, "4 distinct labels => 4 groups");
         // Find the "alpha" group — should have count 2.
-        let alpha_row = rows.iter().find(|r| r[0] == Value::Str("alpha".to_string()));
+        let alpha_row = rows
+            .iter()
+            .find(|r| r[0] == Value::Str("alpha".to_string()));
         assert!(alpha_row.is_some(), "should have alpha group");
         match &alpha_row.unwrap()[1] {
             Value::I64(n) => assert_eq!(*n, 2, "alpha should have count 2"),
@@ -416,7 +353,7 @@ fn sql_logic_dml_sequence() {
 
 /// Test M1 SQL gap features.
 #[test]
-    fn sql_logic_m1_gaps() {
+fn sql_logic_m1_gaps() {
     let (_dir, db) = setup_logic_db();
 
     // --- 1. Nested function calls: round(avg(price), 2) ---
@@ -437,10 +374,7 @@ fn sql_logic_dml_sequence() {
     }
 
     // --- 2. Column aliases in GROUP BY/ORDER BY ---
-    let result = run_sql(
-        &db,
-        "SELECT label AS lbl FROM data ORDER BY lbl",
-    );
+    let result = run_sql(&db, "SELECT label AS lbl FROM data ORDER BY lbl");
     if let QueryResult::Rows { columns, rows, .. } = result {
         assert!(
             columns.contains(&"lbl".to_string()),
@@ -453,10 +387,7 @@ fn sql_logic_dml_sequence() {
     }
 
     // --- 3. NULL literal in expressions (COALESCE) ---
-    let result = run_sql(
-        &db,
-        "SELECT coalesce(label, 'unknown') FROM data",
-    );
+    let result = run_sql(&db, "SELECT coalesce(label, 'unknown') FROM data");
     if let QueryResult::Rows { rows, .. } = result {
         assert_eq!(rows.len(), 5);
         // All labels are non-null, so should return the actual labels.
@@ -479,10 +410,7 @@ fn sql_logic_dml_sequence() {
     assert_eq!(count, "5", "all rows should have x > -1");
 
     // --- 5. Multiple column ORDER BY ---
-    let result = run_sql(
-        &db,
-        "SELECT label, x FROM data ORDER BY label ASC, x DESC",
-    );
+    let result = run_sql(&db, "SELECT label, x FROM data ORDER BY label ASC, x DESC");
     if let QueryResult::Rows { rows, .. } = result {
         assert_eq!(rows.len(), 5);
         // alpha rows should come first (alpha < beta < delta < gamma).

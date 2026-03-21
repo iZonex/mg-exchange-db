@@ -37,9 +37,7 @@ impl Default for TlsConfig {
 
 /// Build a hardened rustls `ServerConfig` with explicit protocol versions
 /// and modern AEAD cipher suites only.
-fn build_rustls_server_config(
-    config: &TlsConfig,
-) -> io::Result<rustls::ServerConfig> {
+fn build_rustls_server_config(config: &TlsConfig) -> io::Result<rustls::ServerConfig> {
     use rustls::crypto::ring::default_provider;
     use rustls::pki_types::CertificateDer;
 
@@ -79,7 +77,10 @@ fn build_rustls_server_config(
     let key = rustls_pemfile::private_key(&mut &key_pem[..])
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("key parse: {e}")))?
         .ok_or_else(|| {
-            io::Error::new(io::ErrorKind::InvalidData, "no private key found in PEM file")
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "no private key found in PEM file",
+            )
         })?;
 
     builder
@@ -94,9 +95,10 @@ pub async fn load_tls_config(
     config: &TlsConfig,
 ) -> io::Result<axum_server::tls_rustls::RustlsConfig> {
     let tls_config = config.clone();
-    let server_config = tokio::task::spawn_blocking(move || build_rustls_server_config(&tls_config))
-        .await
-        .map_err(io::Error::other)??;
+    let server_config =
+        tokio::task::spawn_blocking(move || build_rustls_server_config(&tls_config))
+            .await
+            .map_err(io::Error::other)??;
 
     Ok(axum_server::tls_rustls::RustlsConfig::from_config(
         Arc::new(server_config),

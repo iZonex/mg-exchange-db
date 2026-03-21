@@ -4,13 +4,11 @@
 //! TopK vs Sort+Limit, compiled vs interpreted filter, SAMPLE BY intervals,
 //! ASOF JOIN, and SIMD aggregation through the query engine.
 
-use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::table::{ColumnValue, TableBuilder, TableMeta, TableWriter};
 use exchange_query::plan::{Filter, Value};
-use exchange_query::{execute, plan_query, QueryResult};
+use exchange_query::{QueryResult, execute, plan_query};
 use std::collections::HashMap;
 use std::path::Path;
 use tempfile::TempDir;
@@ -454,20 +452,14 @@ fn bench_sample_by(c: &mut Criterion) {
     group.sample_size(10);
 
     for interval in ["1m", "1h", "1d"] {
-        let sql = format!(
-            "SELECT avg(price), sum(volume) FROM trades SAMPLE BY {interval}"
-        );
+        let sql = format!("SELECT avg(price), sum(volume) FROM trades SAMPLE BY {interval}");
 
-        group.bench_with_input(
-            BenchmarkId::new("interval", interval),
-            &interval,
-            |b, _| {
-                b.iter(|| {
-                    let result = run_sql(dir.path(), &sql);
-                    black_box(result);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("interval", interval), &interval, |b, _| {
+            b.iter(|| {
+                let result = run_sql(dir.path(), &sql);
+                black_box(result);
+            });
+        });
     }
 
     group.finish();
@@ -544,8 +536,7 @@ fn bench_simd_aggregation(c: &mut Criterion) {
     // min/max.
     group.bench_function("min_max_1M", |b| {
         b.iter(|| {
-            let result =
-                run_sql(dir.path(), "SELECT min(price), max(price) FROM trades");
+            let result = run_sql(dir.path(), "SELECT min(price), max(price) FROM trades");
             black_box(result);
         });
     });
@@ -593,10 +584,7 @@ fn bench_latest_on_scale(c: &mut Criterion) {
         group.throughput(Throughput::Elements(num_rows));
 
         group.bench_with_input(
-            BenchmarkId::new(
-                "rows_symbols",
-                format!("{num_rows}_{num_symbols}"),
-            ),
+            BenchmarkId::new("rows_symbols", format!("{num_rows}_{num_symbols}")),
             &(num_rows, num_symbols),
             |b, _| {
                 b.iter(|| {

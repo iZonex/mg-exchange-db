@@ -215,7 +215,8 @@ mod tenant_management {
         let dir = TempDir::new().unwrap();
         let mgr = TenantManager::new(dir.path().to_path_buf());
         for i in 0..10 {
-            mgr.create_tenant(&make_tenant(&format!("tenant{i:02}"))).unwrap();
+            mgr.create_tenant(&make_tenant(&format!("tenant{i:02}")))
+                .unwrap();
         }
         assert_eq!(mgr.list_tenants().unwrap().len(), 10);
     }

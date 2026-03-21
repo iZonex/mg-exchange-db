@@ -196,8 +196,11 @@ pub fn parquet_to_partition(
     let footer_start = data.len() - 20; // metadata_offset(8) + checksum(8) + magic(4)
     let metadata_offset =
         u64::from_le_bytes(data[footer_start..footer_start + 8].try_into().unwrap());
-    let stored_checksum =
-        u64::from_le_bytes(data[footer_start + 8..footer_start + 16].try_into().unwrap());
+    let stored_checksum = u64::from_le_bytes(
+        data[footer_start + 8..footer_start + 16]
+            .try_into()
+            .unwrap(),
+    );
 
     // Verify checksum (everything before footer)
     let computed_checksum = xxhash_rust::xxh3::xxh3_64(&data[..footer_start]);
@@ -495,7 +498,10 @@ mod tests {
         assert_eq!(rows, num_rows as u64);
 
         // Verify all files match
-        assert_eq!(ts_data, fs::read(restored_path.join("timestamp.d")).unwrap());
+        assert_eq!(
+            ts_data,
+            fs::read(restored_path.join("timestamp.d")).unwrap()
+        );
         assert_eq!(data_buf, fs::read(restored_path.join("symbol.d")).unwrap());
         assert_eq!(index_buf, fs::read(restored_path.join("symbol.i")).unwrap());
         assert_eq!(price_data, fs::read(restored_path.join("price.d")).unwrap());

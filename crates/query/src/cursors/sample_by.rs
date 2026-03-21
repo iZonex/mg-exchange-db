@@ -430,8 +430,8 @@ mod tests {
 
         let mut cursor = SampleByCursor::new(
             Box::new(source),
-            100,                                          // interval
-            0,                                            // ts_col
+            100,                                                      // interval
+            0,                                                        // ts_col
             vec![(AggregateKind::Avg, 1), (AggregateKind::Count, 1)], // aggregates
             FillMode::None,
         );

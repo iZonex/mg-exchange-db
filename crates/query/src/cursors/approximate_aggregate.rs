@@ -23,9 +23,19 @@ const NUM_REGISTERS: usize = 256;
 
 impl ApproxAggregateCursor {
     pub fn new(source: Box<dyn RecordCursor>, col_name: &str) -> Self {
-        let col_idx = source.schema().iter().position(|(n, _)| n == col_name).unwrap_or(0);
+        let col_idx = source
+            .schema()
+            .iter()
+            .position(|(n, _)| n == col_name)
+            .unwrap_or(0);
         let schema = vec![(format!("approx_distinct({col_name})"), ColumnType::I64)];
-        Self { source: Some(source), col_idx, schema, registers: vec![0u8; NUM_REGISTERS], emitted: false }
+        Self {
+            source: Some(source),
+            col_idx,
+            schema,
+            registers: vec![0u8; NUM_REGISTERS],
+            emitted: false,
+        }
     }
 
     fn hash_value(v: &Value) -> u64 {
@@ -57,10 +67,14 @@ impl ApproxAggregateCursor {
 }
 
 impl RecordCursor for ApproxAggregateCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, _max_rows: usize) -> Result<Option<RecordBatch>> {
-        if self.emitted { return Ok(None); }
+        if self.emitted {
+            return Ok(None);
+        }
         if let Some(mut source) = self.source.take() {
             while let Some(b) = source.next_batch(1024)? {
                 for r in 0..b.row_count() {
@@ -93,7 +107,10 @@ mod tests {
         let source = MemoryCursor::from_rows(schema, &rows);
         let mut cursor = ApproxAggregateCursor::new(Box::new(source), "v");
         let batch = cursor.next_batch(1).unwrap().unwrap();
-        let approx = match batch.get_value(0, 0) { Value::I64(n) => n, _ => 0 };
+        let approx = match batch.get_value(0, 0) {
+            Value::I64(n) => n,
+            _ => 0,
+        };
         // HLL is approximate; should be roughly 10.
         assert!(approx >= 5 && approx <= 20, "approx was {approx}");
     }

@@ -160,10 +160,13 @@ mod select_basic {
     fn select_symbol_values() {
         let db = TestDb::with_trades(3);
         let (_, rows) = db.query("SELECT symbol FROM trades");
-        let symbols: Vec<&str> = rows.iter().map(|r| match &r[0] {
-            Value::Str(s) => s.as_str(),
-            other => panic!("expected Str, got {other:?}"),
-        }).collect();
+        let symbols: Vec<&str> = rows
+            .iter()
+            .map(|r| match &r[0] {
+                Value::Str(s) => s.as_str(),
+                other => panic!("expected Str, got {other:?}"),
+            })
+            .collect();
         assert_eq!(symbols, vec!["BTC/USD", "ETH/USD", "SOL/USD"]);
     }
 
@@ -586,7 +589,8 @@ mod select_where {
     #[test]
     fn where_in_all_symbols() {
         let db = TestDb::with_trades(9);
-        let (_, rows) = db.query("SELECT * FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD', 'SOL/USD')");
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD', 'SOL/USD')");
         assert_eq!(rows.len(), 9);
     }
 
@@ -602,7 +606,8 @@ mod select_where {
     #[test]
     fn where_not_in_all() {
         let db = TestDb::with_trades(9);
-        let (_, rows) = db.query("SELECT * FROM trades WHERE symbol NOT IN ('BTC/USD', 'ETH/USD', 'SOL/USD')");
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE symbol NOT IN ('BTC/USD', 'ETH/USD', 'SOL/USD')");
         assert_eq!(rows.len(), 0);
     }
 
@@ -735,7 +740,8 @@ mod select_where {
     #[test]
     fn where_or_two_conditions() {
         let db = TestDb::with_trades(9);
-        let (_, rows) = db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'ETH/USD'");
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'ETH/USD'");
         assert_eq!(rows.len(), 6);
     }
 
@@ -749,7 +755,8 @@ mod select_where {
     #[test]
     fn where_or_one_matches() {
         let db = TestDb::with_trades(9);
-        let (_, rows) = db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'XRP/USD'");
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'XRP/USD'");
         assert_eq!(rows.len(), 3);
     }
 
@@ -829,9 +836,8 @@ mod select_where {
     #[test]
     fn where_in_and_gt() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD') AND price > 5000",
-        );
+        let (_, rows) = db
+            .query("SELECT * FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD') AND price > 5000");
         assert!(rows.len() > 0);
     }
 
@@ -845,7 +851,8 @@ mod select_where {
     #[test]
     fn where_is_null_and_symbol() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query("SELECT * FROM trades WHERE volume IS NULL AND symbol = 'BTC/USD'");
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE volume IS NULL AND symbol = 'BTC/USD'");
         // Row 0 has NULL volume (may be stored as 0.0) and is BTC/USD
         // May return 0 or 1 rows depending on NULL representation
         assert!(rows.len() <= 1);
@@ -1041,7 +1048,8 @@ mod select_order_by {
     #[test]
     fn order_by_with_where() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query("SELECT price FROM trades WHERE symbol = 'BTC/USD' ORDER BY price ASC");
+        let (_, rows) =
+            db.query("SELECT price FROM trades WHERE symbol = 'BTC/USD' ORDER BY price ASC");
         assert_eq!(rows.len(), 4);
         for i in 1..rows.len() {
             assert!(rows[i - 1][0].cmp_coerce(&rows[i][0]) != Some(std::cmp::Ordering::Greater));
@@ -1104,7 +1112,8 @@ mod select_order_by {
     #[test]
     fn order_by_multiple_desc_asc() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query("SELECT symbol, price FROM trades ORDER BY symbol DESC, price ASC");
+        let (_, rows) =
+            db.query("SELECT symbol, price FROM trades ORDER BY symbol DESC, price ASC");
         assert_eq!(rows.len(), 12);
     }
 
@@ -1148,9 +1157,8 @@ mod select_order_by {
     #[test]
     fn order_by_with_where_and_limit() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT price FROM trades WHERE symbol = 'ETH/USD' ORDER BY price DESC LIMIT 3",
-        );
+        let (_, rows) = db
+            .query("SELECT price FROM trades WHERE symbol = 'ETH/USD' ORDER BY price DESC LIMIT 3");
         assert!(rows.len() <= 3);
         for i in 1..rows.len() {
             assert!(rows[i - 1][0].cmp_coerce(&rows[i][0]) != Some(std::cmp::Ordering::Less));
@@ -1234,7 +1242,8 @@ mod select_order_by {
     #[test]
     fn order_by_two_columns_desc_desc() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query("SELECT symbol, price FROM trades ORDER BY symbol DESC, price DESC");
+        let (_, rows) =
+            db.query("SELECT symbol, price FROM trades ORDER BY symbol DESC, price DESC");
         assert_eq!(rows.len(), 12);
     }
 
@@ -1264,9 +1273,8 @@ mod select_order_by {
     #[test]
     fn order_by_with_is_not_null() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT volume FROM trades WHERE volume IS NOT NULL ORDER BY volume ASC",
-        );
+        let (_, rows) =
+            db.query("SELECT volume FROM trades WHERE volume IS NOT NULL ORDER BY volume ASC");
         // NULL volumes may be stored as 0.0, so IS NOT NULL may return 18 or 20
         assert!(rows.len() >= 18);
         for i in 1..rows.len() {
@@ -1403,7 +1411,8 @@ mod select_limit_offset {
     fn offset_with_where() {
         let db = TestDb::with_trades(20);
         let (_, all_btc) = db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD'");
-        let (_, rows) = db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' LIMIT 100 OFFSET 2");
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' LIMIT 100 OFFSET 2");
         assert_eq!(rows.len(), all_btc.len() - 2);
     }
 
@@ -1543,10 +1552,13 @@ mod select_distinct {
     fn distinct_symbol_values() {
         let db = TestDb::with_trades(12);
         let (_, rows) = db.query("SELECT DISTINCT symbol FROM trades ORDER BY symbol");
-        let symbols: Vec<&str> = rows.iter().map(|r| match &r[0] {
-            Value::Str(s) => s.as_str(),
-            other => panic!("expected Str, got {other:?}"),
-        }).collect();
+        let symbols: Vec<&str> = rows
+            .iter()
+            .map(|r| match &r[0] {
+                Value::Str(s) => s.as_str(),
+                other => panic!("expected Str, got {other:?}"),
+            })
+            .collect();
         assert_eq!(symbols, vec!["BTC/USD", "ETH/USD", "SOL/USD"]);
     }
 
@@ -1554,10 +1566,13 @@ mod select_distinct {
     fn distinct_side_values() {
         let db = TestDb::with_trades(10);
         let (_, rows) = db.query("SELECT DISTINCT side FROM trades ORDER BY side");
-        let sides: Vec<&str> = rows.iter().map(|r| match &r[0] {
-            Value::Str(s) => s.as_str(),
-            other => panic!("expected Str, got {other:?}"),
-        }).collect();
+        let sides: Vec<&str> = rows
+            .iter()
+            .map(|r| match &r[0] {
+                Value::Str(s) => s.as_str(),
+                other => panic!("expected Str, got {other:?}"),
+            })
+            .collect();
         assert_eq!(sides, vec!["buy", "sell"]);
     }
 
@@ -1670,9 +1685,8 @@ mod select_distinct {
     #[test]
     fn distinct_with_in_filter() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT DISTINCT symbol FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD')",
-        );
+        let (_, rows) =
+            db.query("SELECT DISTINCT symbol FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD')");
         assert_eq!(rows.len(), 2);
     }
 
@@ -1701,7 +1715,8 @@ mod select_distinct {
             let v = if i % 2 == 0 { 1.0 } else { 2.0 };
             db.exec_ok(&format!(
                 "INSERT INTO two_t (timestamp, val) VALUES ({}, {})",
-                base_ts + i * 1_000_000_000, v
+                base_ts + i * 1_000_000_000,
+                v
             ));
         }
         let (_, rows) = db.query("SELECT DISTINCT val FROM two_t ORDER BY val");
@@ -1750,7 +1765,8 @@ mod select_distinct {
     #[test]
     fn distinct_with_between_filter() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query("SELECT DISTINCT symbol FROM trades WHERE price BETWEEN 0 AND 5000");
+        let (_, rows) =
+            db.query("SELECT DISTINCT symbol FROM trades WHERE price BETWEEN 0 AND 5000");
         // ETH and SOL have prices < 5000
         assert!(rows.len() >= 2);
     }
@@ -1848,7 +1864,8 @@ mod select_group_by {
     #[test]
     fn group_by_side_count_balanced() {
         let db = TestDb::with_trades(10);
-        let (_, rows) = db.query("SELECT side, count(*) AS c FROM trades GROUP BY side ORDER BY side");
+        let (_, rows) =
+            db.query("SELECT side, count(*) AS c FROM trades GROUP BY side ORDER BY side");
         assert_eq!(rows.len(), 2);
         // buy: 5, sell: 5
         assert_eq!(rows[0][1], Value::I64(5));
@@ -1859,10 +1876,13 @@ mod select_group_by {
     fn group_by_total_count_matches() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol");
-        let total: i64 = rows.iter().map(|r| match &r[1] {
-            Value::I64(n) => *n,
-            other => panic!("expected I64, got {other:?}"),
-        }).sum();
+        let total: i64 = rows
+            .iter()
+            .map(|r| match &r[1] {
+                Value::I64(n) => *n,
+                other => panic!("expected I64, got {other:?}"),
+            })
+            .sum();
         assert_eq!(total, 30);
     }
 
@@ -1879,18 +1899,16 @@ mod select_group_by {
     #[test]
     fn group_by_with_having_count() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING c >= 4",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING c >= 4");
         assert_eq!(rows.len(), 3); // each has 4
     }
 
     #[test]
     fn group_by_with_having_filters_out() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING c > 100",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING c > 100");
         assert_eq!(rows.len(), 0);
     }
 
@@ -1907,9 +1925,8 @@ mod select_group_by {
     #[test]
     fn group_by_with_order_by() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) AS c FROM trades GROUP BY symbol ORDER BY symbol ASC",
-        );
+        let (_, rows) = db
+            .query("SELECT symbol, count(*) AS c FROM trades GROUP BY symbol ORDER BY symbol ASC");
         assert_eq!(rows.len(), 3);
         assert_eq!(rows[0][0], Value::Str("BTC/USD".to_string()));
     }
@@ -1917,18 +1934,15 @@ mod select_group_by {
     #[test]
     fn group_by_with_order_by_count_desc() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) AS c FROM trades GROUP BY symbol ORDER BY c DESC",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, count(*) AS c FROM trades GROUP BY symbol ORDER BY c DESC");
         assert_eq!(rows.len(), 3);
     }
 
     #[test]
     fn group_by_with_limit() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) FROM trades GROUP BY symbol LIMIT 2",
-        );
+        let (_, rows) = db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol LIMIT 2");
         assert_eq!(rows.len(), 2);
     }
 
@@ -2025,21 +2039,21 @@ mod select_group_by {
     #[test]
     fn group_by_min_max_same_group() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, min(price) AS mn, max(price) AS mx FROM trades GROUP BY symbol",
-        );
+        let (_, rows) = db
+            .query("SELECT symbol, min(price) AS mn, max(price) AS mx FROM trades GROUP BY symbol");
         for row in &rows {
-            assert!(row[1].cmp_coerce(&row[2]) != Some(std::cmp::Ordering::Greater),
-                "min should be <= max");
+            assert!(
+                row[1].cmp_coerce(&row[2]) != Some(std::cmp::Ordering::Greater),
+                "min should be <= max"
+            );
         }
     }
 
     #[test]
     fn group_by_avg_between_min_max() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, min(price), avg(price), max(price) FROM trades GROUP BY symbol",
-        );
+        let (_, rows) = db
+            .query("SELECT symbol, min(price), avg(price), max(price) FROM trades GROUP BY symbol");
         for row in &rows {
             assert!(row[1].cmp_coerce(&row[2]) != Some(std::cmp::Ordering::Greater));
             assert!(row[2].cmp_coerce(&row[3]) != Some(std::cmp::Ordering::Greater));
@@ -2049,27 +2063,23 @@ mod select_group_by {
     #[test]
     fn group_by_with_where() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) FROM trades WHERE side = 'buy' GROUP BY symbol",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, count(*) FROM trades WHERE side = 'buy' GROUP BY symbol");
         assert_eq!(rows.len(), 3);
     }
 
     #[test]
     fn group_by_symbol_side() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, side, count(*) FROM trades GROUP BY symbol, side",
-        );
+        let (_, rows) = db.query("SELECT symbol, side, count(*) FROM trades GROUP BY symbol, side");
         assert_eq!(rows.len(), 6); // 3 symbols * 2 sides
     }
 
     #[test]
     fn group_by_symbol_side_sum() {
         let db = TestDb::with_trades(12);
-        let (cols, rows) = db.query(
-            "SELECT symbol, side, sum(price) FROM trades GROUP BY symbol, side",
-        );
+        let (cols, rows) =
+            db.query("SELECT symbol, side, sum(price) FROM trades GROUP BY symbol, side");
         assert_eq!(cols.len(), 3);
         assert_eq!(rows.len(), 6);
     }
@@ -2152,9 +2162,8 @@ mod select_group_by {
     #[test]
     fn aggregate_no_group_multi() {
         let db = TestDb::with_trades(20);
-        let (cols, rows) = db.query(
-            "SELECT count(*), sum(price), avg(price), min(price), max(price) FROM trades",
-        );
+        let (cols, rows) =
+            db.query("SELECT count(*), sum(price), avg(price), min(price), max(price) FROM trades");
         assert_eq!(cols.len(), 5);
         assert_eq!(rows.len(), 1);
     }
@@ -2176,10 +2185,13 @@ mod select_group_by {
         let db = TestDb::with_trades(12);
         let total = db.query_scalar("SELECT sum(price) FROM trades");
         let (_, groups) = db.query("SELECT symbol, sum(price) FROM trades GROUP BY symbol");
-        let group_total: f64 = groups.iter().map(|r| match &r[1] {
-            Value::F64(v) => *v,
-            other => panic!("expected F64, got {other:?}"),
-        }).sum();
+        let group_total: f64 = groups
+            .iter()
+            .map(|r| match &r[1] {
+                Value::F64(v) => *v,
+                other => panic!("expected F64, got {other:?}"),
+            })
+            .sum();
         match total {
             Value::F64(t) => assert!((t - group_total).abs() < 0.01),
             other => panic!("expected F64, got {other:?}"),
@@ -2190,19 +2202,21 @@ mod select_group_by {
     fn group_by_count_equals_total() {
         let db = TestDb::with_trades(15);
         let (_, groups) = db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol");
-        let total: i64 = groups.iter().map(|r| match &r[1] {
-            Value::I64(n) => *n,
-            other => panic!("expected I64, got {other:?}"),
-        }).sum();
+        let total: i64 = groups
+            .iter()
+            .map(|r| match &r[1] {
+                Value::I64(n) => *n,
+                other => panic!("expected I64, got {other:?}"),
+            })
+            .sum();
         assert_eq!(total, 15);
     }
 
     #[test]
     fn group_by_first_last_differ() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, first(price), last(price) FROM trades GROUP BY symbol",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, first(price), last(price) FROM trades GROUP BY symbol");
         for row in &rows {
             // first and last should differ for BTC (which has > 1 row)
             if row[0] == Value::Str("BTC/USD".to_string()) {
@@ -2214,24 +2228,26 @@ mod select_group_by {
     #[test]
     fn group_by_min_le_first() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, min(price), first(price) FROM trades GROUP BY symbol",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, min(price), first(price) FROM trades GROUP BY symbol");
         for row in &rows {
-            assert!(row[1].cmp_coerce(&row[2]) != Some(std::cmp::Ordering::Greater),
-                "min should be <= first");
+            assert!(
+                row[1].cmp_coerce(&row[2]) != Some(std::cmp::Ordering::Greater),
+                "min should be <= first"
+            );
         }
     }
 
     #[test]
     fn group_by_max_ge_last() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, max(price), last(price) FROM trades GROUP BY symbol",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, max(price), last(price) FROM trades GROUP BY symbol");
         for row in &rows {
-            assert!(row[1].cmp_coerce(&row[2]) != Some(std::cmp::Ordering::Less),
-                "max should be >= last");
+            assert!(
+                row[1].cmp_coerce(&row[2]) != Some(std::cmp::Ordering::Less),
+                "max should be >= last"
+            );
         }
     }
 
@@ -2257,18 +2273,16 @@ mod select_group_by {
     #[test]
     fn group_by_having_sum() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, sum(price) AS s FROM trades GROUP BY symbol HAVING s > 1000",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, sum(price) AS s FROM trades GROUP BY symbol HAVING s > 1000");
         assert!(rows.len() > 0);
     }
 
     #[test]
     fn group_by_three_aggregates() {
         let db = TestDb::with_trades(12);
-        let (cols, rows) = db.query(
-            "SELECT symbol, sum(price), min(price), max(price) FROM trades GROUP BY symbol",
-        );
+        let (cols, rows) = db
+            .query("SELECT symbol, sum(price), min(price), max(price) FROM trades GROUP BY symbol");
         assert_eq!(cols.len(), 4);
         assert_eq!(rows.len(), 3);
     }
@@ -2296,9 +2310,8 @@ mod select_group_by {
     #[test]
     fn group_by_where_like() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) FROM trades WHERE symbol LIKE 'BTC%' GROUP BY symbol",
-        );
+        let (_, rows) = db
+            .query("SELECT symbol, count(*) FROM trades WHERE symbol LIKE 'BTC%' GROUP BY symbol");
         // Should have at least a BTC group
         assert!(rows.len() >= 1);
     }
@@ -2315,9 +2328,8 @@ mod select_group_by {
     #[test]
     fn group_by_order_by_symbol() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol");
         assert_eq!(rows[0][0], Value::Str("BTC/USD".to_string()));
         assert_eq!(rows[1][0], Value::Str("ETH/USD".to_string()));
         assert_eq!(rows[2][0], Value::Str("SOL/USD".to_string()));
@@ -2326,9 +2338,8 @@ mod select_group_by {
     #[test]
     fn group_by_order_by_aggregate_asc() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, avg(price) AS ap FROM trades GROUP BY symbol ORDER BY ap ASC",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, avg(price) AS ap FROM trades GROUP BY symbol ORDER BY ap ASC");
         assert_eq!(rows.len(), 3);
         for i in 1..rows.len() {
             assert!(rows[i - 1][1].cmp_coerce(&rows[i][1]) != Some(std::cmp::Ordering::Greater));
@@ -2338,9 +2349,8 @@ mod select_group_by {
     #[test]
     fn group_by_order_by_aggregate_desc() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, avg(price) AS ap FROM trades GROUP BY symbol ORDER BY ap DESC",
-        );
+        let (_, rows) = db
+            .query("SELECT symbol, avg(price) AS ap FROM trades GROUP BY symbol ORDER BY ap DESC");
         assert_eq!(rows.len(), 3);
         // BTC has highest avg
         assert_eq!(rows[0][0], Value::Str("BTC/USD".to_string()));
@@ -2349,18 +2359,15 @@ mod select_group_by {
     #[test]
     fn group_by_with_limit_1() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) FROM trades GROUP BY symbol LIMIT 1",
-        );
+        let (_, rows) = db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol LIMIT 1");
         assert_eq!(rows.len(), 1);
     }
 
     #[test]
     fn group_by_with_offset() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol LIMIT 2",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol LIMIT 2");
         assert_eq!(rows.len(), 2);
     }
 
@@ -2383,31 +2390,30 @@ mod select_group_by {
     #[test]
     fn group_by_having_0_results() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING c > 999",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING c > 999");
         assert_eq!(rows.len(), 0);
     }
 
     #[test]
     fn group_by_having_all_pass() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING c >= 1",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING c >= 1");
         assert_eq!(rows.len(), 3);
     }
 
     #[test]
     fn group_by_multiple_keys_count() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, side, count(*) FROM trades GROUP BY symbol, side",
-        );
-        let total: i64 = rows.iter().map(|r| match &r[2] {
-            Value::I64(n) => *n,
-            other => panic!("expected I64, got {other:?}"),
-        }).sum();
+        let (_, rows) = db.query("SELECT symbol, side, count(*) FROM trades GROUP BY symbol, side");
+        let total: i64 = rows
+            .iter()
+            .map(|r| match &r[2] {
+                Value::I64(n) => *n,
+                other => panic!("expected I64, got {other:?}"),
+            })
+            .sum();
         assert_eq!(total, 12);
     }
 
@@ -2425,10 +2431,12 @@ mod select_group_by {
         let db = TestDb::with_trades(12);
         // BTC rows: 0,3,6,9 -> prices: 60000, 60300, 60600, 60900
         // avg = (60000+60300+60600+60900)/4 = 60450
-        let (_, rows) = db.query(
-            "SELECT symbol, avg(price) FROM trades GROUP BY symbol ORDER BY symbol",
-        );
-        let btc_row = rows.iter().find(|r| r[0] == Value::Str("BTC/USD".to_string())).unwrap();
+        let (_, rows) =
+            db.query("SELECT symbol, avg(price) FROM trades GROUP BY symbol ORDER BY symbol");
+        let btc_row = rows
+            .iter()
+            .find(|r| r[0] == Value::Str("BTC/USD".to_string()))
+            .unwrap();
         match &btc_row[1] {
             Value::F64(avg) => assert!((avg - 60450.0).abs() < 0.01, "expected ~60450, got {avg}"),
             other => panic!("expected F64, got {other:?}"),
@@ -2438,10 +2446,12 @@ mod select_group_by {
     #[test]
     fn group_by_sol_count_correct() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol",
-        );
-        let sol_row = rows.iter().find(|r| r[0] == Value::Str("SOL/USD".to_string())).unwrap();
+        let (_, rows) =
+            db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol");
+        let sol_row = rows
+            .iter()
+            .find(|r| r[0] == Value::Str("SOL/USD".to_string()))
+            .unwrap();
         assert_eq!(sol_row[1], Value::I64(4));
     }
 
@@ -2449,20 +2459,24 @@ mod select_group_by {
     fn group_by_eth_min_price() {
         let db = TestDb::with_trades(12);
         // ETH rows: 1,4,7,10 -> prices: 3010, 3040, 3070, 3100
-        let (_, rows) = db.query(
-            "SELECT symbol, min(price) FROM trades GROUP BY symbol ORDER BY symbol",
-        );
-        let eth_row = rows.iter().find(|r| r[0] == Value::Str("ETH/USD".to_string())).unwrap();
+        let (_, rows) =
+            db.query("SELECT symbol, min(price) FROM trades GROUP BY symbol ORDER BY symbol");
+        let eth_row = rows
+            .iter()
+            .find(|r| r[0] == Value::Str("ETH/USD".to_string()))
+            .unwrap();
         assert_eq!(eth_row[1], Value::F64(3010.0));
     }
 
     #[test]
     fn group_by_eth_max_price() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, max(price) FROM trades GROUP BY symbol ORDER BY symbol",
-        );
-        let eth_row = rows.iter().find(|r| r[0] == Value::Str("ETH/USD".to_string())).unwrap();
+        let (_, rows) =
+            db.query("SELECT symbol, max(price) FROM trades GROUP BY symbol ORDER BY symbol");
+        let eth_row = rows
+            .iter()
+            .find(|r| r[0] == Value::Str("ETH/USD".to_string()))
+            .unwrap();
         assert_eq!(eth_row[1], Value::F64(3100.0));
     }
 }
@@ -2501,10 +2515,13 @@ mod select_sample_by {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT count(*) FROM trades SAMPLE BY 1h");
         assert!(rows.len() > 1);
-        let total: i64 = rows.iter().map(|r| match &r[0] {
-            Value::I64(n) => *n,
-            other => panic!("expected I64, got {other:?}"),
-        }).sum();
+        let total: i64 = rows
+            .iter()
+            .map(|r| match &r[0] {
+                Value::I64(n) => *n,
+                other => panic!("expected I64, got {other:?}"),
+            })
+            .sum();
         assert_eq!(total, 30);
     }
 
@@ -2567,18 +2584,15 @@ mod select_sample_by {
     #[test]
     fn sample_by_with_where() {
         let db = TestDb::with_trades(30);
-        let (_, rows) = db.query(
-            "SELECT avg(price) FROM trades WHERE symbol = 'BTC/USD' SAMPLE BY 1h",
-        );
+        let (_, rows) =
+            db.query("SELECT avg(price) FROM trades WHERE symbol = 'BTC/USD' SAMPLE BY 1h");
         assert!(rows.len() >= 1);
     }
 
     #[test]
     fn sample_by_with_where_side() {
         let db = TestDb::with_trades(30);
-        let (_, rows) = db.query(
-            "SELECT count(*) FROM trades WHERE side = 'buy' SAMPLE BY 1h",
-        );
+        let (_, rows) = db.query("SELECT count(*) FROM trades WHERE side = 'buy' SAMPLE BY 1h");
         assert!(rows.len() >= 1);
     }
 
@@ -2620,18 +2634,14 @@ mod select_sample_by {
     #[test]
     fn sample_by_align_to_calendar() {
         let db = TestDb::with_trades(30);
-        let (_, rows) = db.query(
-            "SELECT avg(price) FROM trades SAMPLE BY 1h ALIGN TO CALENDAR",
-        );
+        let (_, rows) = db.query("SELECT avg(price) FROM trades SAMPLE BY 1h ALIGN TO CALENDAR");
         assert!(rows.len() > 0);
     }
 
     #[test]
     fn sample_by_first_last() {
         let db = TestDb::with_trades(30);
-        let (cols, rows) = db.query(
-            "SELECT first(price), last(price) FROM trades SAMPLE BY 1h",
-        );
+        let (cols, rows) = db.query("SELECT first(price), last(price) FROM trades SAMPLE BY 1h");
         assert_eq!(cols.len(), 2);
         assert!(rows.len() > 0);
     }
@@ -2655,10 +2665,13 @@ mod select_sample_by {
     fn sample_by_count_sum_matches_total() {
         let db = TestDb::with_trades(20);
         let (_, sampled) = db.query("SELECT count(*) FROM trades SAMPLE BY 1h");
-        let total: i64 = sampled.iter().map(|r| match &r[0] {
-            Value::I64(n) => *n,
-            other => panic!("expected I64, got {other:?}"),
-        }).sum();
+        let total: i64 = sampled
+            .iter()
+            .map(|r| match &r[0] {
+                Value::I64(n) => *n,
+                other => panic!("expected I64, got {other:?}"),
+            })
+            .sum();
         assert_eq!(total, 20);
     }
 
@@ -2667,10 +2680,13 @@ mod select_sample_by {
         let db = TestDb::with_trades(20);
         let total_val = db.query_scalar("SELECT sum(price) FROM trades");
         let (_, sampled) = db.query("SELECT sum(price) FROM trades SAMPLE BY 1h");
-        let sampled_total: f64 = sampled.iter().map(|r| match &r[0] {
-            Value::F64(v) => *v,
-            other => panic!("expected F64, got {other:?}"),
-        }).sum();
+        let sampled_total: f64 = sampled
+            .iter()
+            .map(|r| match &r[0] {
+                Value::F64(v) => *v,
+                other => panic!("expected F64, got {other:?}"),
+            })
+            .sum();
         match total_val {
             Value::F64(t) => assert!((t - sampled_total).abs() < 0.01),
             other => panic!("expected F64, got {other:?}"),
@@ -2707,10 +2723,13 @@ mod select_sample_by {
     fn sample_by_fill_none_count_sum() {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT count(*) FROM trades SAMPLE BY 1h FILL(NONE)");
-        let total: i64 = rows.iter().map(|r| match &r[0] {
-            Value::I64(n) => *n,
-            other => panic!("expected I64, got {other:?}"),
-        }).sum();
+        let total: i64 = rows
+            .iter()
+            .map(|r| match &r[0] {
+                Value::I64(n) => *n,
+                other => panic!("expected I64, got {other:?}"),
+            })
+            .sum();
         assert_eq!(total, 30);
     }
 
@@ -2728,8 +2747,10 @@ mod select_sample_by {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT min(price), max(price) FROM trades SAMPLE BY 1h");
         for row in &rows {
-            assert!(row[0].cmp_coerce(&row[1]) != Some(std::cmp::Ordering::Greater),
-                "min should be <= max in each bucket");
+            assert!(
+                row[0].cmp_coerce(&row[1]) != Some(std::cmp::Ordering::Greater),
+                "min should be <= max in each bucket"
+            );
         }
     }
 
@@ -2809,27 +2830,21 @@ mod select_latest_on {
     #[test]
     fn latest_on_basic() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol",
-        );
+        let (_, rows) = db.query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol");
         assert_eq!(rows.len(), 3);
     }
 
     #[test]
     fn latest_on_returns_one_per_symbol() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol",
-        );
+        let (_, rows) = db.query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol");
         assert_eq!(rows.len(), 3);
     }
 
     #[test]
     fn latest_on_column_count() {
         let db = TestDb::with_trades(12);
-        let (cols, _) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol",
-        );
+        let (cols, _) = db.query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol");
         assert_eq!(cols.len(), 5);
     }
 
@@ -2865,9 +2880,7 @@ mod select_latest_on {
     #[test]
     fn latest_on_by_side() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY side",
-        );
+        let (_, rows) = db.query("SELECT * FROM trades LATEST ON timestamp PARTITION BY side");
         assert_eq!(rows.len(), 2); // buy and sell
     }
 
@@ -2892,18 +2905,14 @@ mod select_latest_on {
     #[test]
     fn latest_on_single_row() {
         let db = TestDb::with_trades(1);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol",
-        );
+        let (_, rows) = db.query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol");
         assert_eq!(rows.len(), 1);
     }
 
     #[test]
     fn latest_on_many_rows() {
         let db = TestDb::with_trades(50);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol",
-        );
+        let (_, rows) = db.query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol");
         assert_eq!(rows.len(), 3);
     }
 
@@ -2920,9 +2929,8 @@ mod select_latest_on {
     #[test]
     fn latest_on_price_is_last() {
         let db = TestDb::with_trades(12);
-        let (_, latest) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol ORDER BY symbol",
-        );
+        let (_, latest) = db
+            .query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol ORDER BY symbol");
         // Verify the price matches the last price for each symbol
         for row in &latest {
             // symbol is at index 1, price at index 2 in SELECT *
@@ -2949,27 +2957,22 @@ mod select_latest_on {
     #[test]
     fn latest_on_with_limit() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol LIMIT 2",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol LIMIT 2");
         assert_eq!(rows.len(), 2);
     }
 
     #[test]
     fn latest_on_20_rows() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol",
-        );
+        let (_, rows) = db.query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol");
         assert_eq!(rows.len(), 3);
     }
 
     #[test]
     fn latest_on_30_rows() {
         let db = TestDb::with_trades(30);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol",
-        );
+        let (_, rows) = db.query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol");
         assert_eq!(rows.len(), 3);
     }
 
@@ -2985,12 +2988,10 @@ mod select_latest_on {
     #[test]
     fn latest_on_deterministic() {
         let db = TestDb::with_trades(12);
-        let (_, rows1) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol ORDER BY symbol",
-        );
-        let (_, rows2) = db.query(
-            "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol ORDER BY symbol",
-        );
+        let (_, rows1) = db
+            .query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol ORDER BY symbol");
+        let (_, rows2) = db
+            .query("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol ORDER BY symbol");
         assert_eq!(rows1, rows2);
     }
 
@@ -3007,9 +3008,8 @@ mod select_latest_on {
     #[test]
     fn latest_on_timestamp_values() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, timestamp FROM trades LATEST ON timestamp PARTITION BY symbol",
-        );
+        let (_, rows) = db
+            .query("SELECT symbol, timestamp FROM trades LATEST ON timestamp PARTITION BY symbol");
         for row in &rows {
             assert!(matches!(row[1], Value::Timestamp(_)));
         }
@@ -3025,18 +3025,16 @@ mod select_case_when {
     #[test]
     fn case_when_simple() {
         let db = TestDb::with_trades(6);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price > 50000 THEN 'high' ELSE 'low' END FROM trades",
-        );
+        let (_, rows) =
+            db.query("SELECT CASE WHEN price > 50000 THEN 'high' ELSE 'low' END FROM trades");
         assert_eq!(rows.len(), 6);
     }
 
     #[test]
     fn case_when_all_high() {
         let db = TestDb::with_trades(3);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price > 0 THEN 'positive' ELSE 'negative' END FROM trades",
-        );
+        let (_, rows) =
+            db.query("SELECT CASE WHEN price > 0 THEN 'positive' ELSE 'negative' END FROM trades");
         for row in &rows {
             assert_eq!(row[0], Value::Str("positive".to_string()));
         }
@@ -3045,9 +3043,8 @@ mod select_case_when {
     #[test]
     fn case_when_all_else() {
         let db = TestDb::with_trades(3);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price > 999999 THEN 'high' ELSE 'normal' END FROM trades",
-        );
+        let (_, rows) =
+            db.query("SELECT CASE WHEN price > 999999 THEN 'high' ELSE 'normal' END FROM trades");
         for row in &rows {
             assert_eq!(row[0], Value::Str("normal".to_string()));
         }
@@ -3074,12 +3071,13 @@ mod select_case_when {
     #[test]
     fn case_when_no_else() {
         let db = TestDb::with_trades(3);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price > 50000 THEN 'high' END FROM trades",
-        );
+        let (_, rows) = db.query("SELECT CASE WHEN price > 50000 THEN 'high' END FROM trades");
         assert_eq!(rows.len(), 3);
         // Rows without match should get NULL
-        let high_count = rows.iter().filter(|r| r[0] == Value::Str("high".to_string())).count();
+        let high_count = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("high".to_string()))
+            .count();
         let null_count = rows.iter().filter(|r| r[0] == Value::Null).count();
         assert_eq!(high_count, 1);
         assert_eq!(null_count, 2);
@@ -3097,9 +3095,7 @@ mod select_case_when {
     #[test]
     fn case_when_returns_numbers() {
         let db = TestDb::with_trades(3);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price > 50000 THEN 1 ELSE 0 END FROM trades",
-        );
+        let (_, rows) = db.query("SELECT CASE WHEN price > 50000 THEN 1 ELSE 0 END FROM trades");
         assert_eq!(rows.len(), 3);
     }
 
@@ -3125,55 +3121,51 @@ mod select_case_when {
     #[test]
     fn case_when_preserves_row_count() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price > 50000 THEN 'high' ELSE 'low' END FROM trades",
-        );
+        let (_, rows) =
+            db.query("SELECT CASE WHEN price > 50000 THEN 'high' ELSE 'low' END FROM trades");
         assert_eq!(rows.len(), 20);
     }
 
     #[test]
     fn case_when_mixed_types_int_result() {
         let db = TestDb::with_trades(3);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price > 50000 THEN 100 ELSE 0 END FROM trades",
-        );
+        let (_, rows) = db.query("SELECT CASE WHEN price > 50000 THEN 100 ELSE 0 END FROM trades");
         assert_eq!(rows.len(), 3);
     }
 
     #[test]
     fn case_when_gt_operator() {
         let db = TestDb::with_trades(6);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price > 10000 THEN 'expensive' ELSE 'cheap' END FROM trades",
-        );
+        let (_, rows) = db
+            .query("SELECT CASE WHEN price > 10000 THEN 'expensive' ELSE 'cheap' END FROM trades");
         assert_eq!(rows.len(), 6);
     }
 
     #[test]
     fn case_when_lt_operator() {
         let db = TestDb::with_trades(6);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price < 1000 THEN 'cheap' ELSE 'pricey' END FROM trades",
-        );
+        let (_, rows) =
+            db.query("SELECT CASE WHEN price < 1000 THEN 'cheap' ELSE 'pricey' END FROM trades");
         assert_eq!(rows.len(), 6);
     }
 
     #[test]
     fn case_when_eq_string_btc() {
         let db = TestDb::with_trades(6);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN symbol = 'BTC/USD' THEN 'yes' ELSE 'no' END FROM trades",
-        );
-        let yes_count = rows.iter().filter(|r| r[0] == Value::Str("yes".to_string())).count();
+        let (_, rows) =
+            db.query("SELECT CASE WHEN symbol = 'BTC/USD' THEN 'yes' ELSE 'no' END FROM trades");
+        let yes_count = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("yes".to_string()))
+            .count();
         assert_eq!(yes_count, 2); // rows 0, 3
     }
 
     #[test]
     fn case_when_with_limit() {
         let db = TestDb::with_trades(10);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price > 50000 THEN 'high' ELSE 'low' END FROM trades LIMIT 3",
-        );
+        let (_, rows) = db
+            .query("SELECT CASE WHEN price > 50000 THEN 'high' ELSE 'low' END FROM trades LIMIT 3");
         assert_eq!(rows.len(), 3);
     }
 
@@ -3200,12 +3192,10 @@ mod select_case_when {
     #[test]
     fn case_when_deterministic() {
         let db = TestDb::with_trades(6);
-        let (_, rows1) = db.query(
-            "SELECT CASE WHEN price > 50000 THEN 'high' ELSE 'low' END FROM trades",
-        );
-        let (_, rows2) = db.query(
-            "SELECT CASE WHEN price > 50000 THEN 'high' ELSE 'low' END FROM trades",
-        );
+        let (_, rows1) =
+            db.query("SELECT CASE WHEN price > 50000 THEN 'high' ELSE 'low' END FROM trades");
+        let (_, rows2) =
+            db.query("SELECT CASE WHEN price > 50000 THEN 'high' ELSE 'low' END FROM trades");
         assert_eq!(rows1, rows2);
     }
 
@@ -3233,9 +3223,7 @@ mod select_case_when {
     #[test]
     fn case_when_with_null_else() {
         let db = TestDb::with_trades(3);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price > 999999 THEN 'match' END FROM trades",
-        );
+        let (_, rows) = db.query("SELECT CASE WHEN price > 999999 THEN 'match' END FROM trades");
         // No match, no ELSE -> all NULL
         for row in &rows {
             assert_eq!(row[0], Value::Null);
@@ -3245,29 +3233,31 @@ mod select_case_when {
     #[test]
     fn case_when_side_buy_sell() {
         let db = TestDb::with_trades(6);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN side = 'buy' THEN 1 ELSE -1 END FROM trades",
-        );
+        let (_, rows) = db.query("SELECT CASE WHEN side = 'buy' THEN 1 ELSE -1 END FROM trades");
         assert_eq!(rows.len(), 6);
     }
 
     #[test]
     fn case_when_gte() {
         let db = TestDb::with_trades(3);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price >= 60000 THEN 'btc_range' ELSE 'other' END FROM trades",
-        );
-        let btc_count = rows.iter().filter(|r| r[0] == Value::Str("btc_range".to_string())).count();
+        let (_, rows) = db
+            .query("SELECT CASE WHEN price >= 60000 THEN 'btc_range' ELSE 'other' END FROM trades");
+        let btc_count = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("btc_range".to_string()))
+            .count();
         assert_eq!(btc_count, 1);
     }
 
     #[test]
     fn case_when_lte() {
         let db = TestDb::with_trades(3);
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN price <= 200 THEN 'cheap' ELSE 'expensive' END FROM trades",
-        );
-        let cheap_count = rows.iter().filter(|r| r[0] == Value::Str("cheap".to_string())).count();
+        let (_, rows) =
+            db.query("SELECT CASE WHEN price <= 200 THEN 'cheap' ELSE 'expensive' END FROM trades");
+        let cheap_count = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("cheap".to_string()))
+            .count();
         assert_eq!(cheap_count, 1); // SOL at 102
     }
 
@@ -3294,9 +3284,7 @@ mod select_case_when {
     fn case_when_empty_table() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE empty_t (timestamp TIMESTAMP, val DOUBLE)");
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN val > 0 THEN 'pos' ELSE 'neg' END FROM empty_t",
-        );
+        let (_, rows) = db.query("SELECT CASE WHEN val > 0 THEN 'pos' ELSE 'neg' END FROM empty_t");
         assert_eq!(rows.len(), 0);
     }
 
@@ -3306,7 +3294,10 @@ mod select_case_when {
         let (_, rows) = db.query(
             "SELECT CASE WHEN symbol = 'BTC/USD' THEN 'crypto' WHEN symbol = 'ETH/USD' THEN 'crypto' ELSE 'alt' END FROM trades",
         );
-        let crypto_count = rows.iter().filter(|r| r[0] == Value::Str("crypto".to_string())).count();
+        let crypto_count = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("crypto".to_string()))
+            .count();
         assert_eq!(crypto_count, 4); // 2 BTC + 2 ETH
     }
 }
@@ -3466,9 +3457,8 @@ mod select_arithmetic {
     #[test]
     fn multiple_expressions() {
         let db = TestDb::with_trades(3);
-        let (cols, rows) = db.query(
-            "SELECT price + 1 AS p1, price - 1 AS p2, price * 2 AS p3 FROM trades",
-        );
+        let (cols, rows) =
+            db.query("SELECT price + 1 AS p1, price - 1 AS p2, price * 2 AS p3 FROM trades");
         assert_eq!(cols.len(), 3);
         assert_eq!(rows.len(), 3);
     }
@@ -3566,7 +3556,8 @@ mod select_arithmetic {
     #[test]
     fn expression_with_order_by() {
         let db = TestDb::with_trades(10);
-        let (_, rows) = db.query("SELECT price, price * 2 AS double_price FROM trades ORDER BY price ASC");
+        let (_, rows) =
+            db.query("SELECT price, price * 2 AS double_price FROM trades ORDER BY price ASC");
         assert_eq!(rows.len(), 10);
     }
 
@@ -3719,27 +3710,24 @@ mod select_subquery {
     #[test]
     fn in_subquery_all_match() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE symbol IN (SELECT DISTINCT symbol FROM trades)",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE symbol IN (SELECT DISTINCT symbol FROM trades)");
         assert_eq!(rows.len(), 12);
     }
 
     #[test]
     fn scalar_subquery_eq() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE price = (SELECT min(price) FROM trades)",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE price = (SELECT min(price) FROM trades)");
         assert_eq!(rows.len(), 1);
     }
 
     #[test]
     fn scalar_subquery_gt() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE price > (SELECT avg(price) FROM trades)",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE price > (SELECT avg(price) FROM trades)");
         assert!(rows.len() > 0);
         assert!(rows.len() < 12);
     }
@@ -3747,27 +3735,24 @@ mod select_subquery {
     #[test]
     fn scalar_subquery_lt() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE price < (SELECT avg(price) FROM trades)",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE price < (SELECT avg(price) FROM trades)");
         assert!(rows.len() > 0);
     }
 
     #[test]
     fn scalar_subquery_gte() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE price >= (SELECT max(price) FROM trades)",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE price >= (SELECT max(price) FROM trades)");
         assert_eq!(rows.len(), 1);
     }
 
     #[test]
     fn scalar_subquery_lte() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE price <= (SELECT min(price) FROM trades)",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE price <= (SELECT min(price) FROM trades)");
         assert_eq!(rows.len(), 1);
     }
 
@@ -3833,18 +3818,16 @@ mod select_subquery {
     #[test]
     fn cte_reuse() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "WITH sym AS (SELECT DISTINCT symbol FROM trades) SELECT count(*) FROM sym",
-        );
+        let (_, rows) =
+            db.query("WITH sym AS (SELECT DISTINCT symbol FROM trades) SELECT count(*) FROM sym");
         assert_eq!(rows[0][0], Value::I64(3));
     }
 
     #[test]
     fn subquery_in_from() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT count(*) FROM (SELECT * FROM trades WHERE symbol = 'BTC/USD') AS btc",
-        );
+        let (_, rows) =
+            db.query("SELECT count(*) FROM (SELECT * FROM trades WHERE symbol = 'BTC/USD') AS btc");
         assert_eq!(rows[0][0], Value::I64(4));
     }
 
@@ -3895,9 +3878,8 @@ mod select_subquery {
     #[test]
     fn subquery_in_from_empty() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT count(*) FROM (SELECT * FROM trades WHERE symbol = 'XRP/USD') AS empty",
-        );
+        let (_, rows) = db
+            .query("SELECT count(*) FROM (SELECT * FROM trades WHERE symbol = 'XRP/USD') AS empty");
         assert_eq!(rows[0][0], Value::I64(0));
     }
 
@@ -3922,9 +3904,7 @@ mod select_subquery {
     #[test]
     fn subquery_from_with_limit() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM (SELECT * FROM trades LIMIT 5) AS limited",
-        );
+        let (_, rows) = db.query("SELECT * FROM (SELECT * FROM trades LIMIT 5) AS limited");
         assert_eq!(rows.len(), 5);
     }
 
@@ -3934,9 +3914,7 @@ mod select_subquery {
         let cte_val = db.query_scalar(
             "WITH btc AS (SELECT price FROM trades WHERE symbol = 'BTC/USD') SELECT avg(price) FROM btc",
         );
-        let direct_val = db.query_scalar(
-            "SELECT avg(price) FROM trades WHERE symbol = 'BTC/USD'",
-        );
+        let direct_val = db.query_scalar("SELECT avg(price) FROM trades WHERE symbol = 'BTC/USD'");
         assert_eq!(cte_val, direct_val);
     }
 
@@ -3974,9 +3952,8 @@ mod select_subquery {
     fn subquery_min_price_eq() {
         let db = TestDb::with_trades(12);
         let min_val = db.query_scalar("SELECT min(price) FROM trades");
-        let (_, rows) = db.query(
-            "SELECT price FROM trades WHERE price = (SELECT min(price) FROM trades)",
-        );
+        let (_, rows) =
+            db.query("SELECT price FROM trades WHERE price = (SELECT min(price) FROM trades)");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], min_val);
     }
@@ -4147,7 +4124,9 @@ mod select_cast {
         let (_, i_rows) = db.query("SELECT CAST(price AS INT) FROM trades ORDER BY price ASC");
         // Integer cast order should match float order (no reordering)
         for i in 1..i_rows.len() {
-            assert!(i_rows[i - 1][0].cmp_coerce(&i_rows[i][0]) != Some(std::cmp::Ordering::Greater));
+            assert!(
+                i_rows[i - 1][0].cmp_coerce(&i_rows[i][0]) != Some(std::cmp::Ordering::Greater)
+            );
         }
         // Same number of rows
         assert_eq!(f_rows.len(), i_rows.len());
@@ -4164,18 +4143,16 @@ mod select_cast {
     #[test]
     fn cast_with_in_filter() {
         let db = TestDb::with_trades(9);
-        let (_, rows) = db.query(
-            "SELECT CAST(price AS INT) FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD')",
-        );
+        let (_, rows) = db
+            .query("SELECT CAST(price AS INT) FROM trades WHERE symbol IN ('BTC/USD', 'ETH/USD')");
         assert_eq!(rows.len(), 6);
     }
 
     #[test]
     fn cast_with_between() {
         let db = TestDb::with_trades(9);
-        let (_, rows) = db.query(
-            "SELECT CAST(price AS INT) FROM trades WHERE price BETWEEN 100 AND 200",
-        );
+        let (_, rows) =
+            db.query("SELECT CAST(price AS INT) FROM trades WHERE price BETWEEN 100 AND 200");
         assert!(rows.len() > 0);
     }
 
@@ -4207,9 +4184,8 @@ mod select_cast {
     #[test]
     fn cast_multiple_columns() {
         let db = TestDb::with_trades(3);
-        let (cols, rows) = db.query(
-            "SELECT CAST(price AS INT) AS ip, CAST(volume AS INT) AS iv FROM trades",
-        );
+        let (cols, rows) =
+            db.query("SELECT CAST(price AS INT) AS ip, CAST(volume AS INT) AS iv FROM trades");
         assert_eq!(cols.len(), 2);
         assert_eq!(rows.len(), 3);
     }
@@ -4218,9 +4194,7 @@ mod select_cast {
     fn cast_with_group_by() {
         let db = TestDb::with_trades(12);
         // CAST inside aggregate not supported, so just test CAST with WHERE + GROUP BY context
-        let (_, rows) = db.query(
-            "SELECT symbol, avg(price) FROM trades GROUP BY symbol",
-        );
+        let (_, rows) = db.query("SELECT symbol, avg(price) FROM trades GROUP BY symbol");
         assert_eq!(rows.len(), 3);
     }
 
@@ -4392,7 +4366,9 @@ mod select_edge_cases {
     fn select_specific_from_wide_table() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE wide (timestamp TIMESTAMP, a DOUBLE, b DOUBLE, c DOUBLE)");
-        db.exec_ok("INSERT INTO wide (timestamp, a, b, c) VALUES (1710460800000000000, 1.0, 2.0, 3.0)");
+        db.exec_ok(
+            "INSERT INTO wide (timestamp, a, b, c) VALUES (1710460800000000000, 1.0, 2.0, 3.0)",
+        );
         let (cols, _) = db.query("SELECT a, c FROM wide");
         assert_eq!(cols.len(), 2);
         assert_eq!(cols[0], "a");
@@ -4429,9 +4405,18 @@ mod select_edge_cases {
     fn sum_eq_count_times_avg() {
         let db = TestDb::with_trades(20);
         let (_, rows) = db.query("SELECT sum(price), count(*), avg(price) FROM trades");
-        let sum_val = match &rows[0][0] { Value::F64(v) => *v, _ => panic!("expected F64") };
-        let count_val = match &rows[0][1] { Value::I64(v) => *v as f64, _ => panic!("expected I64") };
-        let avg_val = match &rows[0][2] { Value::F64(v) => *v, _ => panic!("expected F64") };
+        let sum_val = match &rows[0][0] {
+            Value::F64(v) => *v,
+            _ => panic!("expected F64"),
+        };
+        let count_val = match &rows[0][1] {
+            Value::I64(v) => *v as f64,
+            _ => panic!("expected I64"),
+        };
+        let avg_val = match &rows[0][2] {
+            Value::F64(v) => *v,
+            _ => panic!("expected F64"),
+        };
         assert!((sum_val - count_val * avg_val).abs() < 0.01);
     }
 
@@ -4492,7 +4477,8 @@ mod select_edge_cases {
     fn offset_consistent_with_full_result() {
         let db = TestDb::with_trades(20);
         let (_, all_rows) = db.query("SELECT price FROM trades ORDER BY price ASC");
-        let (_, offset_rows) = db.query("SELECT price FROM trades ORDER BY price ASC LIMIT 100 OFFSET 5");
+        let (_, offset_rows) =
+            db.query("SELECT price FROM trades ORDER BY price ASC LIMIT 100 OFFSET 5");
         assert_eq!(offset_rows[0], all_rows[5]);
     }
 
@@ -4514,7 +4500,8 @@ mod select_edge_cases {
     #[test]
     fn group_by_count_matches_where_count() {
         let db = TestDb::with_trades(12);
-        let (_, groups) = db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol");
+        let (_, groups) =
+            db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol");
         let btc = db.query_scalar("SELECT count(*) FROM trades WHERE symbol = 'BTC/USD'");
         let eth = db.query_scalar("SELECT count(*) FROM trades WHERE symbol = 'ETH/USD'");
         let sol = db.query_scalar("SELECT count(*) FROM trades WHERE symbol = 'SOL/USD'");
@@ -4527,7 +4514,8 @@ mod select_edge_cases {
     fn select_star_then_specific_same_data() {
         let db = TestDb::with_trades(5);
         let (_, star_rows) = db.query("SELECT * FROM trades");
-        let (_, specific_rows) = db.query("SELECT timestamp, symbol, price, volume, side FROM trades");
+        let (_, specific_rows) =
+            db.query("SELECT timestamp, symbol, price, volume, side FROM trades");
         assert_eq!(star_rows.len(), specific_rows.len());
         for i in 0..star_rows.len() {
             assert_eq!(star_rows[i], specific_rows[i]);
@@ -4714,9 +4702,8 @@ mod select_string_functions {
     #[test]
     fn concat_multiple_aliases() {
         let db = TestDb::with_trades(3);
-        let (cols, _) = db.query(
-            "SELECT symbol || side AS combo, symbol || '-test' AS test FROM trades",
-        );
+        let (cols, _) =
+            db.query("SELECT symbol || side AS combo, symbol || '-test' AS test FROM trades");
         assert!(cols.contains(&"combo".to_string()));
         assert!(cols.contains(&"test".to_string()));
     }
@@ -4724,9 +4711,8 @@ mod select_string_functions {
     #[test]
     fn concat_with_group_by_first() {
         let db = TestDb::with_trades(9);
-        let (_, rows) = db.query(
-            "SELECT symbol, first(side) FROM trades GROUP BY symbol ORDER BY symbol",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, first(side) FROM trades GROUP BY symbol ORDER BY symbol");
         assert_eq!(rows.len(), 3);
     }
 
@@ -4753,7 +4739,8 @@ mod select_string_functions {
     #[test]
     fn select_multiple_aggregates_at_once() {
         let db = TestDb::with_trades(10);
-        let (cols, rows) = db.query("SELECT sum(price), avg(price), min(price), max(price), count(*) FROM trades");
+        let (cols, rows) =
+            db.query("SELECT sum(price), avg(price), min(price), max(price), count(*) FROM trades");
         assert_eq!(cols.len(), 5);
         assert_eq!(rows.len(), 1);
     }

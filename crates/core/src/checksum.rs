@@ -155,10 +155,7 @@ mod tests {
 
         let mut writer = TableWriter::open(db_root, "trades").unwrap();
         writer
-            .write_row(
-                Timestamp::from_secs(1710513000),
-                &[ColumnValue::F64(100.0)],
-            )
+            .write_row(Timestamp::from_secs(1710513000), &[ColumnValue::F64(100.0)])
             .unwrap();
         writer.flush().unwrap();
         drop(writer);
@@ -184,10 +181,7 @@ mod tests {
 
         let mut writer = TableWriter::open(db_root, "trades").unwrap();
         writer
-            .write_row(
-                Timestamp::from_secs(1710513000),
-                &[ColumnValue::F64(100.0)],
-            )
+            .write_row(Timestamp::from_secs(1710513000), &[ColumnValue::F64(100.0)])
             .unwrap();
         writer.flush().unwrap();
         drop(writer);
@@ -225,16 +219,10 @@ mod tests {
 
         let mut writer = TableWriter::open(db_root, "trades").unwrap();
         writer
-            .write_row(
-                Timestamp::from_secs(1710513000),
-                &[ColumnValue::F64(100.0)],
-            )
+            .write_row(Timestamp::from_secs(1710513000), &[ColumnValue::F64(100.0)])
             .unwrap();
         writer
-            .write_row(
-                Timestamp::from_secs(1710599400),
-                &[ColumnValue::F64(200.0)],
-            )
+            .write_row(Timestamp::from_secs(1710599400), &[ColumnValue::F64(200.0)])
             .unwrap();
         writer.flush().unwrap();
         drop(writer);
@@ -270,10 +258,7 @@ mod tests {
 
         let mut writer = TableWriter::open(db_root, "trades").unwrap();
         writer
-            .write_row(
-                Timestamp::from_secs(1710513000),
-                &[ColumnValue::F64(42.0)],
-            )
+            .write_row(Timestamp::from_secs(1710513000), &[ColumnValue::F64(42.0)])
             .unwrap();
         writer.flush().unwrap();
         drop(writer);

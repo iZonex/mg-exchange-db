@@ -16,18 +16,27 @@ pub struct RateLimitCursor {
 
 impl RateLimitCursor {
     pub fn new(source: Box<dyn RecordCursor>, max_per_batch: usize) -> Self {
-        Self { source, max_per_batch: max_per_batch.max(1), leftover: None, leftover_offset: 0 }
+        Self {
+            source,
+            max_per_batch: max_per_batch.max(1),
+            leftover: None,
+            leftover_offset: 0,
+        }
     }
 }
 
 impl RecordCursor for RateLimitCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { self.source.schema() }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        self.source.schema()
+    }
 
     fn next_batch(&mut self, _max_rows: usize) -> Result<Option<RecordBatch>> {
         // Check leftover first.
         if let Some(lo) = &self.leftover {
             if self.leftover_offset < lo.row_count() {
-                let n = self.max_per_batch.min(lo.row_count() - self.leftover_offset);
+                let n = self
+                    .max_per_batch
+                    .min(lo.row_count() - self.leftover_offset);
                 let batch = lo.slice(self.leftover_offset, n);
                 self.leftover_offset += n;
                 if self.leftover_offset >= lo.row_count() {

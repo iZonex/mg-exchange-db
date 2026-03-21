@@ -28,8 +28,13 @@ impl ParquetType {
     pub fn from_column_type(ct: ColumnType) -> Self {
         match ct {
             ColumnType::Boolean => Self::Boolean,
-            ColumnType::I8 | ColumnType::I16 | ColumnType::I32 | ColumnType::Symbol
-            | ColumnType::Date | ColumnType::IPv4 | ColumnType::Char => Self::Int32,
+            ColumnType::I8
+            | ColumnType::I16
+            | ColumnType::I32
+            | ColumnType::Symbol
+            | ColumnType::Date
+            | ColumnType::IPv4
+            | ColumnType::Char => Self::Int32,
             ColumnType::I64 | ColumnType::GeoHash => Self::Int64,
             ColumnType::Timestamp => Self::Int96,
             ColumnType::F32 => Self::Float,
@@ -37,16 +42,23 @@ impl ParquetType {
             ColumnType::Varchar | ColumnType::Binary => Self::ByteArray,
             ColumnType::Uuid | ColumnType::Long128 | ColumnType::Long256 => Self::ByteArray,
             // New types
-            ColumnType::TimestampMicro | ColumnType::TimestampMilli
-            | ColumnType::Decimal64 | ColumnType::Cursor | ColumnType::Record => Self::Int64,
+            ColumnType::TimestampMicro
+            | ColumnType::TimestampMilli
+            | ColumnType::Decimal64
+            | ColumnType::Cursor
+            | ColumnType::Record => Self::Int64,
             ColumnType::Decimal8 | ColumnType::GeoByte => Self::Int32, // promoted to 4-byte
             ColumnType::Decimal16 | ColumnType::GeoShort => Self::Int32,
-            ColumnType::Decimal32 | ColumnType::GeoInt
-            | ColumnType::RegClass | ColumnType::RegProcedure => Self::Int32,
-            ColumnType::Interval | ColumnType::Decimal128 | ColumnType::Decimal256 => Self::ByteArray,
+            ColumnType::Decimal32
+            | ColumnType::GeoInt
+            | ColumnType::RegClass
+            | ColumnType::RegProcedure => Self::Int32,
+            ColumnType::Interval | ColumnType::Decimal128 | ColumnType::Decimal256 => {
+                Self::ByteArray
+            }
             ColumnType::String | ColumnType::Array | ColumnType::ArrayString => Self::ByteArray,
             ColumnType::VarcharSlice => Self::ByteArray, // transient varchar slice
-            ColumnType::IPv6 => Self::ByteArray, // 16-byte IPv6 address
+            ColumnType::IPv6 => Self::ByteArray,         // 16-byte IPv6 address
             ColumnType::Null | ColumnType::VarArg | ColumnType::Parameter => Self::Int32, // zero-size sentinel
         }
     }
@@ -589,11 +601,11 @@ mod tests {
         assert_eq!(rows_restored, num_rows as u64);
 
         // Verify data matches byte-for-byte.
-        assert_eq!(ts_data, fs::read(restored_path.join("timestamp.d")).unwrap());
         assert_eq!(
-            price_data,
-            fs::read(restored_path.join("price.d")).unwrap()
+            ts_data,
+            fs::read(restored_path.join("timestamp.d")).unwrap()
         );
+        assert_eq!(price_data, fs::read(restored_path.join("price.d")).unwrap());
         assert_eq!(
             volume_data,
             fs::read(restored_path.join("volume.d")).unwrap()
@@ -643,16 +655,13 @@ mod tests {
         let reader = ParquetReader::open(&parquet_path).unwrap();
         reader.to_partition(&restored_path, &meta).unwrap();
 
-        assert_eq!(ts_data, fs::read(restored_path.join("timestamp.d")).unwrap());
+        assert_eq!(
+            ts_data,
+            fs::read(restored_path.join("timestamp.d")).unwrap()
+        );
         assert_eq!(data_buf, fs::read(restored_path.join("symbol.d")).unwrap());
-        assert_eq!(
-            index_buf,
-            fs::read(restored_path.join("symbol.i")).unwrap()
-        );
-        assert_eq!(
-            price_data,
-            fs::read(restored_path.join("price.d")).unwrap()
-        );
+        assert_eq!(index_buf, fs::read(restored_path.join("symbol.i")).unwrap());
+        assert_eq!(price_data, fs::read(restored_path.join("price.d")).unwrap());
     }
 
     #[test]
@@ -712,9 +721,7 @@ mod tests {
 
         // Read only the "price" column.
         let reader = ParquetReader::open(&parquet_path).unwrap();
-        let rows = reader
-            .read_columns(&["price".to_string()])
-            .unwrap();
+        let rows = reader.read_columns(&["price".to_string()]).unwrap();
         assert_eq!(rows.len(), num_rows);
         // Each row should have exactly 1 column.
         assert_eq!(rows[0].len(), 1);
@@ -733,9 +740,7 @@ mod tests {
         let meta = test_meta_fixed();
         let num_rows: usize = 42;
 
-        let ts_data: Vec<u8> = (0..num_rows as i64)
-            .flat_map(|i| i.to_le_bytes())
-            .collect();
+        let ts_data: Vec<u8> = (0..num_rows as i64).flat_map(|i| i.to_le_bytes()).collect();
         let price_data: Vec<u8> = (0..num_rows)
             .flat_map(|i| (i as f64).to_le_bytes())
             .collect();

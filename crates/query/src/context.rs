@@ -10,8 +10,8 @@ use exchange_common::error::{ExchangeDbError, Result};
 use exchange_core::audit::AuditLog;
 use exchange_core::mvcc::{MvccManager, SnapshotGuard};
 use exchange_core::rbac::SecurityContext;
-use exchange_core::rls::RlsManager;
 use exchange_core::resource::{QueryToken, ResourceManager};
+use exchange_core::rls::RlsManager;
 
 use crate::memory::QueryMemoryTracker;
 use crate::timeout::QueryDeadline;
@@ -45,7 +45,9 @@ impl CancellationToken {
     /// Returns `Err` if the query should be aborted.
     pub fn check(&self) -> Result<()> {
         if self.cancelled.load(Ordering::Relaxed) {
-            Err(ExchangeDbError::Query("query cancelled by user".to_string()))
+            Err(ExchangeDbError::Query(
+                "query cancelled by user".to_string(),
+            ))
         } else {
             Ok(())
         }
@@ -188,7 +190,9 @@ impl ExecutionContext {
     /// Begin an MVCC snapshot if an MVCC manager is configured.
     /// The snapshot is automatically released when the guard is dropped.
     pub fn begin_snapshot(&self) -> Option<SnapshotGuard> {
-        self.mvcc.as_ref().map(|mgr| SnapshotGuard::new(Arc::clone(mgr)))
+        self.mvcc
+            .as_ref()
+            .map(|mgr| SnapshotGuard::new(Arc::clone(mgr)))
     }
 
     /// Get the RLS filter for the current user on a table, if any.
@@ -219,48 +223,52 @@ impl ExecutionContext {
     /// for backwards compatibility.
     pub fn check_read(&self, table: &str) -> Result<()> {
         if let Some(ref sec) = self.security
-            && !sec.can_read_table(table) {
-                return Err(ExchangeDbError::PermissionDenied(format!(
-                    "user '{}' does not have READ permission on table '{}'",
-                    sec.user, table
-                )));
-            }
+            && !sec.can_read_table(table)
+        {
+            return Err(ExchangeDbError::PermissionDenied(format!(
+                "user '{}' does not have READ permission on table '{}'",
+                sec.user, table
+            )));
+        }
         Ok(())
     }
 
     /// Check that the current user has write access to the given table.
     pub fn check_write(&self, table: &str) -> Result<()> {
         if let Some(ref sec) = self.security
-            && !sec.can_write_table(table) {
-                return Err(ExchangeDbError::PermissionDenied(format!(
-                    "user '{}' does not have WRITE permission on table '{}'",
-                    sec.user, table
-                )));
-            }
+            && !sec.can_write_table(table)
+        {
+            return Err(ExchangeDbError::PermissionDenied(format!(
+                "user '{}' does not have WRITE permission on table '{}'",
+                sec.user, table
+            )));
+        }
         Ok(())
     }
 
     /// Check that the current user has DDL privileges (CREATE/ALTER/DROP TABLE).
     pub fn check_ddl(&self) -> Result<()> {
         if let Some(ref sec) = self.security
-            && !sec.can_ddl() {
-                return Err(ExchangeDbError::PermissionDenied(format!(
-                    "user '{}' does not have DDL permission",
-                    sec.user
-                )));
-            }
+            && !sec.can_ddl()
+        {
+            return Err(ExchangeDbError::PermissionDenied(format!(
+                "user '{}' does not have DDL permission",
+                sec.user
+            )));
+        }
         Ok(())
     }
 
     /// Check that the current user has admin privileges.
     pub fn check_admin(&self) -> Result<()> {
         if let Some(ref sec) = self.security
-            && !sec.can_admin() {
-                return Err(ExchangeDbError::PermissionDenied(format!(
-                    "user '{}' does not have ADMIN permission",
-                    sec.user
-                )));
-            }
+            && !sec.can_admin()
+        {
+            return Err(ExchangeDbError::PermissionDenied(format!(
+                "user '{}' does not have ADMIN permission",
+                sec.user
+            )));
+        }
         Ok(())
     }
 
@@ -315,9 +323,9 @@ impl ExecutionContext {
     pub fn admit_query(&self) -> Result<Option<QueryToken>> {
         match self.resource_mgr {
             Some(ref mgr) => {
-                let token = mgr.try_admit().map_err(|e| {
-                    ExchangeDbError::ResourceExhausted(e.to_string())
-                })?;
+                let token = mgr
+                    .try_admit()
+                    .map_err(|e| ExchangeDbError::ResourceExhausted(e.to_string()))?;
                 Ok(Some(token))
             }
             None => Ok(None),
@@ -358,7 +366,9 @@ mod tests {
             rls: None,
             current_user: None,
             sql_text: None,
-            audit_log: None, replication_manager: None, cancellation_token: None,
+            audit_log: None,
+            replication_manager: None,
+            cancellation_token: None,
         }
     }
 
@@ -492,7 +502,9 @@ mod tests {
             rls: None,
             current_user: None,
             sql_text: None,
-            audit_log: None, replication_manager: None, cancellation_token: None,
+            audit_log: None,
+            replication_manager: None,
+            cancellation_token: None,
         };
         let token = ctx.admit_query().unwrap();
         assert!(token.is_some());
@@ -526,10 +538,15 @@ mod tests {
             rls: None,
             current_user: None,
             sql_text: None,
-            audit_log: None, replication_manager: None, cancellation_token: None,
+            audit_log: None,
+            replication_manager: None,
+            cancellation_token: None,
         };
         let result = ctx.admit_query();
         assert!(result.is_err());
-        assert!(matches!(result.err().unwrap(), ExchangeDbError::ResourceExhausted(_)));
+        assert!(matches!(
+            result.err().unwrap(),
+            ExchangeDbError::ResourceExhausted(_)
+        ));
     }
 }

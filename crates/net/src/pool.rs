@@ -3,8 +3,8 @@
 //! Provides a simple connection-count limiter. When the active connection count
 //! reaches `max_connections`, new requests are rejected with HTTP 503.
 
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use axum::response::IntoResponse;
 

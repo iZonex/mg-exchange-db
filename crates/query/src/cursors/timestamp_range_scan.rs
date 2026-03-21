@@ -17,7 +17,12 @@ pub struct TimestampRangeScanCursor {
 
 impl TimestampRangeScanCursor {
     pub fn new(source: Box<dyn RecordCursor>, ts_col: usize, lo: i64, hi: i64) -> Self {
-        Self { source, ts_col, lo, hi }
+        Self {
+            source,
+            ts_col,
+            lo,
+            hi,
+        }
     }
 }
 
@@ -43,13 +48,19 @@ impl RecordCursor for TimestampRangeScanCursor {
                             let row: Vec<Value> =
                                 (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                             result.append_row(&row);
-                            if result.row_count() >= max_rows { break; }
+                            if result.row_count() >= max_rows {
+                                break;
+                            }
                         }
                     }
                 }
             }
         }
-        if result.row_count() == 0 { Ok(None) } else { Ok(Some(result)) }
+        if result.row_count() == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(result))
+        }
     }
 }
 
@@ -60,7 +71,10 @@ mod tests {
 
     #[test]
     fn filters_timestamp_range() {
-        let schema = vec![("ts".to_string(), ColumnType::Timestamp), ("v".to_string(), ColumnType::I64)];
+        let schema = vec![
+            ("ts".to_string(), ColumnType::Timestamp),
+            ("v".to_string(), ColumnType::I64),
+        ];
         let rows = vec![
             vec![Value::Timestamp(100), Value::I64(1)],
             vec![Value::Timestamp(200), Value::I64(2)],

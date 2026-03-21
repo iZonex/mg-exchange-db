@@ -5,8 +5,8 @@
 //! configurable number of consecutive failures the monitor invokes a
 //! caller-supplied failover callback and exits.
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 
 /// Monitors primary health from a replica and triggers failover when the
@@ -59,10 +59,7 @@ impl PrimaryHealthMonitor {
     /// let monitor = Arc::new(PrimaryHealthMonitor::new(...));
     /// tokio::spawn(monitor.start(|| { /* promote */ }));
     /// ```
-    pub async fn start(
-        self: Arc<Self>,
-        failover_callback: impl Fn() + Send + 'static,
-    ) {
+    pub async fn start(self: Arc<Self>, failover_callback: impl Fn() + Send + 'static) {
         tracing::info!(
             primary = %self.primary_http_addr,
             interval = ?self.check_interval,
@@ -188,9 +185,7 @@ mod tests {
     #[tokio::test]
     async fn reachable_primary_does_not_trigger_failover() {
         // Start a TCP listener to act as a reachable primary.
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
 
         let monitor = Arc::new(PrimaryHealthMonitor::new(
@@ -210,11 +205,7 @@ mod tests {
 
     #[test]
     fn failure_counter_increments() {
-        let m = PrimaryHealthMonitor::new(
-            "127.0.0.1:1".into(),
-            Duration::from_secs(1),
-            10,
-        );
+        let m = PrimaryHealthMonitor::new("127.0.0.1:1".into(), Duration::from_secs(1), 10);
 
         // Simulate failures via atomic.
         m.consecutive_failures.store(5, Ordering::SeqCst);

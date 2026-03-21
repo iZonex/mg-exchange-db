@@ -81,7 +81,10 @@ impl HashJoinCursor {
 
     /// Build phase: consume all rows from the right cursor into the hash table.
     fn build(&mut self) -> Result<()> {
-        let mut right = self.right_source.take().expect("right source already consumed");
+        let mut right = self
+            .right_source
+            .take()
+            .expect("right source already consumed");
 
         loop {
             match right.next_batch(1024)? {
@@ -175,17 +178,17 @@ impl HashJoinCursor {
         self.right_emitted = true;
 
         for (key, matched) in &self.right_matched {
-            if !matched
-                && let Some(right_rows) = self.right_table.get(key) {
-                    for right_row in right_rows {
-                        let mut combined = Vec::with_capacity(self.left_col_count + self.right_col_count);
-                        for _ in 0..self.left_col_count {
-                            combined.push(Value::Null);
-                        }
-                        combined.extend(right_row.iter().cloned());
-                        self.buffer.push_back(combined);
+            if !matched && let Some(right_rows) = self.right_table.get(key) {
+                for right_row in right_rows {
+                    let mut combined =
+                        Vec::with_capacity(self.left_col_count + self.right_col_count);
+                    for _ in 0..self.left_col_count {
+                        combined.push(Value::Null);
                     }
+                    combined.extend(right_row.iter().cloned());
+                    self.buffer.push_back(combined);
                 }
+            }
         }
     }
 }

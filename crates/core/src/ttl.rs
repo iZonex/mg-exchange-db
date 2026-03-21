@@ -124,9 +124,10 @@ impl TtlManager {
                 // Try to parse the partition timestamp.
                 // Try Day format first, then other common formats.
                 if let Some(partition_secs) = parse_partition_timestamp(&name_str)
-                    && partition_secs < cutoff_secs {
-                        expired_partitions.push(path);
-                    }
+                    && partition_secs < cutoff_secs
+                {
+                    expired_partitions.push(path);
+                }
             }
 
             expired_partitions.sort();
@@ -417,12 +418,14 @@ mod tests {
         assert!(!table_dir.join("2020-01-01").exists());
 
         // Archive should have the data.
-        assert!(archive_dir
-            .path()
-            .join("trades")
-            .join("2020-01-01")
-            .join("col.d")
-            .exists());
+        assert!(
+            archive_dir
+                .path()
+                .join("trades")
+                .join("2020-01-01")
+                .join("col.d")
+                .exists()
+        );
     }
 
     #[test]
@@ -450,12 +453,14 @@ mod tests {
         assert!(!table_dir.join("2020-01-01").exists());
 
         // Cold tier should have the data.
-        assert!(db_root
-            .join("_tier_cold")
-            .join("trades")
-            .join("2020-01-01")
-            .join("col.d")
-            .exists());
+        assert!(
+            db_root
+                .join("_tier_cold")
+                .join("trades")
+                .join("2020-01-01")
+                .join("col.d")
+                .exists()
+        );
     }
 
     #[test]

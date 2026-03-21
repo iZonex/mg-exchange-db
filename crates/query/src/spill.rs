@@ -165,8 +165,7 @@ impl ExternalSort {
         }
 
         let col_indices = self.col_indices.clone();
-        self.buffer
-            .sort_by(|a, b| compare_rows(a, b, &col_indices));
+        self.buffer.sort_by(|a, b| compare_rows(a, b, &col_indices));
 
         let run_path = self
             .temp_dir
@@ -405,7 +404,11 @@ mod tests {
         sorter.add_rows(&mut rows).unwrap();
 
         // Should have created multiple runs.
-        assert!(sorter.run_count() > 1, "expected multiple runs, got {}", sorter.run_count());
+        assert!(
+            sorter.run_count() > 1,
+            "expected multiple runs, got {}",
+            sorter.run_count()
+        );
 
         let result = sorter.finish().unwrap().collect_rows().unwrap();
         assert_eq!(result.len(), 1000);
@@ -452,8 +455,14 @@ mod tests {
     fn external_sort_matches_in_memory_sort() {
         let temp = tempfile::tempdir().unwrap();
         let order_by = vec![
-            OrderBy { column: "group".to_string(), descending: false },
-            OrderBy { column: "value".to_string(), descending: true },
+            OrderBy {
+                column: "group".to_string(),
+                descending: false,
+            },
+            OrderBy {
+                column: "value".to_string(),
+                descending: true,
+            },
         ];
         let col_names = vec!["group".to_string(), "value".to_string()];
 
@@ -478,12 +487,7 @@ mod tests {
         });
 
         // External sort with small memory budget.
-        let mut sorter = ExternalSort::new(
-            temp.path().to_path_buf(),
-            512,
-            order_by,
-            col_names,
-        );
+        let mut sorter = ExternalSort::new(temp.path().to_path_buf(), 512, order_by, col_names);
         let mut data = test_data;
         sorter.add_rows(&mut data).unwrap();
         let result = sorter.finish().unwrap().collect_rows().unwrap();
@@ -503,16 +507,9 @@ mod tests {
         }];
         let col_names = vec!["id".to_string()];
 
-        let mut sorter = ExternalSort::new(
-            temp.path().to_path_buf(),
-            200,
-            order_by,
-            col_names,
-        );
+        let mut sorter = ExternalSort::new(temp.path().to_path_buf(), 200, order_by, col_names);
 
-        let mut rows: Vec<Vec<Value>> = (0..100)
-            .map(|i| vec![Value::I64(i)])
-            .collect();
+        let mut rows: Vec<Vec<Value>> = (0..100).map(|i| vec![Value::I64(i)]).collect();
         sorter.add_rows(&mut rows).unwrap();
 
         let result = sorter.finish().unwrap().collect_rows().unwrap();
@@ -524,12 +521,7 @@ mod tests {
     #[test]
     fn empty_external_sort() {
         let temp = tempfile::tempdir().unwrap();
-        let mut sorter = ExternalSort::new(
-            temp.path().to_path_buf(),
-            1024,
-            vec![],
-            vec![],
-        );
+        let mut sorter = ExternalSort::new(temp.path().to_path_buf(), 1024, vec![], vec![]);
         let mut rows: Vec<Vec<Value>> = Vec::new();
         sorter.add_rows(&mut rows).unwrap();
         let result = sorter.finish().unwrap().collect_rows().unwrap();

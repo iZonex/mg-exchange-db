@@ -97,7 +97,7 @@ mod tests {
     use super::*;
     use crate::table::TableBuilder;
     use crate::txn::TxnFile;
-    use crate::wal::row_codec::{encode_row, OwnedColumnValue};
+    use crate::wal::row_codec::{OwnedColumnValue, encode_row};
     use crate::wal::writer::{CommitMode, WalWriter, WalWriterConfig};
     use exchange_common::types::{ColumnType, PartitionBy};
     use tempfile::tempdir;
@@ -186,10 +186,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let db_root = dir.path();
 
-        let mgr = CheckpointManager::with_interval(
-            db_root.to_path_buf(),
-            Duration::from_secs(30),
-        );
+        let mgr = CheckpointManager::with_interval(db_root.to_path_buf(), Duration::from_secs(30));
         assert_eq!(mgr.interval(), Duration::from_secs(30));
     }
 

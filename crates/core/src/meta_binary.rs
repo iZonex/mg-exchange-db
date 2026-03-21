@@ -13,9 +13,7 @@
 //!     Type: u8
 //!     Flags: u8 (bit 0 = indexed)
 
-use crate::table::{
-    ColumnDef, ColumnTypeSerializable, PartitionBySerializable, TableMeta,
-};
+use crate::table::{ColumnDef, ColumnTypeSerializable, PartitionBySerializable, TableMeta};
 use exchange_common::error::{ExchangeDbError, Result};
 use std::io::{Cursor, Read, Write};
 use std::path::Path;
@@ -138,8 +136,8 @@ pub fn read_meta_auto(path: &Path) -> Result<TableMeta> {
         read_binary_meta(path)
     } else {
         // Try JSON.
-        let json = std::str::from_utf8(&data)
-            .map_err(|e| ExchangeDbError::Corruption(e.to_string()))?;
+        let json =
+            std::str::from_utf8(&data).map_err(|e| ExchangeDbError::Corruption(e.to_string()))?;
         serde_json::from_str(json).map_err(|e| ExchangeDbError::Corruption(e.to_string()))
     }
 }

@@ -77,8 +77,14 @@ pub async fn start_pg_server(
     replication_manager: Option<Arc<ReplicationManager>>,
 ) -> std::io::Result<()> {
     let db_root = db_root.into();
-    let handler = Arc::new(ExchangeDbHandler::new(db_root.clone(), replication_manager.clone()));
-    let extended_handler = Arc::new(ExchangeDbExtendedHandler::new(db_root.clone(), replication_manager));
+    let handler = Arc::new(ExchangeDbHandler::new(
+        db_root.clone(),
+        replication_manager.clone(),
+    ));
+    let extended_handler = Arc::new(ExchangeDbExtendedHandler::new(
+        db_root.clone(),
+        replication_manager,
+    ));
     let copy_handler = Arc::new(ExchangeDbCopyHandler::new(db_root));
 
     let handlers = Arc::new(ExchangeDbServerHandlers {

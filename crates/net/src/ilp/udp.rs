@@ -14,7 +14,7 @@ use tokio::net::UdpSocket;
 
 use exchange_core::table::WriteMode;
 
-use super::parser::{parse_ilp_line, IlpLine};
+use super::parser::{IlpLine, parse_ilp_line};
 use super::server::flush_batch_public;
 
 /// Default port for the ILP UDP server.
@@ -90,14 +90,14 @@ pub async fn start_ilp_udp_server_with_config(config: IlpUdpServerConfig) -> io:
                 Ok(parsed) => {
                     batch.push(parsed);
                     if batch.len() >= config.batch_size {
-                        let to_flush = std::mem::replace(
-                            &mut batch,
-                            Vec::with_capacity(config.batch_size),
-                        );
+                        let to_flush =
+                            std::mem::replace(&mut batch, Vec::with_capacity(config.batch_size));
                         let db_root = config.db_root.clone();
                         let wm = config.write_mode;
                         // Flush in a blocking task to avoid blocking the UDP recv loop.
-                        tokio::task::spawn_blocking(move || flush_batch_public(&db_root, to_flush, wm));
+                        tokio::task::spawn_blocking(move || {
+                            flush_batch_public(&db_root, to_flush, wm)
+                        });
                     }
                 }
                 Err(e) => {
@@ -110,10 +110,7 @@ pub async fn start_ilp_udp_server_with_config(config: IlpUdpServerConfig) -> io:
         // and we've been idle, flush proactively to reduce latency.
         // For simplicity, we flush at the end of each datagram if non-empty.
         if !batch.is_empty() {
-            let to_flush = std::mem::replace(
-                &mut batch,
-                Vec::with_capacity(config.batch_size),
-            );
+            let to_flush = std::mem::replace(&mut batch, Vec::with_capacity(config.batch_size));
             let db_root = config.db_root.clone();
             let wm = config.write_mode;
             tokio::task::spawn_blocking(move || flush_batch_public(&db_root, to_flush, wm));
@@ -229,7 +226,10 @@ mod tests {
 
         // Send invalid UTF-8 bytes.
         let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        client.send_to(&[0xff, 0xfe, 0xfd], server_addr).await.unwrap();
+        client
+            .send_to(&[0xff, 0xfe, 0xfd], server_addr)
+            .await
+            .unwrap();
 
         // Server should not crash; just skip the datagram.
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;

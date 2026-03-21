@@ -322,14 +322,14 @@ fn decode_value_from_column(
         }
         let bytes = &buf[offset..offset + elem_size];
         match col_type {
-            ColumnType::Timestamp => RowValue::Timestamp(i64::from_le_bytes(bytes.try_into().unwrap())),
+            ColumnType::Timestamp => {
+                RowValue::Timestamp(i64::from_le_bytes(bytes.try_into().unwrap()))
+            }
             ColumnType::I64 | ColumnType::GeoHash => {
                 RowValue::I64(i64::from_le_bytes(bytes.try_into().unwrap()))
             }
             ColumnType::F64 => RowValue::F64(f64::from_le_bytes(bytes.try_into().unwrap())),
-            ColumnType::F32 => {
-                RowValue::F64(f32::from_le_bytes(bytes.try_into().unwrap()) as f64)
-            }
+            ColumnType::F32 => RowValue::F64(f32::from_le_bytes(bytes.try_into().unwrap()) as f64),
             ColumnType::I32 | ColumnType::Symbol | ColumnType::Date | ColumnType::IPv4 => {
                 RowValue::I64(i32::from_le_bytes(bytes.try_into().unwrap()) as i64)
             }
@@ -358,7 +358,8 @@ fn decode_variable_value(buf: &[u8], row_idx: usize) -> RowValue {
     if index_start + 4 > buf.len() {
         return RowValue::Str(String::new());
     }
-    let index_len = u32::from_le_bytes(buf[index_start..index_start + 4].try_into().unwrap()) as usize;
+    let index_len =
+        u32::from_le_bytes(buf[index_start..index_start + 4].try_into().unwrap()) as usize;
     let index_section = &buf[index_start + 4..index_start + 4 + index_len];
 
     // Each index entry is 8 bytes (u64 offset into data section).
@@ -366,15 +367,21 @@ fn decode_variable_value(buf: &[u8], row_idx: usize) -> RowValue {
     if idx_offset + 8 > index_section.len() {
         return RowValue::Str(String::new());
     }
-    let data_offset =
-        u64::from_le_bytes(index_section[idx_offset..idx_offset + 8].try_into().unwrap()) as usize;
+    let data_offset = u64::from_le_bytes(
+        index_section[idx_offset..idx_offset + 8]
+            .try_into()
+            .unwrap(),
+    ) as usize;
 
     // Read length prefix from data section.
     if data_offset + 4 > data_section.len() {
         return RowValue::Str(String::new());
     }
-    let val_len =
-        u32::from_le_bytes(data_section[data_offset..data_offset + 4].try_into().unwrap()) as usize;
+    let val_len = u32::from_le_bytes(
+        data_section[data_offset..data_offset + 4]
+            .try_into()
+            .unwrap(),
+    ) as usize;
     if data_offset + 4 + val_len > data_section.len() {
         return RowValue::Str(String::new());
     }

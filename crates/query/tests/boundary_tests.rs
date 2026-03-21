@@ -116,9 +116,8 @@ fn empty_join() {
     let db = TestDb::new();
     db.exec_ok("CREATE TABLE t1 (timestamp TIMESTAMP, key VARCHAR, value DOUBLE)");
     db.exec_ok("CREATE TABLE t2 (timestamp TIMESTAMP, key VARCHAR, other DOUBLE)");
-    let (_, rows) = db.query(
-        "SELECT t1.key, t1.value, t2.other FROM t1 INNER JOIN t2 ON t1.key = t2.key",
-    );
+    let (_, rows) =
+        db.query("SELECT t1.key, t1.value, t2.other FROM t1 INNER JOIN t2 ON t1.key = t2.key");
     assert_eq!(rows.len(), 0);
 }
 
@@ -448,7 +447,9 @@ fn deeply_nested_or() {
 #[test]
 fn in_list_many_values() {
     let db = TestDb::with_trades(50);
-    let values: Vec<String> = (0..100).map(|i| format!("{}", 60000.0 + i as f64 * 100.0)).collect();
+    let values: Vec<String> = (0..100)
+        .map(|i| format!("{}", 60000.0 + i as f64 * 100.0))
+        .collect();
     let in_list = values.join(", ");
     let sql = format!("SELECT count(*) FROM trades WHERE price IN ({in_list})");
     let val = db.query_scalar(&sql);
@@ -461,8 +462,7 @@ fn in_list_many_values() {
 #[test]
 fn between_filter() {
     let db = TestDb::with_trades(100);
-    let (_, rows) =
-        db.query("SELECT * FROM trades WHERE price BETWEEN 60000.0 AND 61000.0");
+    let (_, rows) = db.query("SELECT * FROM trades WHERE price BETWEEN 60000.0 AND 61000.0");
     // Should find some BTC rows.
     assert!(!rows.is_empty());
 }
@@ -546,7 +546,9 @@ fn select_nonexistent_table() {
     let err = db.exec_err("SELECT * FROM no_such_table");
     let msg = format!("{err}");
     assert!(
-        msg.contains("not found") || msg.contains("does not exist") || msg.contains("TableNotFound"),
+        msg.contains("not found")
+            || msg.contains("does not exist")
+            || msg.contains("TableNotFound"),
         "unexpected error: {msg}"
     );
 }
@@ -555,12 +557,13 @@ fn select_nonexistent_table() {
 #[test]
 fn insert_nonexistent_table() {
     let db = TestDb::new();
-    let err = db.exec_err(
-        "INSERT INTO no_such_table (timestamp, value) VALUES (1000000000000, 1.0)",
-    );
+    let err =
+        db.exec_err("INSERT INTO no_such_table (timestamp, value) VALUES (1000000000000, 1.0)");
     let msg = format!("{err}");
     assert!(
-        msg.contains("not found") || msg.contains("does not exist") || msg.contains("TableNotFound"),
+        msg.contains("not found")
+            || msg.contains("does not exist")
+            || msg.contains("TableNotFound"),
         "unexpected error: {msg}"
     );
 }
@@ -602,9 +605,8 @@ fn multi_insert_group_by_having() {
         ));
     }
 
-    let (_, rows) = db.query(
-        "SELECT group_id, count(*) FROM test GROUP BY group_id HAVING count(*) >= 20",
-    );
+    let (_, rows) =
+        db.query("SELECT group_id, count(*) FROM test GROUP BY group_id HAVING count(*) >= 20");
     assert_eq!(rows.len(), 5); // All groups have 20 rows.
 }
 
@@ -660,9 +662,7 @@ fn comparison_operators() {
 #[test]
 fn where_and_conditions() {
     let db = TestDb::with_trades(100);
-    let (_, rows) = db.query(
-        "SELECT * FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy'",
-    );
+    let (_, rows) = db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy'");
     for row in &rows {
         if let (Value::Str(sym), Value::Str(side)) = (&row[1], &row[4]) {
             assert_eq!(sym, "BTC/USD");
@@ -675,9 +675,7 @@ fn where_and_conditions() {
 #[test]
 fn where_or_conditions() {
     let db = TestDb::with_trades(30);
-    let (_, rows) = db.query(
-        "SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'ETH/USD'",
-    );
+    let (_, rows) = db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'ETH/USD'");
     for row in &rows {
         if let Value::Str(sym) = &row[1] {
             assert!(sym == "BTC/USD" || sym == "ETH/USD");
@@ -721,9 +719,7 @@ fn insert_multiple_values() {
 #[test]
 fn group_by_order_by() {
     let db = TestDb::with_trades(100);
-    let (_, rows) = db.query(
-        "SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol",
-    );
+    let (_, rows) = db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol");
     assert_eq!(rows.len(), 3);
     // Verify sorted by symbol.
     if let (Value::Str(a), Value::Str(b)) = (&rows[0][0], &rows[1][0]) {
@@ -749,9 +745,8 @@ fn join_one_empty() {
     db.exec_ok("CREATE TABLE t2 (timestamp TIMESTAMP, key VARCHAR, other DOUBLE)");
     db.exec_ok("INSERT INTO t1 (timestamp, key, value) VALUES (1000000000000, 'a', 1.0)");
 
-    let (_, rows) = db.query(
-        "SELECT t1.key, t1.value, t2.other FROM t1 INNER JOIN t2 ON t1.key = t2.key",
-    );
+    let (_, rows) =
+        db.query("SELECT t1.key, t1.value, t2.other FROM t1 INNER JOIN t2 ON t1.key = t2.key");
     assert_eq!(rows.len(), 0);
 }
 
@@ -759,9 +754,7 @@ fn join_one_empty() {
 #[test]
 fn mixed_types_table() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE mixed (timestamp TIMESTAMP, name VARCHAR, price DOUBLE, qty LONG)",
-    );
+    db.exec_ok("CREATE TABLE mixed (timestamp TIMESTAMP, name VARCHAR, price DOUBLE, qty LONG)");
     db.exec_ok(
         "INSERT INTO mixed (timestamp, name, price, qty) VALUES (1000000000000, 'BTC', 65000.0, 100)",
     );

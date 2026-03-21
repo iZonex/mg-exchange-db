@@ -12,10 +12,8 @@ use std::sync::Arc;
 
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::column::FixedColumnReader;
-use exchange_core::replication::config::{
-    ReplicationConfig, ReplicationRole, ReplicationSyncMode,
-};
 use exchange_core::replication::ReplicationManager;
+use exchange_core::replication::config::{ReplicationConfig, ReplicationRole, ReplicationSyncMode};
 use exchange_core::table::TableBuilder;
 use exchange_core::txn::TxnFile;
 use exchange_core::wal::row_codec::OwnedColumnValue;
@@ -75,19 +73,14 @@ async fn wal_streaming_replication_e2e() {
 
     // --- Start the replica's replication TCP listener ---
     // Use port 0 to let the OS assign a free port.
-    let replica_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .unwrap();
+    let replica_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let replica_repl_addr = replica_listener.local_addr().unwrap();
     drop(replica_listener); // Release so replication_server can bind.
 
     let replica_root = replica_dir.path().to_path_buf();
     let repl_server_handle = tokio::spawn(async move {
-        exchange_net::replication_server::start_replication_server(
-            replica_repl_addr,
-            replica_root,
-        )
-        .await
+        exchange_net::replication_server::start_replication_server(replica_repl_addr, replica_root)
+            .await
     });
 
     // Give the listener a moment to start.
@@ -103,8 +96,7 @@ async fn wal_streaming_replication_e2e() {
         ..Default::default()
     };
 
-    let mut primary_mgr =
-        ReplicationManager::new(primary_dir.path().to_path_buf(), primary_config);
+    let mut primary_mgr = ReplicationManager::new(primary_dir.path().to_path_buf(), primary_config);
     primary_mgr.start().await.unwrap();
     let primary_mgr = Arc::new(primary_mgr);
 
@@ -119,8 +111,7 @@ async fn wal_streaming_replication_e2e() {
             ..Default::default()
         };
 
-        let mut writer =
-            WalTableWriter::open(&primary_root, "trades", config).unwrap();
+        let mut writer = WalTableWriter::open(&primary_root, "trades", config).unwrap();
         writer.set_replication_manager(mgr_clone);
 
         let base_ts: i64 = 1_710_513_000_000_000_000; // 2024-03-15
@@ -145,24 +136,14 @@ async fn wal_streaming_replication_e2e() {
     .unwrap();
 
     // --- Verify primary has the data ---
-    let primary_rows = count_rows(
-        primary_dir.path(),
-        "trades",
-        "price",
-        ColumnType::F64,
-    );
+    let primary_rows = count_rows(primary_dir.path(), "trades", "price", ColumnType::F64);
     assert_eq!(primary_rows, 5, "primary should have 5 rows");
 
     // --- Wait for replication to complete (up to 2 seconds) ---
     let start = std::time::Instant::now();
     let mut replica_rows = 0;
     while start.elapsed() < std::time::Duration::from_secs(2) {
-        replica_rows = count_rows(
-            replica_dir.path(),
-            "trades",
-            "price",
-            ColumnType::F64,
-        );
+        replica_rows = count_rows(replica_dir.path(), "trades", "price", ColumnType::F64);
         if replica_rows >= 5 {
             break;
         }
@@ -181,20 +162,14 @@ async fn wal_streaming_replication_e2e() {
         "replica partition directory should exist"
     );
 
-    let price_reader = FixedColumnReader::open(
-        &replica_part_dir.join("price.d"),
-        ColumnType::F64,
-    )
-    .unwrap();
+    let price_reader =
+        FixedColumnReader::open(&replica_part_dir.join("price.d"), ColumnType::F64).unwrap();
     assert_eq!(price_reader.row_count(), 5);
     assert_eq!(price_reader.read_f64(0), 100.0);
     assert_eq!(price_reader.read_f64(4), 104.0);
 
-    let volume_reader = FixedColumnReader::open(
-        &replica_part_dir.join("volume.d"),
-        ColumnType::I64,
-    )
-    .unwrap();
+    let volume_reader =
+        FixedColumnReader::open(&replica_part_dir.join("volume.d"), ColumnType::I64).unwrap();
     assert_eq!(volume_reader.row_count(), 5);
 
     // Clean up: abort the replication server.
@@ -211,19 +186,14 @@ async fn wal_streaming_multiple_batches() {
     create_trades_table(replica_dir.path());
 
     // Start replica listener.
-    let replica_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .unwrap();
+    let replica_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let replica_repl_addr = replica_listener.local_addr().unwrap();
     drop(replica_listener);
 
     let replica_root = replica_dir.path().to_path_buf();
     let repl_server_handle = tokio::spawn(async move {
-        exchange_net::replication_server::start_replication_server(
-            replica_repl_addr,
-            replica_root,
-        )
-        .await
+        exchange_net::replication_server::start_replication_server(replica_repl_addr, replica_root)
+            .await
     });
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -237,8 +207,7 @@ async fn wal_streaming_multiple_batches() {
         ..Default::default()
     };
 
-    let mut primary_mgr =
-        ReplicationManager::new(primary_dir.path().to_path_buf(), primary_config);
+    let mut primary_mgr = ReplicationManager::new(primary_dir.path().to_path_buf(), primary_config);
     primary_mgr.start().await.unwrap();
     let primary_mgr = Arc::new(primary_mgr);
 
@@ -285,12 +254,7 @@ async fn wal_streaming_multiple_batches() {
     let start = std::time::Instant::now();
     let mut replica_rows = 0;
     while start.elapsed() < std::time::Duration::from_secs(2) {
-        replica_rows = count_rows(
-            replica_dir.path(),
-            "trades",
-            "price",
-            ColumnType::F64,
-        );
+        replica_rows = count_rows(replica_dir.path(), "trades", "price", ColumnType::F64);
         if replica_rows >= 6 {
             break;
         }

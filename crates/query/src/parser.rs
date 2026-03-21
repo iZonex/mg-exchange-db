@@ -188,10 +188,12 @@ pub fn parse_sql(sql: &str) -> Result<ParsedQuery> {
 
     // Pre-process QuestDB-style TIMESTAMP(col) and PARTITION BY <strategy>
     // clauses from CREATE TABLE before passing to sqlparser.
-    let (rewritten_ts, designated_timestamp, partition_by_clause) = extract_questdb_create_table_clauses(sql);
+    let (rewritten_ts, designated_timestamp, partition_by_clause) =
+        extract_questdb_create_table_clauses(sql);
 
     let (rewritten, pivot_info) = extract_pivot(&rewritten_ts);
-    let (rewritten, sample_by_raw, sample_by_fill, sample_by_align_calendar) = extract_sample_by(&rewritten);
+    let (rewritten, sample_by_raw, sample_by_fill, sample_by_align_calendar) =
+        extract_sample_by(&rewritten);
     let (rewritten, asof_join) = extract_asof_join(&rewritten);
     let (rewritten, latest_on) = extract_latest_on(&rewritten);
     // Pre-process BETWEEN SYMMETRIC into regular BETWEEN.
@@ -388,36 +390,46 @@ fn parse_grant(_sql: &str, tokens: &[&str], orig_tokens: &[&str]) -> Option<Rbac
         // Collect privilege keywords between GRANT and ON
         let on_pos = tokens.iter().position(|t| *t == "ON");
         if let Some(on_idx) = on_pos
-            && on_idx > 1 && on_idx + 1 < to_idx {
-                let table = orig_tokens[on_idx + 1].to_string();
-                // Parse the privilege list between GRANT (idx 0) and ON (on_idx)
-                let priv_str = tokens[1..on_idx].join(" ");
-                let privs: Vec<&str> = priv_str.split(',').map(|s| s.trim()).collect();
-                // If ALL is present, return All
-                if privs.iter().any(|p| *p == "ALL" || *p == "ALL PRIVILEGES") {
+            && on_idx > 1
+            && on_idx + 1 < to_idx
+        {
+            let table = orig_tokens[on_idx + 1].to_string();
+            // Parse the privilege list between GRANT (idx 0) and ON (on_idx)
+            let priv_str = tokens[1..on_idx].join(" ");
+            let privs: Vec<&str> = priv_str.split(',').map(|s| s.trim()).collect();
+            // If ALL is present, return All
+            if privs.iter().any(|p| *p == "ALL" || *p == "ALL PRIVILEGES") {
+                return Some(RbacCommand::Grant {
+                    permission: GrantPermission::All { table },
+                    target,
+                });
+            }
+            // Return the first matching privilege (multi-priv is handled
+            // by the caller splitting into multiple grants).
+            for priv_name in &privs {
+                let perm = match *priv_name {
+                    "SELECT" => Some(GrantPermission::Select {
+                        table: table.clone(),
+                    }),
+                    "INSERT" => Some(GrantPermission::Insert {
+                        table: table.clone(),
+                    }),
+                    "UPDATE" => Some(GrantPermission::Update {
+                        table: table.clone(),
+                    }),
+                    "DELETE" => Some(GrantPermission::Delete {
+                        table: table.clone(),
+                    }),
+                    _ => None,
+                };
+                if let Some(p) = perm {
                     return Some(RbacCommand::Grant {
-                        permission: GrantPermission::All { table },
+                        permission: p,
                         target,
                     });
                 }
-                // Return the first matching privilege (multi-priv is handled
-                // by the caller splitting into multiple grants).
-                for priv_name in &privs {
-                    let perm = match *priv_name {
-                        "SELECT" => Some(GrantPermission::Select { table: table.clone() }),
-                        "INSERT" => Some(GrantPermission::Insert { table: table.clone() }),
-                        "UPDATE" => Some(GrantPermission::Update { table: table.clone() }),
-                        "DELETE" => Some(GrantPermission::Delete { table: table.clone() }),
-                        _ => None,
-                    };
-                    if let Some(p) = perm {
-                        return Some(RbacCommand::Grant {
-                            permission: p,
-                            target,
-                        });
-                    }
-                }
             }
+        }
     }
 
     // GRANT <role_name> TO <user> — role assignment
@@ -514,32 +526,42 @@ fn parse_revoke(_sql: &str, tokens: &[&str], orig_tokens: &[&str]) -> Option<Rba
     {
         let on_pos = tokens.iter().position(|t| *t == "ON");
         if let Some(on_idx) = on_pos
-            && on_idx > 1 && on_idx + 1 < from_idx {
-                let table = orig_tokens[on_idx + 1].to_string();
-                let priv_str = tokens[1..on_idx].join(" ");
-                let privs: Vec<&str> = priv_str.split(',').map(|s| s.trim()).collect();
-                if privs.iter().any(|p| *p == "ALL" || *p == "ALL PRIVILEGES") {
+            && on_idx > 1
+            && on_idx + 1 < from_idx
+        {
+            let table = orig_tokens[on_idx + 1].to_string();
+            let priv_str = tokens[1..on_idx].join(" ");
+            let privs: Vec<&str> = priv_str.split(',').map(|s| s.trim()).collect();
+            if privs.iter().any(|p| *p == "ALL" || *p == "ALL PRIVILEGES") {
+                return Some(RbacCommand::Revoke {
+                    permission: GrantPermission::All { table },
+                    target,
+                });
+            }
+            for priv_name in &privs {
+                let perm = match *priv_name {
+                    "SELECT" => Some(GrantPermission::Select {
+                        table: table.clone(),
+                    }),
+                    "INSERT" => Some(GrantPermission::Insert {
+                        table: table.clone(),
+                    }),
+                    "UPDATE" => Some(GrantPermission::Update {
+                        table: table.clone(),
+                    }),
+                    "DELETE" => Some(GrantPermission::Delete {
+                        table: table.clone(),
+                    }),
+                    _ => None,
+                };
+                if let Some(p) = perm {
                     return Some(RbacCommand::Revoke {
-                        permission: GrantPermission::All { table },
+                        permission: p,
                         target,
                     });
                 }
-                for priv_name in &privs {
-                    let perm = match *priv_name {
-                        "SELECT" => Some(GrantPermission::Select { table: table.clone() }),
-                        "INSERT" => Some(GrantPermission::Insert { table: table.clone() }),
-                        "UPDATE" => Some(GrantPermission::Update { table: table.clone() }),
-                        "DELETE" => Some(GrantPermission::Delete { table: table.clone() }),
-                        _ => None,
-                    };
-                    if let Some(p) = perm {
-                        return Some(RbacCommand::Revoke {
-                            permission: p,
-                            target,
-                        });
-                    }
-                }
             }
+        }
     }
 
     // REVOKE <role_name> FROM <user>
@@ -696,12 +718,27 @@ pub enum ShowCommand {
 /// Pre-parsed RBAC commands that sqlparser cannot handle.
 #[derive(Debug, Clone)]
 pub enum RbacCommand {
-    CreateUser { username: String, password: String },
-    DropUser { username: String },
-    CreateRole { name: String },
-    DropRole { name: String },
-    Grant { permission: crate::plan::GrantPermission, target: String },
-    Revoke { permission: crate::plan::GrantPermission, target: String },
+    CreateUser {
+        username: String,
+        password: String,
+    },
+    DropUser {
+        username: String,
+    },
+    CreateRole {
+        name: String,
+    },
+    DropRole {
+        name: String,
+    },
+    Grant {
+        permission: crate::plan::GrantPermission,
+        target: String,
+    },
+    Revoke {
+        permission: crate::plan::GrantPermission,
+        target: String,
+    },
 }
 
 /// Strip `SAMPLE BY <interval> [FILL(...)] [ALIGN TO CALENDAR]` from the SQL
@@ -730,8 +767,15 @@ fn extract_questdb_create_table_clauses(sql: &str) -> (String, Option<String>, O
     if let Some(pb_pos) = result_upper.rfind("PARTITION BY ") {
         let after = result[pb_pos + 13..].trim();
         // Extract the partition strategy word (DAY, MONTH, YEAR, HOUR, WEEK, NONE)
-        let strategy = after.split_whitespace().next().unwrap_or("").to_ascii_uppercase();
-        if matches!(strategy.as_str(), "DAY" | "MONTH" | "YEAR" | "HOUR" | "WEEK" | "NONE") {
+        let strategy = after
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_ascii_uppercase();
+        if matches!(
+            strategy.as_str(),
+            "DAY" | "MONTH" | "YEAR" | "HOUR" | "WEEK" | "NONE"
+        ) {
             partition_by = Some(strategy);
             result = result[..pb_pos].trim().to_string();
         }
@@ -780,20 +824,14 @@ fn extract_sample_by(sql: &str) -> (String, Option<String>, Option<String>, bool
             .unwrap_or(after_trimmed.len());
 
         // Also stop at known keywords that might follow: ORDER, LIMIT, GROUP.
-        let end = ["ORDER", "LIMIT", "GROUP"]
-            .iter()
-            .fold(end, |acc, kw| {
-                let upper_after = after_trimmed.to_ascii_uppercase();
-                if let Some(kw_pos) = upper_after.find(kw) {
-                    if kw_pos < acc {
-                        kw_pos
-                    } else {
-                        acc
-                    }
-                } else {
-                    acc
-                }
-            });
+        let end = ["ORDER", "LIMIT", "GROUP"].iter().fold(end, |acc, kw| {
+            let upper_after = after_trimmed.to_ascii_uppercase();
+            if let Some(kw_pos) = upper_after.find(kw) {
+                if kw_pos < acc { kw_pos } else { acc }
+            } else {
+                acc
+            }
+        });
 
         let clause = after_trimmed[..end].trim().to_string();
         let remainder = &after_trimmed[end..];
@@ -846,17 +884,23 @@ fn extract_show(sql: &str) -> Option<ShowCommand> {
 
     // SHOW COLUMNS FROM <table>
     if tokens.len() == 4 && tokens[0] == "SHOW" && tokens[1] == "COLUMNS" && tokens[2] == "FROM" {
-        return Some(ShowCommand::ShowColumns { table: orig_tokens[3].to_string() });
+        return Some(ShowCommand::ShowColumns {
+            table: orig_tokens[3].to_string(),
+        });
     }
 
     // SHOW CREATE TABLE <table>
     if tokens.len() == 4 && tokens[0] == "SHOW" && tokens[1] == "CREATE" && tokens[2] == "TABLE" {
-        return Some(ShowCommand::ShowCreateTable { table: orig_tokens[3].to_string() });
+        return Some(ShowCommand::ShowCreateTable {
+            table: orig_tokens[3].to_string(),
+        });
     }
 
     // DESCRIBE <table>
     if tokens.len() == 2 && (tokens[0] == "DESCRIBE" || tokens[0] == "DESC") {
-        return Some(ShowCommand::ShowColumns { table: orig_tokens[1].to_string() });
+        return Some(ShowCommand::ShowColumns {
+            table: orig_tokens[1].to_string(),
+        });
     }
 
     None
@@ -960,8 +1004,10 @@ fn extract_left_alias(before_asof: &str) -> Option<String> {
         // Second token is the alias (if it's not a keyword).
         let candidate = tokens[1];
         let upper_candidate = candidate.to_ascii_uppercase();
-        if !["WHERE", "ORDER", "LIMIT", "GROUP", "HAVING", "ASOF", "LATEST"]
-            .contains(&upper_candidate.as_str())
+        if ![
+            "WHERE", "ORDER", "LIMIT", "GROUP", "HAVING", "ASOF", "LATEST",
+        ]
+        .contains(&upper_candidate.as_str())
         {
             return Some(candidate.to_string());
         }
@@ -1013,9 +1059,10 @@ fn find_keyword_boundary(s: &str) -> usize {
     let mut best = s.len();
     for kw in &keywords {
         if let Some(pos) = upper.find(kw)
-            && pos < best {
-                best = pos;
-            }
+            && pos < best
+        {
+            best = pos;
+        }
     }
     best
 }
@@ -1023,9 +1070,19 @@ fn find_keyword_boundary(s: &str) -> usize {
 /// Pre-parsed partition management commands.
 #[derive(Debug, Clone)]
 pub enum PartitionCommand {
-    Detach { table: String, partition: String },
-    Attach { table: String, partition: String },
-    Squash { table: String, partition1: String, partition2: String },
+    Detach {
+        table: String,
+        partition: String,
+    },
+    Attach {
+        table: String,
+        partition: String,
+    },
+    Squash {
+        table: String,
+        partition1: String,
+        partition2: String,
+    },
 }
 
 /// Extract `ALTER TABLE <table> DETACH|ATTACH PARTITION '<name>'` or
@@ -1047,39 +1104,37 @@ fn extract_partition_command(sql: &str) -> Option<PartitionCommand> {
     let table = orig_tokens[2].to_string();
 
     // ALTER TABLE <table> DETACH PARTITION '<name>'
-    if tokens.len() >= 5 && tokens[3] == "DETACH" && tokens[4] == "PARTITION"
-        && tokens.len() >= 6 {
-            let partition = strip_quotes(orig_tokens[5]);
-            return Some(PartitionCommand::Detach { table, partition });
-        }
+    if tokens.len() >= 5 && tokens[3] == "DETACH" && tokens[4] == "PARTITION" && tokens.len() >= 6 {
+        let partition = strip_quotes(orig_tokens[5]);
+        return Some(PartitionCommand::Detach { table, partition });
+    }
 
     // ALTER TABLE <table> ATTACH PARTITION '<name>'
-    if tokens.len() >= 5 && tokens[3] == "ATTACH" && tokens[4] == "PARTITION"
-        && tokens.len() >= 6 {
-            let partition = strip_quotes(orig_tokens[5]);
-            return Some(PartitionCommand::Attach { table, partition });
-        }
+    if tokens.len() >= 5 && tokens[3] == "ATTACH" && tokens[4] == "PARTITION" && tokens.len() >= 6 {
+        let partition = strip_quotes(orig_tokens[5]);
+        return Some(PartitionCommand::Attach { table, partition });
+    }
 
     // ALTER TABLE <table> SQUASH PARTITIONS '<p1>', '<p2>'
-    if tokens.len() >= 5 && tokens[3] == "SQUASH" && tokens[4] == "PARTITIONS"
-        && tokens.len() >= 6 {
-            // The rest is "'p1', 'p2'" or "'p1','p2'" — parse from original string.
-            let rest_start = trimmed
-                .to_ascii_uppercase()
-                .find("PARTITIONS")
-                .map(|p| p + "PARTITIONS".len())?;
-            let rest = trimmed[rest_start..].trim();
-            let parts: Vec<&str> = rest.split(',').collect();
-            if parts.len() >= 2 {
-                let p1 = strip_quotes(parts[0].trim());
-                let p2 = strip_quotes(parts[1].trim());
-                return Some(PartitionCommand::Squash {
-                    table,
-                    partition1: p1,
-                    partition2: p2,
-                });
-            }
+    if tokens.len() >= 5 && tokens[3] == "SQUASH" && tokens[4] == "PARTITIONS" && tokens.len() >= 6
+    {
+        // The rest is "'p1', 'p2'" or "'p1','p2'" — parse from original string.
+        let rest_start = trimmed
+            .to_ascii_uppercase()
+            .find("PARTITIONS")
+            .map(|p| p + "PARTITIONS".len())?;
+        let rest = trimmed[rest_start..].trim();
+        let parts: Vec<&str> = rest.split(',').collect();
+        if parts.len() >= 2 {
+            let p1 = strip_quotes(parts[0].trim());
+            let p2 = strip_quotes(parts[1].trim());
+            return Some(PartitionCommand::Squash {
+                table,
+                partition1: p1,
+                partition2: p2,
+            });
         }
+    }
 
     None
 }
@@ -1137,10 +1192,16 @@ pub fn parse_duration(s: &str) -> Result<std::time::Duration> {
     }
 
     let (num_str, suffix) = if s.ends_with(|c: char| c.is_ascii_alphabetic()) {
-        let split = s.len() - s.chars().rev().take_while(|c| c.is_ascii_alphabetic()).count();
+        let split = s.len()
+            - s.chars()
+                .rev()
+                .take_while(|c| c.is_ascii_alphabetic())
+                .count();
         (&s[..split], &s[split..])
     } else {
-        return Err(ExchangeDbError::Parse(format!("missing unit suffix in duration: '{s}'")));
+        return Err(ExchangeDbError::Parse(format!(
+            "missing unit suffix in duration: '{s}'"
+        )));
     };
 
     let num: u64 = num_str
@@ -1155,7 +1216,7 @@ pub fn parse_duration(s: &str) -> Result<std::time::Duration> {
         other => {
             return Err(ExchangeDbError::Parse(format!(
                 "unknown duration suffix: '{other}'"
-            )))
+            )));
         }
     };
 
@@ -1174,7 +1235,11 @@ fn extract_create_matview(sql: &str) -> Option<(String, String)> {
     let rest_upper = rest.to_ascii_uppercase();
     let as_pos = rest_upper.find(" AS ")?;
     let name = rest[..as_pos].trim().to_string();
-    let query = rest[as_pos + 4..].trim().trim_end_matches(';').trim().to_string();
+    let query = rest[as_pos + 4..]
+        .trim()
+        .trim_end_matches(';')
+        .trim()
+        .to_string();
     if name.is_empty() || query.is_empty() {
         return None;
     }
@@ -1280,7 +1345,10 @@ fn extract_pivot(sql: &str) -> (String, Option<PivotInfo>) {
         return (sql.to_string(), None);
     };
     let aggregate = agg_part[..agg_paren].trim().to_string();
-    let agg_column = agg_part[agg_paren + 1..].trim_end_matches(')').trim().to_string();
+    let agg_column = agg_part[agg_paren + 1..]
+        .trim_end_matches(')')
+        .trim()
+        .to_string();
 
     // Parse values: 'val1' AS alias1, 'val2' AS alias2
     let mut values = Vec::new();
@@ -1383,7 +1451,10 @@ fn extract_merge(sql: &str) -> Option<MergeInfo> {
     if let Some(wm_pos) = remainder_upper.find("WHEN MATCHED THEN UPDATE SET") {
         let after_set = &remainder[wm_pos + "WHEN MATCHED THEN UPDATE SET".len()..];
         // Read until WHEN or end.
-        let end = after_set.to_ascii_uppercase().find("WHEN").unwrap_or(after_set.len());
+        let end = after_set
+            .to_ascii_uppercase()
+            .find("WHEN")
+            .unwrap_or(after_set.len());
         let set_clause = after_set[..end].trim().trim_end_matches(';');
         let assignments: Vec<(String, String)> = set_clause
             .split(',')
@@ -1456,9 +1527,7 @@ fn rewrite_between_symmetric(sql: &str) -> String {
         let before = result[..bs_pos].trim_end();
         // Find the last whitespace before the column name (or WHERE/AND/OR keyword boundary).
         let col_start = before
-            .rfind(|c: char| {
-                c == ' ' || c == '(' || c == '\t' || c == '\n'
-            })
+            .rfind(|c: char| c == ' ' || c == '(' || c == '\t' || c == '\n')
             .map(|p| p + 1)
             .unwrap_or(0);
         let col = before[col_start..].trim().to_string();
@@ -1503,10 +1572,10 @@ fn find_top_level_and(s: &str) -> Option<usize> {
             b'(' => depth += 1,
             b')' => depth -= 1,
             b'A' | b'a' if depth == 0 => {
-                if i + 3 <= s.len() && s[i..i+3].eq_ignore_ascii_case("AND") {
+                if i + 3 <= s.len() && s[i..i + 3].eq_ignore_ascii_case("AND") {
                     // Check boundaries.
-                    let before_ok = i == 0 || !bytes[i-1].is_ascii_alphanumeric();
-                    let after_ok = i + 3 >= s.len() || !bytes[i+3].is_ascii_alphanumeric();
+                    let before_ok = i == 0 || !bytes[i - 1].is_ascii_alphanumeric();
+                    let after_ok = i + 3 >= s.len() || !bytes[i + 3].is_ascii_alphanumeric();
                     if before_ok && after_ok {
                         return Some(i);
                     }
@@ -1543,9 +1612,7 @@ fn rewrite_mysql_limit(sql: &str) -> String {
     let rest_upper = rest.to_ascii_uppercase();
 
     // Find the end of the LIMIT clause (next keyword or end of string).
-    let end_pos = rest_upper
-        .find(';')
-        .unwrap_or(rest.len());
+    let end_pos = rest_upper.find(';').unwrap_or(rest.len());
     let limit_clause = rest[..end_pos].trim();
 
     // Check if there's a comma (MySQL syntax: offset, count).
@@ -1582,7 +1649,8 @@ fn find_keyword_outside_strings(sql: &str, keyword: &str) -> Option<usize> {
                 if bytes[i..i + kw_len].eq_ignore_ascii_case(kw_bytes) {
                     // Check word boundaries.
                     let before_ok = i == 0 || !bytes[i - 1].is_ascii_alphanumeric();
-                    let after_ok = i + kw_len >= bytes.len() || !bytes[i + kw_len].is_ascii_alphanumeric();
+                    let after_ok =
+                        i + kw_len >= bytes.len() || !bytes[i + kw_len].is_ascii_alphanumeric();
                     if before_ok && after_ok {
                         return Some(i);
                     }
@@ -1638,7 +1706,12 @@ fn extract_call_procedure(sql: &str) -> Option<String> {
     }
     let rest = trimmed["CALL ".len()..].trim();
     // Remove trailing parentheses if present.
-    let name = rest.trim_end_matches("()").trim_end_matches('(').trim_end_matches(')').trim().to_string();
+    let name = rest
+        .trim_end_matches("()")
+        .trim_end_matches('(')
+        .trim_end_matches(')')
+        .trim()
+        .to_string();
     if name.is_empty() {
         return None;
     }
@@ -1772,7 +1845,11 @@ fn extract_create_trigger(sql: &str) -> Option<(String, String, String)> {
         return None;
     }
     let proc_raw = tokens.get(exec_pos + 2)?;
-    let proc_name = proc_raw.trim_end_matches("()").trim_end_matches('(').trim_end_matches(')').to_string();
+    let proc_name = proc_raw
+        .trim_end_matches("()")
+        .trim_end_matches('(')
+        .trim_end_matches(')')
+        .to_string();
     Some((name, table, proc_name))
 }
 
@@ -1844,9 +1921,8 @@ mod tests {
 
     #[test]
     fn parse_select_with_sample_by() {
-        let pq =
-            parse_sql("SELECT symbol, avg(price) FROM trades SAMPLE BY 1h ORDER BY timestamp")
-                .unwrap();
+        let pq = parse_sql("SELECT symbol, avg(price) FROM trades SAMPLE BY 1h ORDER BY timestamp")
+            .unwrap();
         assert_eq!(pq.sample_by_raw, Some("1h".to_string()));
         assert_eq!(pq.statements.len(), 1);
         // The rewritten SQL should still parse with ORDER BY intact.
@@ -1887,9 +1963,8 @@ mod tests {
 
     #[test]
     fn extract_sample_by_works() {
-        let (rewritten, interval, fill, align) = extract_sample_by(
-            "SELECT avg(price) FROM trades SAMPLE BY 5m ORDER BY ts LIMIT 10",
-        );
+        let (rewritten, interval, fill, align) =
+            extract_sample_by("SELECT avg(price) FROM trades SAMPLE BY 5m ORDER BY ts LIMIT 10");
         assert_eq!(interval, Some("5m".to_string()));
         assert!(fill.is_none());
         assert!(!align);
@@ -1902,43 +1977,42 @@ mod tests {
 
     #[test]
     fn extract_sample_by_with_fill() {
-        let (_, interval, fill, _) = extract_sample_by(
-            "SELECT avg(price) FROM trades SAMPLE BY 1h FILL(NULL) ORDER BY ts",
-        );
+        let (_, interval, fill, _) =
+            extract_sample_by("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(NULL) ORDER BY ts");
         assert_eq!(interval, Some("1h".to_string()));
         assert_eq!(fill, Some("NULL".to_string()));
     }
 
     #[test]
     fn extract_sample_by_with_fill_prev() {
-        let (_, interval, fill, _) = extract_sample_by(
-            "SELECT avg(price) FROM trades SAMPLE BY 1h FILL(PREV) ORDER BY ts",
-        );
+        let (_, interval, fill, _) =
+            extract_sample_by("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(PREV) ORDER BY ts");
         assert_eq!(interval, Some("1h".to_string()));
         assert_eq!(fill, Some("PREV".to_string()));
     }
 
     #[test]
     fn extract_sample_by_fill_zero() {
-        let (_, interval, fill, _) = extract_sample_by(
-            "SELECT avg(price) FROM trades SAMPLE BY 1h FILL(0)",
-        );
+        let (_, interval, fill, _) =
+            extract_sample_by("SELECT avg(price) FROM trades SAMPLE BY 1h FILL(0)");
         assert_eq!(interval, Some("1h".to_string()));
         assert_eq!(fill, Some("0".to_string()));
     }
 
     #[test]
     fn extract_sample_by_align_calendar() {
-        let (_, interval, _, align) = extract_sample_by(
-            "SELECT avg(price) FROM trades SAMPLE BY 1h ALIGN TO CALENDAR",
-        );
+        let (_, interval, _, align) =
+            extract_sample_by("SELECT avg(price) FROM trades SAMPLE BY 1h ALIGN TO CALENDAR");
         assert_eq!(interval, Some("1h".to_string()));
         assert!(align);
     }
 
     #[test]
     fn extract_show_tables() {
-        assert!(matches!(extract_show("SHOW TABLES;"), Some(ShowCommand::ShowTables)));
+        assert!(matches!(
+            extract_show("SHOW TABLES;"),
+            Some(ShowCommand::ShowTables)
+        ));
     }
 
     #[test]
@@ -1967,13 +2041,17 @@ mod tests {
 
     #[test]
     fn extract_asof_join_basic() {
-        let sql = "SELECT t.*, q.bid, q.ask FROM trades t ASOF JOIN quotes q ON (t.symbol = q.symbol)";
+        let sql =
+            "SELECT t.*, q.bid, q.ask FROM trades t ASOF JOIN quotes q ON (t.symbol = q.symbol)";
         let (rewritten, info) = extract_asof_join(sql);
         let info = info.unwrap();
         assert_eq!(info.right_table, "quotes");
         assert_eq!(info.right_alias, Some("q".to_string()));
         assert_eq!(info.left_alias, Some("t".to_string()));
-        assert_eq!(info.on_columns, vec![("symbol".to_string(), "symbol".to_string())]);
+        assert_eq!(
+            info.on_columns,
+            vec![("symbol".to_string(), "symbol".to_string())]
+        );
         // The rewritten SQL should be a valid SELECT from trades only.
         let upper = rewritten.to_ascii_uppercase();
         assert!(!upper.contains("ASOF"));
@@ -1988,7 +2066,10 @@ mod tests {
         assert_eq!(info.right_table, "quotes");
         assert_eq!(info.right_alias, None);
         assert_eq!(info.left_alias, None);
-        assert_eq!(info.on_columns, vec![("symbol".to_string(), "symbol".to_string())]);
+        assert_eq!(
+            info.on_columns,
+            vec![("symbol".to_string(), "symbol".to_string())]
+        );
     }
 
     #[test]
@@ -2017,7 +2098,8 @@ mod tests {
 
     #[test]
     fn parse_asof_join_full() {
-        let sql = "SELECT t.*, q.bid, q.ask FROM trades t ASOF JOIN quotes q ON (t.symbol = q.symbol)";
+        let sql =
+            "SELECT t.*, q.bid, q.ask FROM trades t ASOF JOIN quotes q ON (t.symbol = q.symbol)";
         let pq = parse_sql(sql).unwrap();
         assert!(pq.asof_join.is_some());
         assert!(pq.latest_on.is_none());
@@ -2064,10 +2146,15 @@ mod tests {
 
     #[test]
     fn parse_alter_table_squash_partitions() {
-        let pq = parse_sql("ALTER TABLE trades SQUASH PARTITIONS '2024-01-15', '2024-01-16';").unwrap();
+        let pq =
+            parse_sql("ALTER TABLE trades SQUASH PARTITIONS '2024-01-15', '2024-01-16';").unwrap();
         let cmd = pq.partition_command.unwrap();
         match cmd {
-            PartitionCommand::Squash { table, partition1, partition2 } => {
+            PartitionCommand::Squash {
+                table,
+                partition1,
+                partition2,
+            } => {
                 assert_eq!(table, "trades");
                 assert_eq!(partition1, "2024-01-15");
                 assert_eq!(partition2, "2024-01-16");

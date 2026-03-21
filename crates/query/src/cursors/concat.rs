@@ -77,11 +77,7 @@ mod tests {
         let s2 = MemoryCursor::from_rows(schema.clone(), &[vec![Value::I64(2)]]);
         let s3 = MemoryCursor::from_rows(schema.clone(), &[vec![Value::I64(3)]]);
 
-        let mut cursor = ConcatCursor::new(vec![
-            Box::new(s1),
-            Box::new(s2),
-            Box::new(s3),
-        ]);
+        let mut cursor = ConcatCursor::new(vec![Box::new(s1), Box::new(s2), Box::new(s3)]);
 
         let mut all = Vec::new();
         while let Some(batch) = cursor.next_batch(100).unwrap() {

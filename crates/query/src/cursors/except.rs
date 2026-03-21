@@ -34,7 +34,10 @@ impl ExceptCursor {
     }
 
     fn build(&mut self) -> Result<()> {
-        let mut right = self.right_source.take().expect("right source already consumed");
+        let mut right = self
+            .right_source
+            .take()
+            .expect("right source already consumed");
         loop {
             match right.next_batch(1024)? {
                 None => break,
@@ -98,9 +101,8 @@ impl RecordCursor for ExceptCursor {
                 None => break,
                 Some(b) => {
                     for r in 0..b.row_count() {
-                        let row: Vec<Value> = (0..b.columns.len())
-                            .map(|c| b.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> =
+                            (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                         let key = Self::row_key(&row);
                         if !self.right_set.contains(&key) && self.emitted.insert(key) {
                             result.append_row(&row);
@@ -131,12 +133,13 @@ mod tests {
         let schema = vec![("val".to_string(), ColumnType::I64)];
         let left = MemoryCursor::from_rows(
             schema.clone(),
-            &[vec![Value::I64(1)], vec![Value::I64(2)], vec![Value::I64(3)]],
+            &[
+                vec![Value::I64(1)],
+                vec![Value::I64(2)],
+                vec![Value::I64(3)],
+            ],
         );
-        let right = MemoryCursor::from_rows(
-            schema,
-            &[vec![Value::I64(2)], vec![Value::I64(4)]],
-        );
+        let right = MemoryCursor::from_rows(schema, &[vec![Value::I64(2)], vec![Value::I64(4)]]);
 
         let mut cursor = ExceptCursor::new(Box::new(left), Box::new(right));
         let mut all = Vec::new();

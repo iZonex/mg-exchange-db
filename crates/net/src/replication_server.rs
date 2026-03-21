@@ -20,10 +20,7 @@ use exchange_core::replication::wal_receiver::WalReceiver;
 /// Accepts connections from the primary and processes incoming WAL segment
 /// messages. For each segment received, the data is written to the table's
 /// WAL directory, a merge is run, and an acknowledgment is sent back.
-pub async fn start_replication_server(
-    addr: SocketAddr,
-    db_root: PathBuf,
-) -> std::io::Result<()> {
+pub async fn start_replication_server(addr: SocketAddr, db_root: PathBuf) -> std::io::Result<()> {
     let listener = TcpListener::bind(addr).await?;
     tracing::info!(addr = %addr, "replication server started");
 

@@ -166,7 +166,8 @@ mod fixed_i64 {
         {
             let mut w = FixedColumnWriter::open(&path, ColumnType::I64).unwrap();
             for i in 0..200 {
-                w.append_i64(if i % 2 == 0 { i64::MAX } else { i64::MIN }).unwrap();
+                w.append_i64(if i % 2 == 0 { i64::MAX } else { i64::MIN })
+                    .unwrap();
             }
             w.flush().unwrap();
         }
@@ -558,10 +559,7 @@ mod fixed_i16 {
         }
         let r = FixedColumnReader::open(&path, ColumnType::I16).unwrap();
         assert_eq!(r.row_count(), 3);
-        assert_eq!(
-            i16::from_le_bytes(r.read_raw(0).try_into().unwrap()),
-            32767
-        );
+        assert_eq!(i16::from_le_bytes(r.read_raw(0).try_into().unwrap()), 32767);
         assert_eq!(
             i16::from_le_bytes(r.read_raw(1).try_into().unwrap()),
             -32768

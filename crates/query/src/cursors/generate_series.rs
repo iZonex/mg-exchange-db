@@ -113,7 +113,13 @@ mod tests {
         }
         assert_eq!(
             all,
-            vec![Value::I64(1), Value::I64(2), Value::I64(3), Value::I64(4), Value::I64(5)]
+            vec![
+                Value::I64(1),
+                Value::I64(2),
+                Value::I64(3),
+                Value::I64(4),
+                Value::I64(5)
+            ]
         );
     }
 
@@ -145,7 +151,11 @@ mod tests {
         }
         assert_eq!(
             all,
-            vec![Value::Timestamp(1000), Value::Timestamp(2000), Value::Timestamp(3000)]
+            vec![
+                Value::Timestamp(1000),
+                Value::Timestamp(2000),
+                Value::Timestamp(3000)
+            ]
         );
     }
 
@@ -161,7 +171,13 @@ mod tests {
         }
         assert_eq!(
             all,
-            vec![Value::I64(5), Value::I64(4), Value::I64(3), Value::I64(2), Value::I64(1)]
+            vec![
+                Value::I64(5),
+                Value::I64(4),
+                Value::I64(3),
+                Value::I64(2),
+                Value::I64(1)
+            ]
         );
     }
 }

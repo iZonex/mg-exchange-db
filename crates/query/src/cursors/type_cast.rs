@@ -19,7 +19,12 @@ impl TypeCastCursor {
     pub fn new(source: Box<dyn RecordCursor>, col_idx: usize, target_type: ColumnType) -> Self {
         let mut schema = source.schema().to_vec();
         schema[col_idx].1 = target_type;
-        Self { source, col_idx, target_type, schema }
+        Self {
+            source,
+            col_idx,
+            target_type,
+            schema,
+        }
     }
 
     fn cast_value(&self, v: Value) -> Value {
@@ -45,7 +50,9 @@ impl TypeCastCursor {
 }
 
 impl RecordCursor for TypeCastCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
         match self.source.next_batch(max_rows)? {
@@ -56,7 +63,11 @@ impl RecordCursor for TypeCastCursor {
                     let row: Vec<Value> = (0..b.columns.len())
                         .map(|c| {
                             let v = b.get_value(r, c);
-                            if c == self.col_idx { self.cast_value(v) } else { v }
+                            if c == self.col_idx {
+                                self.cast_value(v)
+                            } else {
+                                v
+                            }
                         })
                         .collect();
                     result.append_row(&row);

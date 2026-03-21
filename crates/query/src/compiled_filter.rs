@@ -92,10 +92,20 @@ impl CompiledFilter {
                 )
             }
             Self::BetweenSymmetric(idx, lo, hi) => {
-                let fwd = matches!(row[*idx].cmp_coerce(lo), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                    && matches!(row[*idx].cmp_coerce(hi), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
-                let rev = matches!(row[*idx].cmp_coerce(hi), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                    && matches!(row[*idx].cmp_coerce(lo), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
+                let fwd = matches!(
+                    row[*idx].cmp_coerce(lo),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    row[*idx].cmp_coerce(hi),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
+                let rev = matches!(
+                    row[*idx].cmp_coerce(hi),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    row[*idx].cmp_coerce(lo),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
                 fwd || rev
             }
             Self::And(filters) => filters.iter().all(|f| f.evaluate(row)),
@@ -105,13 +115,25 @@ impl CompiledFilter {
             Self::In(idx, vals) => vals.iter().any(|v| row[*idx].eq_coerce(v)),
             Self::NotIn(idx, vals) => !vals.iter().any(|v| row[*idx].eq_coerce(v)),
             Self::Like(idx, regex) => {
-                if let Value::Str(s) = &row[*idx] { regex.is_match(s) } else { false }
+                if let Value::Str(s) = &row[*idx] {
+                    regex.is_match(s)
+                } else {
+                    false
+                }
             }
             Self::NotLike(idx, regex) => {
-                if let Value::Str(s) = &row[*idx] { !regex.is_match(s) } else { true }
+                if let Value::Str(s) = &row[*idx] {
+                    !regex.is_match(s)
+                } else {
+                    true
+                }
             }
             Self::ILike(idx, regex) => {
-                if let Value::Str(s) = &row[*idx] { regex.is_match(s) } else { false }
+                if let Value::Str(s) = &row[*idx] {
+                    regex.is_match(s)
+                } else {
+                    false
+                }
             }
             Self::AlwaysTrue => true,
         }
@@ -341,10 +363,20 @@ impl LinearFilter {
                 )
             }
             FilterOp::BetweenSymmetric(idx, lo, hi) => {
-                let fwd = matches!(row[*idx].cmp_coerce(lo), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                    && matches!(row[*idx].cmp_coerce(hi), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
-                let rev = matches!(row[*idx].cmp_coerce(hi), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                    && matches!(row[*idx].cmp_coerce(lo), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
+                let fwd = matches!(
+                    row[*idx].cmp_coerce(lo),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    row[*idx].cmp_coerce(hi),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
+                let rev = matches!(
+                    row[*idx].cmp_coerce(hi),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    row[*idx].cmp_coerce(lo),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
                 fwd || rev
             }
             FilterOp::IsNull(idx) => row[*idx] == Value::Null,
@@ -352,13 +384,25 @@ impl LinearFilter {
             FilterOp::In(idx, vals) => vals.iter().any(|v| row[*idx].eq_coerce(v)),
             FilterOp::NotIn(idx, vals) => !vals.iter().any(|v| row[*idx].eq_coerce(v)),
             FilterOp::Like(idx, regex) => {
-                if let Value::Str(s) = &row[*idx] { regex.is_match(s) } else { false }
+                if let Value::Str(s) = &row[*idx] {
+                    regex.is_match(s)
+                } else {
+                    false
+                }
             }
             FilterOp::NotLike(idx, regex) => {
-                if let Value::Str(s) = &row[*idx] { !regex.is_match(s) } else { true }
+                if let Value::Str(s) = &row[*idx] {
+                    !regex.is_match(s)
+                } else {
+                    true
+                }
             }
             FilterOp::ILike(idx, regex) => {
-                if let Value::Str(s) = &row[*idx] { regex.is_match(s) } else { false }
+                if let Value::Str(s) = &row[*idx] {
+                    regex.is_match(s)
+                } else {
+                    false
+                }
             }
             FilterOp::AlwaysTrue => true,
             // And/Or are handled in the main loop, not here.
@@ -372,7 +416,10 @@ impl LinearFilter {
 /// The filter tree is flattened into post-order bytecode. Numeric comparisons
 /// are specialized to avoid `cmp_coerce` overhead when the constant is f64 or
 /// i64.
-pub fn build_linear_filter(filter: &Filter, column_indices: &HashMap<String, usize>) -> LinearFilter {
+pub fn build_linear_filter(
+    filter: &Filter,
+    column_indices: &HashMap<String, usize>,
+) -> LinearFilter {
     let mut ops = Vec::new();
     emit_ops(filter, column_indices, &mut ops);
     LinearFilter { ops }
@@ -455,9 +502,18 @@ fn emit_ops(filter: &Filter, column_indices: &HashMap<String, usize>, ops: &mut 
         Filter::IsNotNull(col) => ops.push(FilterOp::IsNotNull(column_indices[col])),
         Filter::In(col, vals) => ops.push(FilterOp::In(column_indices[col], vals.clone())),
         Filter::NotIn(col, vals) => ops.push(FilterOp::NotIn(column_indices[col], vals.clone())),
-        Filter::Like(col, pattern) => ops.push(FilterOp::Like(column_indices[col], like_to_regex(pattern, true))),
-        Filter::NotLike(col, pattern) => ops.push(FilterOp::NotLike(column_indices[col], like_to_regex(pattern, true))),
-        Filter::ILike(col, pattern) => ops.push(FilterOp::ILike(column_indices[col], like_to_regex(pattern, false))),
+        Filter::Like(col, pattern) => ops.push(FilterOp::Like(
+            column_indices[col],
+            like_to_regex(pattern, true),
+        )),
+        Filter::NotLike(col, pattern) => ops.push(FilterOp::NotLike(
+            column_indices[col],
+            like_to_regex(pattern, true),
+        )),
+        Filter::ILike(col, pattern) => ops.push(FilterOp::ILike(
+            column_indices[col],
+            like_to_regex(pattern, false),
+        )),
         _ => ops.push(FilterOp::AlwaysTrue),
     }
 }
@@ -470,7 +526,10 @@ fn emit_ops(filter: &Filter, column_indices: &HashMap<String, usize>, ops: &mut 
 ///
 /// `column_indices` maps column names to their positional index in the row
 /// slice that the resulting evaluator will receive.
-pub fn build_compiled_filter(filter: &Filter, column_indices: &HashMap<String, usize>) -> CompiledFilter {
+pub fn build_compiled_filter(
+    filter: &Filter,
+    column_indices: &HashMap<String, usize>,
+) -> CompiledFilter {
     match filter {
         Filter::Eq(col, val) => CompiledFilter::Eq(column_indices[col], val.clone()),
         Filter::NotEq(col, val) => CompiledFilter::NotEq(column_indices[col], val.clone()),
@@ -478,17 +537,37 @@ pub fn build_compiled_filter(filter: &Filter, column_indices: &HashMap<String, u
         Filter::Lt(col, val) => CompiledFilter::Lt(column_indices[col], val.clone()),
         Filter::Gte(col, val) => CompiledFilter::Gte(column_indices[col], val.clone()),
         Filter::Lte(col, val) => CompiledFilter::Lte(column_indices[col], val.clone()),
-        Filter::Between(col, lo, hi) => CompiledFilter::Between(column_indices[col], lo.clone(), hi.clone()),
-        Filter::BetweenSymmetric(col, lo, hi) => CompiledFilter::BetweenSymmetric(column_indices[col], lo.clone(), hi.clone()),
-        Filter::And(filters) => CompiledFilter::And(filters.iter().map(|f| build_compiled_filter(f, column_indices)).collect()),
-        Filter::Or(filters) => CompiledFilter::Or(filters.iter().map(|f| build_compiled_filter(f, column_indices)).collect()),
+        Filter::Between(col, lo, hi) => {
+            CompiledFilter::Between(column_indices[col], lo.clone(), hi.clone())
+        }
+        Filter::BetweenSymmetric(col, lo, hi) => {
+            CompiledFilter::BetweenSymmetric(column_indices[col], lo.clone(), hi.clone())
+        }
+        Filter::And(filters) => CompiledFilter::And(
+            filters
+                .iter()
+                .map(|f| build_compiled_filter(f, column_indices))
+                .collect(),
+        ),
+        Filter::Or(filters) => CompiledFilter::Or(
+            filters
+                .iter()
+                .map(|f| build_compiled_filter(f, column_indices))
+                .collect(),
+        ),
         Filter::IsNull(col) => CompiledFilter::IsNull(column_indices[col]),
         Filter::IsNotNull(col) => CompiledFilter::IsNotNull(column_indices[col]),
         Filter::In(col, vals) => CompiledFilter::In(column_indices[col], vals.clone()),
         Filter::NotIn(col, vals) => CompiledFilter::NotIn(column_indices[col], vals.clone()),
-        Filter::Like(col, pattern) => CompiledFilter::Like(column_indices[col], like_to_regex(pattern, true)),
-        Filter::NotLike(col, pattern) => CompiledFilter::NotLike(column_indices[col], like_to_regex(pattern, true)),
-        Filter::ILike(col, pattern) => CompiledFilter::ILike(column_indices[col], like_to_regex(pattern, false)),
+        Filter::Like(col, pattern) => {
+            CompiledFilter::Like(column_indices[col], like_to_regex(pattern, true))
+        }
+        Filter::NotLike(col, pattern) => {
+            CompiledFilter::NotLike(column_indices[col], like_to_regex(pattern, true))
+        }
+        Filter::ILike(col, pattern) => {
+            CompiledFilter::ILike(column_indices[col], like_to_regex(pattern, false))
+        }
         _ => CompiledFilter::AlwaysTrue,
     }
 }
@@ -593,10 +672,20 @@ pub fn compile_columnar_filter(
             let hi = hi.clone();
             Box::new(move |cols: &[&[u8]], row: usize| {
                 let row_val = read_value_from_column(cols[idx], row);
-                let fwd = matches!(row_val.cmp_coerce(&lo), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                    && matches!(row_val.cmp_coerce(&hi), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
-                let rev = matches!(row_val.cmp_coerce(&hi), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                    && matches!(row_val.cmp_coerce(&lo), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
+                let fwd = matches!(
+                    row_val.cmp_coerce(&lo),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    row_val.cmp_coerce(&hi),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
+                let rev = matches!(
+                    row_val.cmp_coerce(&hi),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    row_val.cmp_coerce(&lo),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
                 fwd || rev
             })
         }
@@ -662,8 +751,7 @@ fn like_to_regex(pattern: &str, case_sensitive: bool) -> regex::Regex {
         match ch {
             '%' => re.push_str(".*"),
             '_' => re.push('.'),
-            '.' | '*' | '+' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '|'
-            | '\\' => {
+            '.' | '*' | '+' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '|' | '\\' => {
                 re.push('\\');
                 re.push(ch);
             }
@@ -718,10 +806,20 @@ pub fn interpret_filter(
         }
         Filter::BetweenSymmetric(col, lo, hi) => {
             let v = &row[column_indices[col]];
-            let fwd = matches!(v.cmp_coerce(lo), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                && matches!(v.cmp_coerce(hi), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
-            let rev = matches!(v.cmp_coerce(hi), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                && matches!(v.cmp_coerce(lo), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
+            let fwd = matches!(
+                v.cmp_coerce(lo),
+                Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+            ) && matches!(
+                v.cmp_coerce(hi),
+                Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+            );
+            let rev = matches!(
+                v.cmp_coerce(hi),
+                Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+            ) && matches!(
+                v.cmp_coerce(lo),
+                Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+            );
             fwd || rev
         }
         Filter::And(fs) => fs.iter().all(|f| interpret_filter(f, row, column_indices)),

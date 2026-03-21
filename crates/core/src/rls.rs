@@ -81,10 +81,8 @@ impl RlsManager {
     /// (no restriction).
     pub fn get_filter(&self, user: &str, table: &str) -> Option<Filter> {
         let user_policies = self.policies.get(user)?;
-        let matching: Vec<&RowLevelPolicy> = user_policies
-            .iter()
-            .filter(|p| p.table == table)
-            .collect();
+        let matching: Vec<&RowLevelPolicy> =
+            user_policies.iter().filter(|p| p.table == table).collect();
 
         if matching.is_empty() {
             return None;
@@ -202,10 +200,7 @@ mod tests {
             column: "exchange".into(),
             allowed_values: vec!["NYSE".into(), "NASDAQ".into()],
         };
-        assert_eq!(
-            filter.to_where_clause(),
-            "exchange IN ('NYSE', 'NASDAQ')"
-        );
+        assert_eq!(filter.to_where_clause(), "exchange IN ('NYSE', 'NASDAQ')");
     }
 
     #[test]

@@ -78,7 +78,10 @@ pub enum RaftCommand {
     DropTable(String),
     AlterTable(String, String),
     /// WAL segment committed.
-    WalCommit { table: String, segment_id: u32 },
+    WalCommit {
+        table: String,
+        segment_id: u32,
+    },
 }
 
 impl RaftNode {

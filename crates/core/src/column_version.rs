@@ -79,12 +79,7 @@ impl ColumnVersionFile {
     }
 
     /// Convenience: record an ADD COLUMN event.
-    pub fn record_add(
-        &mut self,
-        version: u64,
-        column_name: &str,
-        path: &Path,
-    ) -> Result<()> {
+    pub fn record_add(&mut self, version: u64, column_name: &str, path: &Path) -> Result<()> {
         self.append_and_save(
             ColumnVersionEntry {
                 version,
@@ -97,12 +92,7 @@ impl ColumnVersionFile {
     }
 
     /// Convenience: record a DROP COLUMN event.
-    pub fn record_drop(
-        &mut self,
-        version: u64,
-        column_name: &str,
-        path: &Path,
-    ) -> Result<()> {
+    pub fn record_drop(&mut self, version: u64, column_name: &str, path: &Path) -> Result<()> {
         self.append_and_save(
             ColumnVersionEntry {
                 version,
@@ -177,8 +167,7 @@ mod tests {
         cv.record_add(2, "exchange", &cv_path).unwrap();
         cv.record_rename(3, "trade_price", "price", &cv_path)
             .unwrap();
-        cv.record_type_change(4, "volume", "F32", &cv_path)
-            .unwrap();
+        cv.record_type_change(4, "volume", "F32", &cv_path).unwrap();
         cv.record_drop(5, "old_col", &cv_path).unwrap();
 
         assert_eq!(cv.entries.len(), 4);

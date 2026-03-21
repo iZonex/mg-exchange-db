@@ -31,9 +31,7 @@ impl FailoverManager {
     /// segments to other replicas.
     pub fn promote_to_primary(&mut self) -> Result<()> {
         if self.config.role == ReplicationRole::Primary {
-            return Err(ExchangeDbError::Wal(
-                "node is already a primary".into(),
-            ));
+            return Err(ExchangeDbError::Wal("node is already a primary".into()));
         }
 
         tracing::info!(
@@ -54,9 +52,7 @@ impl FailoverManager {
     /// (since this node is no longer responsible for shipping).
     pub fn demote_to_replica(&mut self, new_primary: &str) -> Result<()> {
         if self.config.role == ReplicationRole::Replica {
-            return Err(ExchangeDbError::Wal(
-                "node is already a replica".into(),
-            ));
+            return Err(ExchangeDbError::Wal("node is already a replica".into()));
         }
 
         tracing::info!(
@@ -81,12 +77,7 @@ impl FailoverManager {
             None => return false,
         };
 
-        match timeout(
-            self.health_check_interval,
-            TcpStream::connect(&addr),
-        )
-        .await
-        {
+        match timeout(self.health_check_interval, TcpStream::connect(&addr)).await {
             Ok(Ok(_stream)) => true,
             Ok(Err(_)) => false,
             Err(_) => false, // Timeout
@@ -138,10 +129,7 @@ mod tests {
 
     #[test]
     fn promote_replica_to_primary() {
-        let mut mgr = FailoverManager::new(
-            replica_config("10.0.0.1:9100"),
-            Duration::from_secs(5),
-        );
+        let mut mgr = FailoverManager::new(replica_config("10.0.0.1:9100"), Duration::from_secs(5));
 
         assert_eq!(*mgr.current_role(), ReplicationRole::Replica);
 
@@ -174,19 +162,13 @@ mod tests {
         mgr.demote_to_replica("10.0.0.2:9100").unwrap();
 
         assert_eq!(*mgr.current_role(), ReplicationRole::Replica);
-        assert_eq!(
-            mgr.config().primary_addr.as_deref(),
-            Some("10.0.0.2:9100")
-        );
+        assert_eq!(mgr.config().primary_addr.as_deref(), Some("10.0.0.2:9100"));
         assert!(mgr.config().replica_addrs.is_empty());
     }
 
     #[test]
     fn demote_replica_fails() {
-        let mut mgr = FailoverManager::new(
-            replica_config("10.0.0.1:9100"),
-            Duration::from_secs(5),
-        );
+        let mut mgr = FailoverManager::new(replica_config("10.0.0.1:9100"), Duration::from_secs(5));
 
         let result = mgr.demote_to_replica("10.0.0.5:9100");
         assert!(result.is_err());
@@ -194,10 +176,7 @@ mod tests {
 
     #[test]
     fn promote_then_demote_roundtrip() {
-        let mut mgr = FailoverManager::new(
-            replica_config("10.0.0.1:9100"),
-            Duration::from_secs(5),
-        );
+        let mut mgr = FailoverManager::new(replica_config("10.0.0.1:9100"), Duration::from_secs(5));
 
         // Promote.
         mgr.promote_to_primary().unwrap();
@@ -206,10 +185,7 @@ mod tests {
         // Demote back.
         mgr.demote_to_replica("10.0.0.99:9100").unwrap();
         assert_eq!(*mgr.current_role(), ReplicationRole::Replica);
-        assert_eq!(
-            mgr.config().primary_addr.as_deref(),
-            Some("10.0.0.99:9100")
-        );
+        assert_eq!(mgr.config().primary_addr.as_deref(), Some("10.0.0.99:9100"));
     }
 
     #[test]
@@ -258,15 +234,10 @@ mod tests {
     #[tokio::test]
     async fn health_check_reachable_primary() {
         // Start a TCP listener to simulate a reachable primary.
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
 
-        let mgr = FailoverManager::new(
-            replica_config(&addr.to_string()),
-            Duration::from_secs(2),
-        );
+        let mgr = FailoverManager::new(replica_config(&addr.to_string()), Duration::from_secs(2));
 
         assert!(mgr.check_primary_health().await);
     }

@@ -17,7 +17,7 @@ use crate::txn::{PartitionEntry, TxnFile, TxnHeader};
 
 use super::event::EventType;
 use super::reader::WalReader;
-use super::row_codec::{decode_row, OwnedColumnValue};
+use super::row_codec::{OwnedColumnValue, decode_row};
 use super::segment::segment_path;
 
 /// Statistics returned by a merge run.
@@ -100,10 +100,7 @@ impl WalMergeJob {
                 let ts = Timestamp(ts_nanos);
                 let dir_name = partition_dir(ts, partition_by);
 
-                partition_rows
-                    .entry(dir_name)
-                    .or_default()
-                    .push(row);
+                partition_rows.entry(dir_name).or_default().push(row);
                 rows_merged += 1;
             }
         }
@@ -317,9 +314,7 @@ fn write_fixed_value(
     val: &OwnedColumnValue,
 ) -> Result<()> {
     match (ct, val) {
-        (ColumnType::Boolean, OwnedColumnValue::Boolean(v)) => {
-            w.append(&[if *v { 1 } else { 0 }])
-        }
+        (ColumnType::Boolean, OwnedColumnValue::Boolean(v)) => w.append(&[if *v { 1 } else { 0 }]),
         (ColumnType::I8, OwnedColumnValue::I8(v)) => w.append(&[*v as u8]),
         (ColumnType::I16, OwnedColumnValue::I16(v)) => w.append(&v.to_le_bytes()),
         (ColumnType::I32, OwnedColumnValue::I32(v)) => w.append_i32(*v),
@@ -342,9 +337,9 @@ fn write_fixed_value(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::table::{ColumnDef, ColumnTypeSerializable, PartitionBySerializable};
     use crate::column::{FixedColumnReader, VarColumnReader};
-    use crate::wal::row_codec::{encode_row, OwnedColumnValue};
+    use crate::table::{ColumnDef, ColumnTypeSerializable, PartitionBySerializable};
+    use crate::wal::row_codec::{OwnedColumnValue, encode_row};
     use crate::wal::writer::{CommitMode, WalWriter, WalWriterConfig};
     use tempfile::tempdir;
 
@@ -456,11 +451,8 @@ mod tests {
         assert_eq!(price_reader.read_f64(0), 65000.50);
         assert_eq!(price_reader.read_f64(1), 65100.25);
 
-        let note_reader = VarColumnReader::open(
-            &part_dir.join("note.d"),
-            &part_dir.join("note.i"),
-        )
-        .unwrap();
+        let note_reader =
+            VarColumnReader::open(&part_dir.join("note.d"), &part_dir.join("note.i")).unwrap();
         assert_eq!(note_reader.row_count(), 2);
         assert_eq!(note_reader.read_str(0), "buy");
         assert_eq!(note_reader.read_str(1), "sell");
@@ -519,7 +511,9 @@ mod tests {
             version: 1,
         };
         meta.save(&table_dir.join("_meta")).unwrap();
-        { let _txn = TxnFile::open(&table_dir).unwrap(); }
+        {
+            let _txn = TxnFile::open(&table_dir).unwrap();
+        }
 
         let wal_dir = table_dir.join("wal");
         let column_types = vec![ColumnType::Timestamp, ColumnType::I64];
@@ -533,18 +527,26 @@ mod tests {
 
             // Day 1: 2024-03-15
             let ts_day1: i64 = 1_710_513_000_000_000_000;
-            let row = encode_row(&column_types, &[
-                OwnedColumnValue::Timestamp(ts_day1),
-                OwnedColumnValue::I64(100),
-            ]).unwrap();
+            let row = encode_row(
+                &column_types,
+                &[
+                    OwnedColumnValue::Timestamp(ts_day1),
+                    OwnedColumnValue::I64(100),
+                ],
+            )
+            .unwrap();
             writer.append_data(ts_day1, row).unwrap();
 
             // Day 2: 2024-03-16 (+ 86400 seconds)
             let ts_day2: i64 = ts_day1 + 86_400_000_000_000;
-            let row = encode_row(&column_types, &[
-                OwnedColumnValue::Timestamp(ts_day2),
-                OwnedColumnValue::I64(200),
-            ]).unwrap();
+            let row = encode_row(
+                &column_types,
+                &[
+                    OwnedColumnValue::Timestamp(ts_day2),
+                    OwnedColumnValue::I64(200),
+                ],
+            )
+            .unwrap();
             writer.append_data(ts_day2, row).unwrap();
 
             writer.flush().unwrap();

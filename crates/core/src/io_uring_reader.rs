@@ -58,7 +58,9 @@ mod linux_io {
                 Some((5, 15))
             );
             assert_eq!(
-                parse_kernel_version("Linux version 6.1.0-17-amd64 (debian-kernel@lists.debian.org)"),
+                parse_kernel_version(
+                    "Linux version 6.1.0-17-amd64 (debian-kernel@lists.debian.org)"
+                ),
                 Some((6, 1))
             );
             assert_eq!(
@@ -142,8 +144,8 @@ impl DirectIoReader {
     /// Both `offset` and `buf.len()` must be aligned to `alignment` bytes
     /// (typically 4096). The buffer must also be memory-aligned.
     pub fn read_aligned(&self, offset: u64, buf: &mut [u8]) -> Result<usize> {
-        use std::os::unix::io::FromRawFd;
         use std::io::Read;
+        use std::os::unix::io::FromRawFd;
 
         // Safety: we own the fd
         let mut file = unsafe { std::fs::File::from_raw_fd(self.fd) };

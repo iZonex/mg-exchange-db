@@ -143,7 +143,9 @@ fn drop_trigger_plans_correctly() {
 #[test]
 fn unique_constraint_allows_first_insert() {
     let db = TestDb::new();
-    db.exec_ok("CREATE TABLE orders (timestamp TIMESTAMP, id BIGINT UNIQUE, symbol VARCHAR, price DOUBLE)");
+    db.exec_ok(
+        "CREATE TABLE orders (timestamp TIMESTAMP, id BIGINT UNIQUE, symbol VARCHAR, price DOUBLE)",
+    );
     db.exec_ok("INSERT INTO orders VALUES (1000000000, 1, 'BTC', 100.0)");
     let (_, rows) = db.query("SELECT * FROM orders");
     assert_eq!(rows.len(), 1);
@@ -152,7 +154,9 @@ fn unique_constraint_allows_first_insert() {
 #[test]
 fn unique_constraint_rejects_duplicate() {
     let db = TestDb::new();
-    db.exec_ok("CREATE TABLE orders (timestamp TIMESTAMP, id BIGINT UNIQUE, symbol VARCHAR, price DOUBLE)");
+    db.exec_ok(
+        "CREATE TABLE orders (timestamp TIMESTAMP, id BIGINT UNIQUE, symbol VARCHAR, price DOUBLE)",
+    );
     db.exec_ok("INSERT INTO orders VALUES (1000000000, 1, 'BTC', 100.0)");
 
     // Second insert with same id should fail.
@@ -167,7 +171,9 @@ fn unique_constraint_rejects_duplicate() {
 #[test]
 fn unique_constraint_allows_different_values() {
     let db = TestDb::new();
-    db.exec_ok("CREATE TABLE orders (timestamp TIMESTAMP, id BIGINT UNIQUE, symbol VARCHAR, price DOUBLE)");
+    db.exec_ok(
+        "CREATE TABLE orders (timestamp TIMESTAMP, id BIGINT UNIQUE, symbol VARCHAR, price DOUBLE)",
+    );
     db.exec_ok("INSERT INTO orders VALUES (1000000000, 1, 'BTC', 100.0)");
     db.exec_ok("INSERT INTO orders VALUES (2000000000, 2, 'ETH', 200.0)");
     let (_, rows) = db.query("SELECT * FROM orders");
@@ -198,7 +204,9 @@ fn foreign_key_allows_valid_reference() {
     db.exec_ok("INSERT INTO symbols VALUES (2000000000, 'ETH')");
 
     // Child table with FK.
-    db.exec_ok("CREATE TABLE orders (timestamp TIMESTAMP, symbol VARCHAR REFERENCES symbols(name))");
+    db.exec_ok(
+        "CREATE TABLE orders (timestamp TIMESTAMP, symbol VARCHAR REFERENCES symbols(name))",
+    );
     // Valid reference - should succeed.
     db.exec_ok("INSERT INTO orders VALUES (3000000000, 'BTC')");
     let (_, rows) = db.query("SELECT * FROM orders");
@@ -211,7 +219,9 @@ fn foreign_key_rejects_invalid_reference() {
     db.exec_ok("CREATE TABLE symbols (timestamp TIMESTAMP, name VARCHAR)");
     db.exec_ok("INSERT INTO symbols VALUES (1000000000, 'BTC')");
 
-    db.exec_ok("CREATE TABLE orders (timestamp TIMESTAMP, symbol VARCHAR REFERENCES symbols(name))");
+    db.exec_ok(
+        "CREATE TABLE orders (timestamp TIMESTAMP, symbol VARCHAR REFERENCES symbols(name))",
+    );
     // Invalid reference - 'SOL' doesn't exist in symbols.
     let err = db.exec_err("INSERT INTO orders VALUES (3000000000, 'SOL')");
     let msg = format!("{err:?}");
@@ -227,7 +237,9 @@ fn foreign_key_allows_null() {
     db.exec_ok("CREATE TABLE symbols (timestamp TIMESTAMP, name VARCHAR)");
     db.exec_ok("INSERT INTO symbols VALUES (1000000000, 'BTC')");
 
-    db.exec_ok("CREATE TABLE orders (timestamp TIMESTAMP, symbol VARCHAR REFERENCES symbols(name))");
+    db.exec_ok(
+        "CREATE TABLE orders (timestamp TIMESTAMP, symbol VARCHAR REFERENCES symbols(name))",
+    );
     // NULL should be allowed.
     db.exec_ok("INSERT INTO orders VALUES (3000000000, NULL)");
     let (_, rows) = db.query("SELECT * FROM orders");
@@ -255,10 +267,15 @@ fn comment_on_column_appears_in_describe() {
 
     // DESCRIBE / SHOW COLUMNS should include the comment.
     let (cols, rows) = db.query("DESCRIBE trades");
-    assert!(cols.contains(&"comment".to_string()), "DESCRIBE should include comment column");
+    assert!(
+        cols.contains(&"comment".to_string()),
+        "DESCRIBE should include comment column"
+    );
 
     // Find the price row and check its comment.
-    let price_row = rows.iter().find(|r| r[0] == Value::Str("price".to_string()));
+    let price_row = rows
+        .iter()
+        .find(|r| r[0] == Value::Str("price".to_string()));
     assert!(price_row.is_some(), "should have a price row");
     let price_comment = &price_row.unwrap()[3]; // comment is 4th column
     assert_eq!(
@@ -271,10 +288,18 @@ fn comment_on_column_appears_in_describe() {
 #[test]
 fn comment_on_plans_correctly() {
     let plan = exchange_query::plan_query("COMMENT ON TABLE trades IS 'test comment'");
-    assert!(plan.is_ok(), "COMMENT ON TABLE should plan: {:?}", plan.err());
+    assert!(
+        plan.is_ok(),
+        "COMMENT ON TABLE should plan: {:?}",
+        plan.err()
+    );
 
     let plan = exchange_query::plan_query("COMMENT ON COLUMN trades.price IS 'price comment'");
-    assert!(plan.is_ok(), "COMMENT ON COLUMN should plan: {:?}", plan.err());
+    assert!(
+        plan.is_ok(),
+        "COMMENT ON COLUMN should plan: {:?}",
+        plan.err()
+    );
 }
 
 // ===========================================================================
@@ -342,7 +367,10 @@ fn grant_select_insert_on_table() {
     assert!(plan.is_ok());
     match plan.unwrap() {
         exchange_query::QueryPlan::Grant { permission, .. } => {
-            assert!(matches!(permission, exchange_query::plan::GrantPermission::Insert { .. }));
+            assert!(matches!(
+                permission,
+                exchange_query::plan::GrantPermission::Insert { .. }
+            ));
         }
         _ => panic!("expected Grant"),
     }
@@ -437,7 +465,10 @@ fn end_to_end_scenario() {
     assert!(cols.contains(&"comment".to_string()));
     let id_row = rows.iter().find(|r| r[0] == Value::Str("id".to_string()));
     assert!(id_row.is_some());
-    assert_eq!(id_row.unwrap()[3], Value::Str("Unique order identifier".to_string()));
+    assert_eq!(
+        id_row.unwrap()[3],
+        Value::Str("Unique order identifier".to_string())
+    );
 
     // Clean up.
     db.exec_ok("DROP VIEW btc_orders");

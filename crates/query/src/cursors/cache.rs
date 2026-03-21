@@ -50,9 +50,7 @@ impl CachedCursor {
                 Some(batch) => {
                     let ncols = batch.columns.len();
                     for r in 0..batch.row_count() {
-                        let row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> = (0..ncols).map(|c| batch.get_value(r, c)).collect();
                         self.cache.push(row);
                     }
                 }
@@ -104,7 +102,11 @@ mod tests {
     #[test]
     fn cache_and_rewind() {
         let schema = vec![("v".to_string(), ColumnType::I64)];
-        let rows = vec![vec![Value::I64(1)], vec![Value::I64(2)], vec![Value::I64(3)]];
+        let rows = vec![
+            vec![Value::I64(1)],
+            vec![Value::I64(2)],
+            vec![Value::I64(3)],
+        ];
         let source = MemoryCursor::from_rows(schema, &rows);
 
         let mut cursor = CachedCursor::new(Box::new(source));

@@ -284,9 +284,7 @@ mod sample_aggregates {
     #[test]
     fn first_last_sample_by() {
         let db = TestDb::with_trades(20);
-        let (cols, rows) = db.query(
-            "SELECT first(price), last(price) FROM trades SAMPLE BY 1h",
-        );
+        let (cols, rows) = db.query("SELECT first(price), last(price) FROM trades SAMPLE BY 1h");
         assert_eq!(cols.len(), 2);
         assert!(!rows.is_empty());
     }
@@ -294,9 +292,7 @@ mod sample_aggregates {
     #[test]
     fn min_max_sample_by() {
         let db = TestDb::with_trades(20);
-        let (cols, rows) = db.query(
-            "SELECT min(price), max(price) FROM trades SAMPLE BY 1h",
-        );
+        let (cols, rows) = db.query("SELECT min(price), max(price) FROM trades SAMPLE BY 1h");
         assert_eq!(cols.len(), 2);
         assert!(!rows.is_empty());
     }
@@ -311,18 +307,15 @@ mod sample_with_where {
     #[test]
     fn sample_by_where_symbol() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT avg(price) FROM trades WHERE symbol = 'BTC/USD' SAMPLE BY 1h",
-        );
+        let (_, rows) =
+            db.query("SELECT avg(price) FROM trades WHERE symbol = 'BTC/USD' SAMPLE BY 1h");
         assert!(!rows.is_empty());
     }
 
     #[test]
     fn sample_by_where_side() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT count(*) FROM trades WHERE side = 'buy' SAMPLE BY 1h",
-        );
+        let (_, rows) = db.query("SELECT count(*) FROM trades WHERE side = 'buy' SAMPLE BY 1h");
         assert!(!rows.is_empty());
     }
 
@@ -338,9 +331,7 @@ mod sample_with_where {
     #[test]
     fn sample_by_where_price_gt() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT count(*) FROM trades WHERE price > 1000 SAMPLE BY 1h",
-        );
+        let (_, rows) = db.query("SELECT count(*) FROM trades WHERE price > 1000 SAMPLE BY 1h");
         assert!(!rows.is_empty());
     }
 
@@ -356,9 +347,8 @@ mod sample_with_where {
     #[test]
     fn sample_by_where_like() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT count(*) FROM trades WHERE symbol LIKE 'BTC%' SAMPLE BY 1h",
-        );
+        let (_, rows) =
+            db.query("SELECT count(*) FROM trades WHERE symbol LIKE 'BTC%' SAMPLE BY 1h");
         assert!(!rows.is_empty());
     }
 }
@@ -390,11 +380,7 @@ mod sample_edge_cases {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         // 10 rows within 1 second
         for i in 0..10 {
-            db.exec_ok(&format!(
-                "INSERT INTO t VALUES ({}, {}.0)",
-                BASE_TS + i,
-                i
-            ));
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", BASE_TS + i, i));
         }
         let (_, rows) = db.query("SELECT count(*) FROM t SAMPLE BY 1h");
         assert_eq!(rows.len(), 1);
@@ -454,9 +440,7 @@ mod sample_multi_column {
     #[test]
     fn sample_by_count_sum() {
         let db = TestDb::with_trades(20);
-        let (cols, rows) = db.query(
-            "SELECT count(*), sum(price) FROM trades SAMPLE BY 1h",
-        );
+        let (cols, rows) = db.query("SELECT count(*), sum(price) FROM trades SAMPLE BY 1h");
         assert_eq!(cols.len(), 2);
         assert!(!rows.is_empty());
     }
@@ -583,9 +567,7 @@ mod sample_custom {
     #[test]
     fn sample_by_align_to_calendar() {
         let db = TestDb::with_trades(20);
-        let result = db.exec(
-            "SELECT avg(price) FROM trades SAMPLE BY 1h ALIGN TO CALENDAR",
-        );
+        let result = db.exec("SELECT avg(price) FROM trades SAMPLE BY 1h ALIGN TO CALENDAR");
         // May or may not be supported; just make sure it doesn't crash
         assert!(result.is_ok());
     }

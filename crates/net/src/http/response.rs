@@ -52,10 +52,14 @@ impl ErrorResponse {
     fn infer_sql_state(status: StatusCode, message: &str) -> Option<String> {
         let lower = message.to_ascii_lowercase();
         // Check specific error patterns first.
-        if lower.contains("table") && (lower.contains("not found") || lower.contains("does not exist")) {
+        if lower.contains("table")
+            && (lower.contains("not found") || lower.contains("does not exist"))
+        {
             return Some("42P01".to_string()); // undefined_table
         }
-        if lower.contains("column") && (lower.contains("not found") || lower.contains("does not exist")) {
+        if lower.contains("column")
+            && (lower.contains("not found") || lower.contains("does not exist"))
+        {
             return Some("42703".to_string()); // undefined_column
         }
         if lower.contains("already exists") {
@@ -72,10 +76,10 @@ impl ErrorResponse {
         }
         // Fall back to status-based mapping.
         match status {
-            StatusCode::BAD_REQUEST => Some("42000".to_string()),   // syntax_error_or_access_rule_violation
-            StatusCode::NOT_FOUND => Some("42P01".to_string()),     // undefined_table
-            StatusCode::CONFLICT => Some("42P07".to_string()),      // duplicate_table
-            StatusCode::FORBIDDEN => Some("42501".to_string()),     // insufficient_privilege
+            StatusCode::BAD_REQUEST => Some("42000".to_string()), // syntax_error_or_access_rule_violation
+            StatusCode::NOT_FOUND => Some("42P01".to_string()),   // undefined_table
+            StatusCode::CONFLICT => Some("42P07".to_string()),    // duplicate_table
+            StatusCode::FORBIDDEN => Some("42501".to_string()),   // insufficient_privilege
             StatusCode::TOO_MANY_REQUESTS => Some("53300".to_string()), // too_many_connections
             StatusCode::INTERNAL_SERVER_ERROR => Some("XX000".to_string()), // internal_error
             _ => None,
@@ -85,17 +89,11 @@ impl ErrorResponse {
 
 impl IntoResponse for ErrorResponse {
     fn into_response(self) -> Response {
-        let status =
-            StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let status = StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
         let body = serde_json::to_string(&self).unwrap_or_else(|_| {
             r#"{"error":"internal serialization error","code":500}"#.to_string()
         });
-        (
-            status,
-            [("content-type", "application/json")],
-            body,
-        )
-            .into_response()
+        (status, [("content-type", "application/json")], body).into_response()
     }
 }
 

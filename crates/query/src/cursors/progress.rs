@@ -15,18 +15,28 @@ pub struct ProgressCursor {
 
 impl ProgressCursor {
     pub fn new(source: Box<dyn RecordCursor>) -> Self {
-        Self { source, rows_processed: 0, batches_processed: 0 }
+        Self {
+            source,
+            rows_processed: 0,
+            batches_processed: 0,
+        }
     }
 
     /// How many rows have been processed so far.
-    pub fn rows_processed(&self) -> u64 { self.rows_processed }
+    pub fn rows_processed(&self) -> u64 {
+        self.rows_processed
+    }
 
     /// How many batches have been produced.
-    pub fn batches_processed(&self) -> u64 { self.batches_processed }
+    pub fn batches_processed(&self) -> u64 {
+        self.batches_processed
+    }
 }
 
 impl RecordCursor for ProgressCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { self.source.schema() }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        self.source.schema()
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
         match self.source.next_batch(max_rows)? {

@@ -90,7 +90,10 @@ fn crash_during_wal_write_recovers_data() {
 
     // Verify data is NOT in column files yet.
     let part_dir = table_dir.join("2024-03-15");
-    assert!(!part_dir.exists(), "partition should not exist before recovery");
+    assert!(
+        !part_dir.exists(),
+        "partition should not exist before recovery"
+    );
 
     // Run recovery.
     let stats = RecoveryManager::recover_all(db_root).unwrap();
@@ -217,15 +220,36 @@ fn multi_table_recovery() {
         let config = WalTableWriterConfig::default();
         let mut w1 = WalTableWriter::open(db_root, "btc_trades", config).unwrap();
         let ts = Timestamp(TS_2024_03_15);
-        w1.write_row(ts, vec![OwnedColumnValue::Timestamp(ts.0), OwnedColumnValue::F64(65000.0)]).unwrap();
+        w1.write_row(
+            ts,
+            vec![
+                OwnedColumnValue::Timestamp(ts.0),
+                OwnedColumnValue::F64(65000.0),
+            ],
+        )
+        .unwrap();
         let ts2 = Timestamp(TS_2024_03_15 + 1_000_000_000);
-        w1.write_row(ts2, vec![OwnedColumnValue::Timestamp(ts2.0), OwnedColumnValue::F64(65100.0)]).unwrap();
+        w1.write_row(
+            ts2,
+            vec![
+                OwnedColumnValue::Timestamp(ts2.0),
+                OwnedColumnValue::F64(65100.0),
+            ],
+        )
+        .unwrap();
         w1.flush().unwrap();
 
         // eth_trades: 1 row.
         let config2 = WalTableWriterConfig::default();
         let mut w2 = WalTableWriter::open(db_root, "eth_trades", config2).unwrap();
-        w2.write_row(ts, vec![OwnedColumnValue::Timestamp(ts.0), OwnedColumnValue::F64(3500.0)]).unwrap();
+        w2.write_row(
+            ts,
+            vec![
+                OwnedColumnValue::Timestamp(ts.0),
+                OwnedColumnValue::F64(3500.0),
+            ],
+        )
+        .unwrap();
         w2.flush().unwrap();
 
         // orders: 1 row.
@@ -238,7 +262,8 @@ fn multi_table_recovery() {
                 OwnedColumnValue::F64(100.0),
                 OwnedColumnValue::I64(500),
             ],
-        ).unwrap();
+        )
+        .unwrap();
         w3.flush().unwrap();
     }
 

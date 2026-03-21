@@ -14,12 +14,12 @@ use futures::stream;
 use pgwire::api::portal::Portal;
 use pgwire::api::query::ExtendedQueryHandler;
 use pgwire::api::results::{
-    DataRowEncoder, DescribePortalResponse, DescribeStatementResponse, FieldInfo,
-    QueryResponse, Response, Tag,
+    DataRowEncoder, DescribePortalResponse, DescribeStatementResponse, FieldInfo, QueryResponse,
+    Response, Tag,
 };
 use pgwire::api::stmt::{QueryParser, StoredStatement};
-use pgwire::api::{ClientInfo, ClientPortalStore, Type};
 use pgwire::api::store::PortalStore;
+use pgwire::api::{ClientInfo, ClientPortalStore, Type};
 use pgwire::error::{ErrorInfo, PgWireError, PgWireResult};
 use pgwire::messages::PgWireBackendMessage;
 
@@ -152,11 +152,12 @@ fn is_safe_numeric_literal(s: &str) -> bool {
     }
     // Try float, but reject non-finite values
     if let Ok(f) = s.parse::<f64>()
-        && f.is_finite() {
-            // Also reject hex-like prefixes and other non-decimal representations
-            let first = s.as_bytes()[0];
-            return first == b'-' || first == b'+' || first.is_ascii_digit() || first == b'.';
-        }
+        && f.is_finite()
+    {
+        // Also reject hex-like prefixes and other non-decimal representations
+        let first = s.as_bytes()[0];
+        return first == b'-' || first == b'+' || first.is_ascii_digit() || first == b'.';
+    }
     false
 }
 
@@ -311,9 +312,10 @@ fn count_placeholders(sql: &str) -> usize {
                 }
             }
             if let Ok(n) = num_str.parse::<usize>()
-                && n > max {
-                    max = n;
-                }
+                && n > max
+            {
+                max = n;
+            }
         }
     }
     max
@@ -325,9 +327,7 @@ fn plan_and_describe(db_root: &std::path::Path, sql: &str) -> Result<Vec<FieldIn
     let result = exchange_query::execute(db_root, &plan).map_err(|e| e.to_string())?;
 
     match result {
-        QueryResult::Rows { columns, rows } => {
-            Ok(infer_field_infos(&columns, &rows))
-        }
+        QueryResult::Rows { columns, rows } => Ok(infer_field_infos(&columns, &rows)),
         QueryResult::Ok { .. } => {
             // DDL/DML — no result columns.
             Ok(vec![])
@@ -346,7 +346,10 @@ mod tests {
 
     #[test]
     fn test_count_placeholders_sequential() {
-        assert_eq!(count_placeholders("SELECT * FROM foo WHERE a = $1 AND b = $2"), 2);
+        assert_eq!(
+            count_placeholders("SELECT * FROM foo WHERE a = $1 AND b = $2"),
+            2
+        );
     }
 
     #[test]
@@ -366,10 +369,7 @@ mod tests {
             Some(bytes::Bytes::from("42")),
             Some(bytes::Bytes::from("hello")),
         ];
-        let result = substitute_params_raw(
-            "SELECT * FROM t WHERE a = $1 AND b = $2",
-            &params,
-        );
+        let result = substitute_params_raw("SELECT * FROM t WHERE a = $1 AND b = $2", &params);
         assert_eq!(result, "SELECT * FROM t WHERE a = 42 AND b = 'hello'");
     }
 

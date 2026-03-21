@@ -7,8 +7,8 @@ use tracing_subscriber::EnvFilter;
 use exchange_common::types::ColumnType;
 use exchange_core::recovery::RecoveryManager;
 use exchange_core::scheduler::{
-    JobScheduler, WalCleanupJob, CheckpointJob, StatsRefreshJob,
-    RetentionJob, TieringJob, TtlJob, PitrCheckpointJob, DownsamplingRefreshJob,
+    CheckpointJob, DownsamplingRefreshJob, JobScheduler, PitrCheckpointJob, RetentionJob,
+    StatsRefreshJob, TieringJob, TtlJob, WalCleanupJob,
 };
 use exchange_core::table::{ColumnTypeSerializable, TableMeta};
 use exchange_net::ServerConfig;
@@ -342,9 +342,7 @@ fn main() -> Result<()> {
             .with_env_filter(filter)
             .init();
     } else {
-        tracing_subscriber::fmt()
-            .with_env_filter(filter)
-            .init();
+        tracing_subscriber::fmt().with_env_filter(filter).init();
     }
 
     let cli = Cli::parse();
@@ -377,22 +375,46 @@ fn main() -> Result<()> {
         Command::Check(sub) => match sub {
             CheckCommand::All { data_dir } => cmd_check_all(&data_dir),
             CheckCommand::Wal { data_dir, table } => cmd_check_wal(&data_dir, table.as_deref()),
-            CheckCommand::Partitions { data_dir, table } => cmd_check_partitions(&data_dir, table.as_deref()),
+            CheckCommand::Partitions { data_dir, table } => {
+                cmd_check_partitions(&data_dir, table.as_deref())
+            }
             CheckCommand::Metadata { data_dir } => cmd_check_metadata(&data_dir),
             CheckCommand::DiskUsage { data_dir } => cmd_check_disk_usage(&data_dir),
         },
         Command::Replication(sub) => match sub {
             ReplicationCommand::Status { config } => cmd_replication_status(config),
-            ReplicationCommand::Promote { config, data_dir } => cmd_replication_promote(config, &data_dir),
-            ReplicationCommand::Demote { config, data_dir, new_primary } => cmd_replication_demote(config, &data_dir, &new_primary),
+            ReplicationCommand::Promote { config, data_dir } => {
+                cmd_replication_promote(config, &data_dir)
+            }
+            ReplicationCommand::Demote {
+                config,
+                data_dir,
+                new_primary,
+            } => cmd_replication_demote(config, &data_dir, &new_primary),
         },
         Command::Debug(sub) => match sub {
-            DebugCommand::WalInspect { data_dir, table, verbose } => cmd_debug_wal_inspect(&data_dir, &table, verbose),
-            DebugCommand::PartitionInfo { data_dir, table } => cmd_debug_partition_info(&data_dir, &table),
+            DebugCommand::WalInspect {
+                data_dir,
+                table,
+                verbose,
+            } => cmd_debug_wal_inspect(&data_dir, &table, verbose),
+            DebugCommand::PartitionInfo { data_dir, table } => {
+                cmd_debug_partition_info(&data_dir, &table)
+            }
             DebugCommand::Diagnostics { host } => cmd_debug_diagnostics(&host),
-            DebugCommand::ColumnDump { data_dir, table, column, partition, limit } => cmd_debug_column_dump(&data_dir, &table, &column, partition.as_deref(), limit),
+            DebugCommand::ColumnDump {
+                data_dir,
+                table,
+                column,
+                partition,
+                limit,
+            } => cmd_debug_column_dump(&data_dir, &table, &column, partition.as_deref(), limit),
         },
-        Command::Compact { data_dir, table, dry_run } => cmd_compact(&data_dir, table.as_deref(), dry_run),
+        Command::Compact {
+            data_dir,
+            table,
+            dry_run,
+        } => cmd_compact(&data_dir, table.as_deref(), dry_run),
         Command::Status { host } => cmd_status(&host),
     }
 }
@@ -408,8 +430,8 @@ fn cmd_server(
     data_dir_override: Option<PathBuf>,
 ) -> Result<()> {
     // Load config: file -> env vars -> CLI overrides
-    let mut cfg = ExchangeDbConfig::load(config_path.as_deref())
-        .context("failed to load configuration")?;
+    let mut cfg =
+        ExchangeDbConfig::load(config_path.as_deref()).context("failed to load configuration")?;
     cfg = cfg.with_env();
 
     // CLI flags take highest precedence.
@@ -495,50 +517,52 @@ fn cmd_server(
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
         // Start the replication manager if configured.
-        let repl_mgr = if repl_config.role != exchange_core::replication::ReplicationRole::Standalone {
-            let mut mgr = exchange_core::replication::ReplicationManager::new(
-                cfg.server.data_dir.clone(),
-                repl_config.clone(),
-            );
-            if let Err(e) = mgr.start().await {
-                tracing::error!(error = %e, "failed to start replication manager");
-                anyhow::bail!("replication startup failed: {e}");
-            }
-            tracing::info!(role = ?repl_config.role, "replication manager started");
-            Some(std::sync::Arc::new(mgr))
-        } else {
-            None
-        };
+        let repl_mgr =
+            if repl_config.role != exchange_core::replication::ReplicationRole::Standalone {
+                let mut mgr = exchange_core::replication::ReplicationManager::new(
+                    cfg.server.data_dir.clone(),
+                    repl_config.clone(),
+                );
+                if let Err(e) = mgr.start().await {
+                    tracing::error!(error = %e, "failed to start replication manager");
+                    anyhow::bail!("replication startup failed: {e}");
+                }
+                tracing::info!(role = ?repl_config.role, "replication manager started");
+                Some(std::sync::Arc::new(mgr))
+            } else {
+                None
+            };
 
         // Start the health monitor for automatic failover if this is a replica
         // with failover enabled.
-        if is_replica && repl_config.failover_enabled
-            && let Some(ref repl_mgr_arc) = repl_mgr {
-                let primary_addr = repl_config
-                    .primary_addr
-                    .clone()
-                    .unwrap_or_else(|| "127.0.0.1:19001".to_string());
+        if is_replica
+            && repl_config.failover_enabled
+            && let Some(ref repl_mgr_arc) = repl_mgr
+        {
+            let primary_addr = repl_config
+                .primary_addr
+                .clone()
+                .unwrap_or_else(|| "127.0.0.1:19001".to_string());
 
-                let monitor = std::sync::Arc::new(
-                    exchange_core::replication::PrimaryHealthMonitor::new(
-                        primary_addr.clone(),
-                        repl_config.health_check_interval,
-                        repl_config.failure_threshold,
-                    ),
-                );
+            let monitor =
+                std::sync::Arc::new(exchange_core::replication::PrimaryHealthMonitor::new(
+                    primary_addr.clone(),
+                    repl_config.health_check_interval,
+                    repl_config.failure_threshold,
+                ));
 
-                let mgr_for_failover = repl_mgr_arc.clone();
-                tokio::spawn(monitor.start(move || {
-                    mgr_for_failover.promote_to_primary();
-                }));
+            let mgr_for_failover = repl_mgr_arc.clone();
+            tokio::spawn(monitor.start(move || {
+                mgr_for_failover.promote_to_primary();
+            }));
 
-                tracing::info!(
-                    primary = %primary_addr,
-                    interval = ?repl_config.health_check_interval,
-                    threshold = repl_config.failure_threshold,
-                    "automatic failover health monitor started"
-                );
-            }
+            tracing::info!(
+                primary = %primary_addr,
+                interval = ?repl_config.health_check_interval,
+                threshold = repl_config.failure_threshold,
+                "automatic failover health monitor started"
+            );
+        }
 
         // Update server config with replication manager.
         let mut server_config = server_config;
@@ -568,9 +592,13 @@ fn cmd_server(
 
         // Retention: drops partitions exceeding the configured max_age.
         if cfg.retention.enabled {
-            tracing::info!("retention job enabled (max_age={:?})", cfg.retention.max_age.as_duration());
+            tracing::info!(
+                "retention job enabled (max_age={:?})",
+                cfg.retention.max_age.as_duration()
+            );
             // Scan existing tables and build retention policies.
-            let policies = build_retention_policies(&cfg.server.data_dir, cfg.retention.max_age.as_duration());
+            let policies =
+                build_retention_policies(&cfg.server.data_dir, cfg.retention.max_age.as_duration());
             scheduler.register(
                 "retention",
                 cfg.retention.check_interval.as_duration(),
@@ -625,12 +653,18 @@ fn cmd_server(
 
         // TTL: expires data older than configured max_age across all tables.
         if cfg.ttl.enabled {
-            tracing::info!("TTL job enabled (default_max_age={:?})", cfg.ttl.default_max_age.as_duration());
-            let ttl_configs = build_ttl_configs(&cfg.server.data_dir, cfg.ttl.default_max_age.as_duration());
+            tracing::info!(
+                "TTL job enabled (default_max_age={:?})",
+                cfg.ttl.default_max_age.as_duration()
+            );
+            let ttl_configs =
+                build_ttl_configs(&cfg.server.data_dir, cfg.ttl.default_max_age.as_duration());
             scheduler.register(
                 "ttl",
                 cfg.ttl.check_interval.as_duration(),
-                Box::new(TtlJob { configs: ttl_configs }),
+                Box::new(TtlJob {
+                    configs: ttl_configs,
+                }),
             );
         }
 
@@ -678,8 +712,8 @@ fn cmd_sql(data_dir: &Path, query: &str) -> Result<()> {
     let plan = exchange_query::plan_query(query)
         .with_context(|| format!("failed to plan query: {query}"))?;
 
-    let result = exchange_query::execute(data_dir, &plan)
-        .with_context(|| "failed to execute query")?;
+    let result =
+        exchange_query::execute(data_dir, &plan).with_context(|| "failed to execute query")?;
 
     match result {
         QueryResult::Rows { columns, rows } => {
@@ -843,12 +877,7 @@ fn cmd_tables(data_dir: &Path) -> Result<()> {
         if entry.file_type()?.is_dir() {
             let meta_path = entry.path().join("_meta");
             if meta_path.exists() {
-                tables.push(
-                    entry
-                        .file_name()
-                        .to_string_lossy()
-                        .to_string(),
-                );
+                tables.push(entry.file_name().to_string_lossy().to_string());
             }
         }
     }
@@ -939,19 +968,19 @@ fn cmd_version() -> Result<()> {
 // ---------------------------------------------------------------------------
 
 fn cmd_config_show(config_path: Option<PathBuf>, format: &str) -> Result<()> {
-    let mut cfg = ExchangeDbConfig::load(config_path.as_deref())
-        .context("failed to load configuration")?;
+    let mut cfg =
+        ExchangeDbConfig::load(config_path.as_deref()).context("failed to load configuration")?;
     cfg = cfg.with_env();
 
     match format {
         "json" => {
-            let json = serde_json::to_string_pretty(&cfg)
-                .context("failed to serialize config to JSON")?;
+            let json =
+                serde_json::to_string_pretty(&cfg).context("failed to serialize config to JSON")?;
             println!("{json}");
         }
         _ => {
-            let toml = toml::to_string_pretty(&cfg)
-                .context("failed to serialize config to TOML")?;
+            let toml =
+                toml::to_string_pretty(&cfg).context("failed to serialize config to TOML")?;
             println!("{toml}");
         }
     }
@@ -972,24 +1001,33 @@ fn cmd_config_validate(config_path: &Path) -> Result<()> {
             let mut warnings = Vec::new();
 
             if cfg.http.enabled
-                && let Err(e) = cfg.http_bind_addr() {
-                    warnings.push(format!("http.bind: {e}"));
-                }
+                && let Err(e) = cfg.http_bind_addr()
+            {
+                warnings.push(format!("http.bind: {e}"));
+            }
             if cfg.pgwire.enabled
-                && let Err(e) = cfg.pgwire_bind_addr() {
-                    warnings.push(format!("pgwire.bind: {e}"));
-                }
+                && let Err(e) = cfg.pgwire_bind_addr()
+            {
+                warnings.push(format!("pgwire.bind: {e}"));
+            }
             if cfg.ilp.enabled
-                && let Err(e) = cfg.ilp_bind_addr() {
-                    warnings.push(format!("ilp.bind: {e}"));
-                }
+                && let Err(e) = cfg.ilp_bind_addr()
+            {
+                warnings.push(format!("ilp.bind: {e}"));
+            }
 
             if cfg.tls.enabled {
                 if !Path::new(&cfg.tls.cert_path).exists() {
-                    warnings.push(format!("tls.cert_path: file not found: {}", cfg.tls.cert_path));
+                    warnings.push(format!(
+                        "tls.cert_path: file not found: {}",
+                        cfg.tls.cert_path
+                    ));
                 }
                 if !Path::new(&cfg.tls.key_path).exists() {
-                    warnings.push(format!("tls.key_path: file not found: {}", cfg.tls.key_path));
+                    warnings.push(format!(
+                        "tls.key_path: file not found: {}",
+                        cfg.tls.key_path
+                    ));
                 }
             }
 
@@ -1046,11 +1084,25 @@ fn cmd_check_all(data_dir: &Path) -> Result<()> {
     // Check disk space.
     match fs_usage(data_dir) {
         Some((used, total)) => {
-            let pct = if total > 0 { used as f64 / total as f64 * 100.0 } else { 0.0 };
-            if pct > 90.0 {
-                println!("[WARN] Disk usage: {:.1}% ({} / {})", pct, human_bytes(used), human_bytes(total));
+            let pct = if total > 0 {
+                used as f64 / total as f64 * 100.0
             } else {
-                println!("[OK] Disk usage: {:.1}% ({} / {})", pct, human_bytes(used), human_bytes(total));
+                0.0
+            };
+            if pct > 90.0 {
+                println!(
+                    "[WARN] Disk usage: {:.1}% ({} / {})",
+                    pct,
+                    human_bytes(used),
+                    human_bytes(total)
+                );
+            } else {
+                println!(
+                    "[OK] Disk usage: {:.1}% ({} / {})",
+                    pct,
+                    human_bytes(used),
+                    human_bytes(total)
+                );
             }
         }
         None => println!("[SKIP] Could not determine disk usage"),
@@ -1067,15 +1119,20 @@ fn cmd_check_all(data_dir: &Path) -> Result<()> {
         // Metadata check.
         match TableMeta::load(&meta_path) {
             Ok(meta) => {
-                println!("[OK] {table_name}: metadata valid ({} columns, partition_by={:?})",
-                    meta.columns.len(), meta.partition_by);
+                println!(
+                    "[OK] {table_name}: metadata valid ({} columns, partition_by={:?})",
+                    meta.columns.len(),
+                    meta.partition_by
+                );
 
                 // WAL check.
                 let wal_dir = table_dir.join("_wal");
                 if wal_dir.exists() {
                     let seg_count = count_wal_segments(&wal_dir);
                     if seg_count > 100 {
-                        println!("[WARN] {table_name}: {seg_count} WAL segments (consider compacting)");
+                        println!(
+                            "[WARN] {table_name}: {seg_count} WAL segments (consider compacting)"
+                        );
                     } else {
                         println!("[OK] {table_name}: {seg_count} WAL segment(s)");
                     }
@@ -1118,7 +1175,10 @@ fn cmd_check_wal(data_dir: &Path, table: Option<&str>) -> Result<()> {
 
         let segments = count_wal_segments(&wal_dir);
         let wal_size = dir_size(&wal_dir);
-        println!("{table_name}: {segments} segment(s), {}", human_bytes(wal_size));
+        println!(
+            "{table_name}: {segments} segment(s), {}",
+            human_bytes(wal_size)
+        );
     }
 
     Ok(())
@@ -1165,7 +1225,12 @@ fn cmd_check_partitions(data_dir: &Path, table: Option<&str>) -> Result<()> {
             }
             let total_rows: u64 = partitions.iter().map(|(_, r, _)| r).sum();
             let total_size: u64 = partitions.iter().map(|(_, _, s)| s).sum();
-            println!("  {:30} {:>12} {:>12}", "TOTAL", total_rows, human_bytes(total_size));
+            println!(
+                "  {:30} {:>12} {:>12}",
+                "TOTAL",
+                total_rows,
+                human_bytes(total_size)
+            );
         }
         println!();
     }
@@ -1180,12 +1245,17 @@ fn cmd_check_metadata(data_dir: &Path) -> Result<()> {
         let meta_path = data_dir.join(table_name).join("_meta");
         match TableMeta::load(&meta_path) {
             Ok(meta) => {
-                let ts_col = meta.columns
+                let ts_col = meta
+                    .columns
                     .get(meta.timestamp_column)
                     .map(|c| c.name.as_str())
                     .unwrap_or("(none)");
-                println!("[OK] {table_name}: {} cols, ts={ts_col}, partition={:?}, v{}",
-                    meta.columns.len(), meta.partition_by, meta.version);
+                println!(
+                    "[OK] {table_name}: {} cols, ts={ts_col}, partition={:?}, v{}",
+                    meta.columns.len(),
+                    meta.partition_by,
+                    meta.version
+                );
             }
             Err(e) => {
                 println!("[FAIL] {table_name}: {e}");
@@ -1199,7 +1269,10 @@ fn cmd_check_metadata(data_dir: &Path) -> Result<()> {
 fn cmd_check_disk_usage(data_dir: &Path) -> Result<()> {
     let tables = list_tables(data_dir);
 
-    println!("{:30} {:>12} {:>12} {:>12}", "TABLE", "DATA", "WAL", "TOTAL");
+    println!(
+        "{:30} {:>12} {:>12} {:>12}",
+        "TABLE", "DATA", "WAL", "TOTAL"
+    );
     println!("{}", "-".repeat(68));
 
     let mut grand_data = 0u64;
@@ -1209,20 +1282,34 @@ fn cmd_check_disk_usage(data_dir: &Path) -> Result<()> {
         let table_dir = data_dir.join(table_name);
         let wal_dir = table_dir.join("_wal");
 
-        let wal_size = if wal_dir.exists() { dir_size(&wal_dir) } else { 0 };
+        let wal_size = if wal_dir.exists() {
+            dir_size(&wal_dir)
+        } else {
+            0
+        };
         let total_size = dir_size(&table_dir);
         let data_size = total_size.saturating_sub(wal_size);
 
         grand_data += data_size;
         grand_wal += wal_size;
 
-        println!("{:30} {:>12} {:>12} {:>12}",
-            table_name, human_bytes(data_size), human_bytes(wal_size), human_bytes(total_size));
+        println!(
+            "{:30} {:>12} {:>12} {:>12}",
+            table_name,
+            human_bytes(data_size),
+            human_bytes(wal_size),
+            human_bytes(total_size)
+        );
     }
 
     println!("{}", "-".repeat(68));
-    println!("{:30} {:>12} {:>12} {:>12}",
-        "TOTAL", human_bytes(grand_data), human_bytes(grand_wal), human_bytes(grand_data + grand_wal));
+    println!(
+        "{:30} {:>12} {:>12} {:>12}",
+        "TOTAL",
+        human_bytes(grand_data),
+        human_bytes(grand_wal),
+        human_bytes(grand_data + grand_wal)
+    );
 
     Ok(())
 }
@@ -1232,8 +1319,8 @@ fn cmd_check_disk_usage(data_dir: &Path) -> Result<()> {
 // ---------------------------------------------------------------------------
 
 fn cmd_replication_status(config_path: Option<PathBuf>) -> Result<()> {
-    let mut cfg = ExchangeDbConfig::load(config_path.as_deref())
-        .context("failed to load configuration")?;
+    let mut cfg =
+        ExchangeDbConfig::load(config_path.as_deref()).context("failed to load configuration")?;
     cfg = cfg.with_env();
 
     let repl = &cfg.replication;
@@ -1254,8 +1341,18 @@ fn cmd_replication_status(config_path: Option<PathBuf>) -> Result<()> {
             }
         }
     } else if repl.role == "replica" {
-        println!("  Primary address:     {}", if repl.primary_addr.is_empty() { "(not set)" } else { &repl.primary_addr });
-        println!("  Health check:        {:?}", repl.health_check_interval.as_duration());
+        println!(
+            "  Primary address:     {}",
+            if repl.primary_addr.is_empty() {
+                "(not set)"
+            } else {
+                &repl.primary_addr
+            }
+        );
+        println!(
+            "  Health check:        {:?}",
+            repl.health_check_interval.as_duration()
+        );
         println!("  Failure threshold:   {}", repl.failure_threshold);
     }
 
@@ -1263,12 +1360,15 @@ fn cmd_replication_status(config_path: Option<PathBuf>) -> Result<()> {
 }
 
 fn cmd_replication_promote(config_path: Option<PathBuf>, data_dir: &Path) -> Result<()> {
-    let mut cfg = ExchangeDbConfig::load(config_path.as_deref())
-        .context("failed to load configuration")?;
+    let mut cfg =
+        ExchangeDbConfig::load(config_path.as_deref()).context("failed to load configuration")?;
     cfg = cfg.with_env();
 
     if cfg.replication.role != "replica" {
-        anyhow::bail!("can only promote a replica (current role: {})", cfg.replication.role);
+        anyhow::bail!(
+            "can only promote a replica (current role: {})",
+            cfg.replication.role
+        );
     }
 
     let repl_config = cfg.replication.to_replication_config();
@@ -1278,7 +1378,9 @@ fn cmd_replication_promote(config_path: Option<PathBuf>, data_dir: &Path) -> Res
             data_dir.to_path_buf(),
             repl_config,
         );
-        mgr.start().await.context("failed to start replication manager")?;
+        mgr.start()
+            .await
+            .context("failed to start replication manager")?;
         mgr.promote_to_primary();
         println!("Node promoted to PRIMARY successfully");
         println!("Update the configuration file to set replication.role = \"primary\"");
@@ -1286,7 +1388,11 @@ fn cmd_replication_promote(config_path: Option<PathBuf>, data_dir: &Path) -> Res
     })
 }
 
-fn cmd_replication_demote(_config_path: Option<PathBuf>, _data_dir: &Path, new_primary: &str) -> Result<()> {
+fn cmd_replication_demote(
+    _config_path: Option<PathBuf>,
+    _data_dir: &Path,
+    new_primary: &str,
+) -> Result<()> {
     // Demoting requires a FailoverManager which operates on a running cluster.
     // For now, provide guidance on manual demote via configuration.
     println!("To demote this node to a replica:");
@@ -1323,14 +1429,19 @@ fn cmd_debug_wal_inspect(data_dir: &Path, table_name: &str, verbose: bool) -> Re
     }
     segments.sort();
 
-    println!("WAL for table '{table_name}': {} segment(s)", segments.len());
+    println!(
+        "WAL for table '{table_name}': {} segment(s)",
+        segments.len()
+    );
     println!();
 
     for seg_name in &segments {
         let seg_dir = wal_dir.join(seg_name);
         let seg_size = dir_size(&seg_dir);
         let events_path = seg_dir.join("_events");
-        let events_size = std::fs::metadata(&events_path).map(|m| m.len()).unwrap_or(0);
+        let events_size = std::fs::metadata(&events_path)
+            .map(|m| m.len())
+            .unwrap_or(0);
 
         println!("  {seg_name}/");
         println!("    Total size: {}", human_bytes(seg_size));
@@ -1341,9 +1452,7 @@ fn cmd_debug_wal_inspect(data_dir: &Path, table_name: &str, verbose: bool) -> Re
             if let Ok(files) = std::fs::read_dir(&seg_dir) {
                 let mut col_files: Vec<(String, u64)> = files
                     .flatten()
-                    .filter(|e| {
-                        e.file_name().to_string_lossy().ends_with(".d")
-                    })
+                    .filter(|e| e.file_name().to_string_lossy().ends_with(".d"))
                     .map(|e| {
                         let name = e.file_name().to_string_lossy().to_string();
                         let size = e.metadata().map(|m| m.len()).unwrap_or(0);
@@ -1419,10 +1528,12 @@ fn cmd_debug_partition_info(data_dir: &Path, table_name: &str) -> Result<()> {
 
 fn cmd_debug_diagnostics(host: &str) -> Result<()> {
     let url = format!("{host}/api/v1/diagnostics");
-    let resp = ureq::get(&url).call()
+    let resp = ureq::get(&url)
+        .call()
         .with_context(|| format!("failed to connect to {url}"))?;
 
-    let body: serde_json::Value = resp.into_json()
+    let body: serde_json::Value = resp
+        .into_json()
         .context("failed to parse diagnostics response")?;
 
     println!("{}", serde_json::to_string_pretty(&body)?);
@@ -1442,7 +1553,10 @@ fn cmd_debug_column_dump(
     let meta = TableMeta::load(&meta_path)
         .with_context(|| format!("failed to load metadata for '{table_name}'"))?;
 
-    let col_meta = meta.columns.iter().find(|c| c.name == column_name)
+    let col_meta = meta
+        .columns
+        .iter()
+        .find(|c| c.name == column_name)
         .with_context(|| format!("column '{column_name}' not found in table '{table_name}'"))?;
 
     let ct: ColumnType = col_meta.col_type.into();
@@ -1474,7 +1588,11 @@ fn cmd_debug_column_dump(
         }
 
         let file_size = std::fs::metadata(&col_file)?.len();
-        println!("{part_name}/{column_name}.d ({}, {})", col_type_display(col_meta.col_type), human_bytes(file_size));
+        println!(
+            "{part_name}/{column_name}.d ({}, {})",
+            col_type_display(col_meta.col_type),
+            human_bytes(file_size)
+        );
 
         // Read raw bytes and display first `limit` values.
         let data = std::fs::read(&col_file)?;
@@ -1486,11 +1604,21 @@ fn cmd_debug_column_dump(
                 let raw = &data[offset..offset + es];
                 let display = match ct {
                     ColumnType::I8 => format!("{}", raw[0] as i8),
-                    ColumnType::I16 => format!("{}", i16::from_le_bytes(raw.try_into().unwrap_or_default())),
-                    ColumnType::I32 => format!("{}", i32::from_le_bytes(raw.try_into().unwrap_or_default())),
-                    ColumnType::I64 => format!("{}", i64::from_le_bytes(raw.try_into().unwrap_or_default())),
-                    ColumnType::F32 => format!("{}", f32::from_le_bytes(raw.try_into().unwrap_or_default())),
-                    ColumnType::F64 => format!("{}", f64::from_le_bytes(raw.try_into().unwrap_or_default())),
+                    ColumnType::I16 => {
+                        format!("{}", i16::from_le_bytes(raw.try_into().unwrap_or_default()))
+                    }
+                    ColumnType::I32 => {
+                        format!("{}", i32::from_le_bytes(raw.try_into().unwrap_or_default()))
+                    }
+                    ColumnType::I64 => {
+                        format!("{}", i64::from_le_bytes(raw.try_into().unwrap_or_default()))
+                    }
+                    ColumnType::F32 => {
+                        format!("{}", f32::from_le_bytes(raw.try_into().unwrap_or_default()))
+                    }
+                    ColumnType::F64 => {
+                        format!("{}", f64::from_le_bytes(raw.try_into().unwrap_or_default()))
+                    }
                     ColumnType::Boolean => format!("{}", raw[0] != 0),
                     ColumnType::Timestamp => {
                         let ns = i64::from_le_bytes(raw.try_into().unwrap_or_default());
@@ -1537,13 +1665,18 @@ fn cmd_compact(data_dir: &Path, table: Option<&str>, dry_run: bool) -> Result<()
         }
 
         if dry_run {
-            println!("{table_name}: would compact {seg_count} segment(s) ({})", human_bytes(wal_size));
+            println!(
+                "{table_name}: would compact {seg_count} segment(s) ({})",
+                human_bytes(wal_size)
+            );
         } else {
             // Trigger recovery which merges WAL into column store.
             match RecoveryManager::recover_all(data_dir) {
                 Ok(stats) => {
-                    println!("{table_name}: compacted {seg_count} segment(s), recovered {} rows in {}ms",
-                        stats.rows_recovered, stats.duration_ms);
+                    println!(
+                        "{table_name}: compacted {seg_count} segment(s), recovered {} rows in {}ms",
+                        stats.rows_recovered, stats.duration_ms
+                    );
                 }
                 Err(e) => {
                     println!("{table_name}: compaction failed: {e}");
@@ -1574,11 +1707,12 @@ fn cmd_status(host: &str) -> Result<()> {
             }
 
             if let Ok(body) = resp.into_json::<serde_json::Value>()
-                && let Some(obj) = body.as_object() {
-                    for (k, v) in obj {
-                        println!("  {k}: {v}");
-                    }
+                && let Some(obj) = body.as_object()
+            {
+                for (k, v) in obj {
+                    println!("  {k}: {v}");
                 }
+            }
         }
         Err(e) => {
             println!("Server: UNREACHABLE ({e})");
@@ -1593,17 +1727,19 @@ fn cmd_status(host: &str) -> Result<()> {
     match ureq::get(&tables_url).call() {
         Ok(resp) => {
             if let Ok(body) = resp.into_json::<serde_json::Value>()
-                && let Some(tables) = body.get("tables").and_then(|t| t.as_array()) {
-                    println!("Tables: {}", tables.len());
-                    for t in tables {
-                        if let Some(name) = t.as_str() {
-                            println!("  - {name}");
-                        } else if let Some(obj) = t.as_object()
-                            && let Some(name) = obj.get("name").and_then(|n| n.as_str()) {
-                                println!("  - {name}");
-                            }
+                && let Some(tables) = body.get("tables").and_then(|t| t.as_array())
+            {
+                println!("Tables: {}", tables.len());
+                for t in tables {
+                    if let Some(name) = t.as_str() {
+                        println!("  - {name}");
+                    } else if let Some(obj) = t.as_object()
+                        && let Some(name) = obj.get("name").and_then(|n| n.as_str())
+                    {
+                        println!("  - {name}");
                     }
                 }
+            }
         }
         Err(_) => {
             println!("Tables: (could not fetch)");
@@ -1623,7 +1759,7 @@ fn cmd_status(host: &str) -> Result<()> {
 /// without restarting the server: `kill -HUP <pid>`.
 #[cfg(unix)]
 async fn watch_config_reload(config_path: PathBuf) {
-    use tokio::signal::unix::{signal, SignalKind};
+    use tokio::signal::unix::{SignalKind, signal};
 
     let mut sighup = match signal(SignalKind::hangup()) {
         Ok(s) => s,
@@ -1726,7 +1862,9 @@ fn dir_size(path: &Path) -> u64 {
     let mut total = 0u64;
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.flatten() {
-            let ft = entry.file_type().unwrap_or_else(|_| std::fs::metadata(entry.path()).unwrap().file_type());
+            let ft = entry
+                .file_type()
+                .unwrap_or_else(|_| std::fs::metadata(entry.path()).unwrap().file_type());
             if ft.is_file() {
                 total += entry.metadata().map(|m| m.len()).unwrap_or(0);
             } else if ft.is_dir() {
@@ -1786,7 +1924,11 @@ fn human_bytes(bytes: u64) -> String {
 fn build_retention_policies(
     db_root: &Path,
     max_age: std::time::Duration,
-) -> Vec<(String, exchange_core::retention::RetentionPolicy, exchange_common::types::PartitionBy)> {
+) -> Vec<(
+    String,
+    exchange_core::retention::RetentionPolicy,
+    exchange_common::types::PartitionBy,
+)> {
     let mut policies = Vec::new();
     let entries = match std::fs::read_dir(db_root) {
         Ok(e) => e,
@@ -1821,7 +1963,11 @@ fn build_tiering_policies(
     hot_retention: std::time::Duration,
     warm_retention: std::time::Duration,
     cold_path: Option<PathBuf>,
-) -> Vec<(String, exchange_core::tiered::policy::TieringPolicy, exchange_common::types::PartitionBy)> {
+) -> Vec<(
+    String,
+    exchange_core::tiered::policy::TieringPolicy,
+    exchange_common::types::PartitionBy,
+)> {
     let mut policies = Vec::new();
     let entries = match std::fs::read_dir(db_root) {
         Ok(e) => e,
@@ -2017,7 +2163,10 @@ fn parse_timestamp_value(s: &str) -> exchange_common::types::Timestamp {
 }
 
 /// Parse a CSV field into a `ColumnValue` given the expected type.
-fn parse_field_to_column_value(field: &str, ct: ColumnType) -> exchange_core::table::ColumnValue<'_> {
+fn parse_field_to_column_value(
+    field: &str,
+    ct: ColumnType,
+) -> exchange_core::table::ColumnValue<'_> {
     use exchange_core::table::ColumnValue;
 
     let field = field.trim();

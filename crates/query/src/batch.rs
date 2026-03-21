@@ -30,11 +30,18 @@ impl ColumnData {
     /// Create an empty `ColumnData` matching the given `ColumnType`.
     pub fn empty_for(ct: ColumnType) -> Self {
         match ct {
-            ColumnType::I64 | ColumnType::I32 | ColumnType::I16 | ColumnType::I8
+            ColumnType::I64
+            | ColumnType::I32
+            | ColumnType::I16
+            | ColumnType::I8
             | ColumnType::Symbol => ColumnData::I64(Vec::new()),
             ColumnType::F64 | ColumnType::F32 => ColumnData::F64(Vec::new()),
-            ColumnType::Varchar | ColumnType::Binary | ColumnType::Char
-            | ColumnType::Uuid | ColumnType::IPv4 | ColumnType::GeoHash
+            ColumnType::Varchar
+            | ColumnType::Binary
+            | ColumnType::Char
+            | ColumnType::Uuid
+            | ColumnType::IPv4
+            | ColumnType::GeoHash
             | ColumnType::VarcharSlice => ColumnData::Str(Vec::new()),
             ColumnType::Timestamp | ColumnType::Date => ColumnData::Timestamp(Vec::new()),
             ColumnType::Boolean => ColumnData::Bool(Vec::new()),
@@ -96,7 +103,13 @@ impl ColumnData {
     pub fn get(&self, row: usize) -> Value {
         match self {
             ColumnData::I64(v) => Value::I64(v[row]),
-            ColumnData::F64(v) => if v[row].is_nan() { Value::Null } else { Value::F64(v[row]) },
+            ColumnData::F64(v) => {
+                if v[row].is_nan() {
+                    Value::Null
+                } else {
+                    Value::F64(v[row])
+                }
+            }
             ColumnData::Str(v) => Value::Str(v[row].clone()),
             ColumnData::Timestamp(v) => Value::Timestamp(v[row]),
             ColumnData::Null(_) => Value::Null,
@@ -108,7 +121,10 @@ impl ColumnData {
 impl RecordBatch {
     /// Create an empty batch with the given schema.
     pub fn new(schema: Vec<(String, ColumnType)>) -> Self {
-        let columns: Vec<ColumnData> = schema.iter().map(|(_, ct)| ColumnData::empty_for(*ct)).collect();
+        let columns: Vec<ColumnData> = schema
+            .iter()
+            .map(|(_, ct)| ColumnData::empty_for(*ct))
+            .collect();
         Self {
             columns,
             schema,
@@ -229,7 +245,10 @@ impl RecordBatch {
         let schema = batches[0].schema.clone();
         let total_rows: usize = batches.iter().map(|b| b.row_count).sum();
 
-        let mut columns: Vec<ColumnData> = schema.iter().map(|(_, ct)| ColumnData::empty_for(*ct)).collect();
+        let mut columns: Vec<ColumnData> = schema
+            .iter()
+            .map(|(_, ct)| ColumnData::empty_for(*ct))
+            .collect();
 
         for batch in batches {
             for row in 0..batch.row_count {

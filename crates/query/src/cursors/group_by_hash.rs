@@ -92,10 +92,8 @@ impl HashGroupByCursor {
         agg_specs: Vec<(HashAggOp, usize)>,
     ) -> Self {
         let src_schema = source.schema();
-        let mut schema: Vec<(String, ColumnType)> = group_cols
-            .iter()
-            .map(|&i| src_schema[i].clone())
-            .collect();
+        let mut schema: Vec<(String, ColumnType)> =
+            group_cols.iter().map(|&i| src_schema[i].clone()).collect();
         for (op, col) in &agg_specs {
             let name = format!("{:?}({})", op, src_schema[*col].0).to_lowercase();
             let ct = match op {
@@ -132,9 +130,7 @@ impl HashGroupByCursor {
                 Some(batch) => {
                     let ncols = batch.columns.len();
                     for r in 0..batch.row_count() {
-                        let row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> = (0..ncols).map(|c| batch.get_value(r, c)).collect();
 
                         let hash = hash_group_key(&row, &self.group_cols);
 
@@ -146,7 +142,11 @@ impl HashGroupByCursor {
                         // Find existing entry with matching key values (handle collisions).
                         let found = bucket.iter_mut().find(|(kv, _)| {
                             kv.len() == self.group_cols.len()
-                                && self.group_cols.iter().enumerate().all(|(ki, &ci)| kv[ki] == row[ci])
+                                && self
+                                    .group_cols
+                                    .iter()
+                                    .enumerate()
+                                    .all(|(ki, &ci)| kv[ki] == row[ci])
                         });
 
                         match found {
@@ -156,8 +156,13 @@ impl HashGroupByCursor {
                                 }
                             }
                             None => {
-                                let key_vals: Vec<Value> = self.group_cols.iter().map(|&i| row[i].clone()).collect();
-                                let mut accs: Vec<HashAccumulator> = self.agg_specs.iter().map(|(op, _)| HashAccumulator::new(*op)).collect();
+                                let key_vals: Vec<Value> =
+                                    self.group_cols.iter().map(|&i| row[i].clone()).collect();
+                                let mut accs: Vec<HashAccumulator> = self
+                                    .agg_specs
+                                    .iter()
+                                    .map(|(op, _)| HashAccumulator::new(*op))
+                                    .collect();
                                 for (i, (_, col)) in self.agg_specs.iter().enumerate() {
                                     accs[i].accumulate(&row[*col]);
                                 }
@@ -326,8 +331,8 @@ mod tests {
         let source = MemoryCursor::from_rows(schema, &rows);
         let mut cursor = HashGroupByCursor::new(
             Box::new(source),
-            vec![0],                           // group by category
-            vec![(HashAggOp::Sum, 1)],         // sum(amount)
+            vec![0],                   // group by category
+            vec![(HashAggOp::Sum, 1)], // sum(amount)
         );
 
         let mut all = Vec::new();

@@ -168,12 +168,9 @@ impl ClusterManager {
             ExchangeDbError::LockContention(format!("cluster nodes lock poisoned: {e}"))
         })?;
 
-        let idx = nodes
-            .iter()
-            .position(|n| n.id == node_id)
-            .ok_or_else(|| {
-                ExchangeDbError::TableNotFound(format!("node '{node_id}' not in cluster"))
-            })?;
+        let idx = nodes.iter().position(|n| n.id == node_id).ok_or_else(|| {
+            ExchangeDbError::TableNotFound(format!("node '{node_id}' not in cluster"))
+        })?;
 
         nodes.remove(idx);
         Ok(())
@@ -317,7 +314,8 @@ mod tests {
         let mgr = ClusterManager::new(test_config("n1"));
         mgr.register().unwrap();
 
-        let mut stale = ClusterNode::new("n2".into(), "127.0.0.2:9000".into(), NodeRole::ReadReplica);
+        let mut stale =
+            ClusterNode::new("n2".into(), "127.0.0.2:9000".into(), NodeRole::ReadReplica);
         stale.last_heartbeat = 0; // epoch = very old
         mgr.add_node(stale);
 

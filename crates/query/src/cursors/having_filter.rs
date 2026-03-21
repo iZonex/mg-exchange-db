@@ -17,7 +17,11 @@ pub struct HavingFilterCursor {
 impl HavingFilterCursor {
     /// Only emits rows where `col_idx >= min_value`.
     pub fn new(source: Box<dyn RecordCursor>, col_idx: usize, min_value: Value) -> Self {
-        Self { source, col_idx, min_value }
+        Self {
+            source,
+            col_idx,
+            min_value,
+        }
     }
 }
 
@@ -35,15 +39,23 @@ impl RecordCursor for HavingFilterCursor {
                 Some(b) => {
                     for r in 0..b.row_count() {
                         let v = b.get_value(r, self.col_idx);
-                        if matches!(v.cmp_coerce(&self.min_value), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)) {
-                            let row: Vec<Value> = (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
+                        if matches!(
+                            v.cmp_coerce(&self.min_value),
+                            Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                        ) {
+                            let row: Vec<Value> =
+                                (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                             result.append_row(&row);
                         }
                     }
                 }
             }
         }
-        if result.row_count() == 0 { Ok(None) } else { Ok(Some(result)) }
+        if result.row_count() == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(result))
+        }
     }
 }
 
@@ -54,7 +66,10 @@ mod tests {
 
     #[test]
     fn having_filters_aggregates() {
-        let schema = vec![("group".to_string(), ColumnType::Varchar), ("cnt".to_string(), ColumnType::I64)];
+        let schema = vec![
+            ("group".to_string(), ColumnType::Varchar),
+            ("cnt".to_string(), ColumnType::I64),
+        ];
         let rows = vec![
             vec![Value::Str("a".into()), Value::I64(5)],
             vec![Value::Str("b".into()), Value::I64(15)],

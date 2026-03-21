@@ -16,7 +16,11 @@ pub struct NullScanCursor {
 
 impl NullScanCursor {
     pub fn new(schema: Vec<(String, ColumnType)>, total: usize) -> Self {
-        Self { schema, total, emitted: 0 }
+        Self {
+            schema,
+            total,
+            emitted: 0,
+        }
     }
 }
 
@@ -50,7 +54,10 @@ mod tests {
 
     #[test]
     fn produces_null_rows() {
-        let schema = vec![("a".to_string(), ColumnType::I64), ("b".to_string(), ColumnType::Varchar)];
+        let schema = vec![
+            ("a".to_string(), ColumnType::I64),
+            ("b".to_string(), ColumnType::Varchar),
+        ];
         let mut cursor = NullScanCursor::new(schema, 5);
         let batch = cursor.next_batch(100).unwrap().unwrap();
         assert_eq!(batch.row_count(), 5);

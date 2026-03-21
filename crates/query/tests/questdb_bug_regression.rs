@@ -14,9 +14,7 @@ use exchange_query::test_utils::TestDb;
 #[test]
 fn questdb_1645_table_accessible_after_write_error() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)",
-    );
+    db.exec_ok("CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)");
     db.exec_ok(
         "INSERT INTO trades (timestamp, symbol, price) VALUES (1000000000000, 'BTC', 42000.0)",
     );
@@ -56,48 +54,40 @@ fn questdb_1645_table_accessible_after_write_error() {
 #[test]
 fn questdb_2623_like_basic_patterns() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE items (timestamp TIMESTAMP, name VARCHAR)",
-    );
-    db.exec_ok(
-        "INSERT INTO items (timestamp, name) VALUES (1000000000000, 'foo_bar')",
-    );
-    db.exec_ok(
-        "INSERT INTO items (timestamp, name) VALUES (2000000000000, 'fooxbar')",
-    );
-    db.exec_ok(
-        "INSERT INTO items (timestamp, name) VALUES (3000000000000, 'foo%bar')",
-    );
+    db.exec_ok("CREATE TABLE items (timestamp TIMESTAMP, name VARCHAR)");
+    db.exec_ok("INSERT INTO items (timestamp, name) VALUES (1000000000000, 'foo_bar')");
+    db.exec_ok("INSERT INTO items (timestamp, name) VALUES (2000000000000, 'fooxbar')");
+    db.exec_ok("INSERT INTO items (timestamp, name) VALUES (3000000000000, 'foo%bar')");
 
     // Without escape, `_` is a wildcard — foo_bar, fooxbar, and foo%bar all match
     // because `_` matches any single character (including `%`).
     let (_, rows) = db.query("SELECT name FROM items WHERE name LIKE 'foo_bar'");
-    assert_eq!(rows.len(), 3, "underscore wildcard should match all three rows");
+    assert_eq!(
+        rows.len(),
+        3,
+        "underscore wildcard should match all three rows"
+    );
 
     // `%` in the middle matches everything including foo%bar.
     let (_, rows) = db.query("SELECT name FROM items WHERE name LIKE 'foo%bar'");
-    assert_eq!(rows.len(), 3, "percent wildcard should match all three rows");
+    assert_eq!(
+        rows.len(),
+        3,
+        "percent wildcard should match all three rows"
+    );
 }
 
 #[test]
 fn questdb_2623_like_escape_underscore() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE items (timestamp TIMESTAMP, name VARCHAR)",
-    );
-    db.exec_ok(
-        "INSERT INTO items (timestamp, name) VALUES (1000000000000, 'foo_bar')",
-    );
-    db.exec_ok(
-        "INSERT INTO items (timestamp, name) VALUES (2000000000000, 'fooxbar')",
-    );
+    db.exec_ok("CREATE TABLE items (timestamp TIMESTAMP, name VARCHAR)");
+    db.exec_ok("INSERT INTO items (timestamp, name) VALUES (1000000000000, 'foo_bar')");
+    db.exec_ok("INSERT INTO items (timestamp, name) VALUES (2000000000000, 'fooxbar')");
 
     // With ESCAPE, `\_` should match literal underscore only.
     // Note: sqlparser may or may not pass the escape char through;
     // this test documents our behavior.
-    let result = db.exec(
-        r"SELECT name FROM items WHERE name LIKE 'foo\_bar' ESCAPE '\'",
-    );
+    let result = db.exec(r"SELECT name FROM items WHERE name LIKE 'foo\_bar' ESCAPE '\'");
     match result {
         Ok(QueryResult::Rows { rows, .. }) => {
             // If ESCAPE is supported, only 'foo_bar' should match.
@@ -128,12 +118,8 @@ fn questdb_2623_like_escape_underscore() {
 #[test]
 fn questdb_2505_case_sensitivity_create_and_select() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE Trades (timestamp TIMESTAMP, price DOUBLE)",
-    );
-    db.exec_ok(
-        "INSERT INTO Trades (timestamp, price) VALUES (1000000000000, 100.0)",
-    );
+    db.exec_ok("CREATE TABLE Trades (timestamp TIMESTAMP, price DOUBLE)");
+    db.exec_ok("INSERT INTO Trades (timestamp, price) VALUES (1000000000000, 100.0)");
 
     // Exact case should work.
     let (_, rows) = db.query("SELECT * FROM Trades");
@@ -162,9 +148,7 @@ fn questdb_2505_case_sensitivity_create_and_select() {
 #[test]
 fn questdb_2505_case_sensitivity_drop() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE MyTable (timestamp TIMESTAMP, val DOUBLE)",
-    );
+    db.exec_ok("CREATE TABLE MyTable (timestamp TIMESTAMP, val DOUBLE)");
 
     // DROP with exact case should work.
     db.exec_ok("DROP TABLE MyTable");
@@ -182,12 +166,8 @@ fn questdb_2505_case_sensitivity_drop() {
 #[test]
 fn questdb_1679_join_type_coercion_int_vs_float() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE orders (timestamp TIMESTAMP, order_id LONG, symbol VARCHAR)",
-    );
-    db.exec_ok(
-        "CREATE TABLE fills (timestamp TIMESTAMP, order_id DOUBLE, fill_price DOUBLE)",
-    );
+    db.exec_ok("CREATE TABLE orders (timestamp TIMESTAMP, order_id LONG, symbol VARCHAR)");
+    db.exec_ok("CREATE TABLE fills (timestamp TIMESTAMP, order_id DOUBLE, fill_price DOUBLE)");
 
     db.exec_ok(
         "INSERT INTO orders (timestamp, order_id, symbol) VALUES (1000000000000, 100, 'BTC')",
@@ -239,13 +219,12 @@ fn questdb_1679_join_type_coercion_int_vs_float() {
 fn questdb_5417_between_with_smallint() {
     let db = TestDb::new();
     // ExchangeDB stores SMALLINT as I64 internally, but BETWEEN should still work.
-    db.exec_ok(
-        "CREATE TABLE sensors (timestamp TIMESTAMP, val LONG)",
-    );
+    db.exec_ok("CREATE TABLE sensors (timestamp TIMESTAMP, val LONG)");
     for i in 1..=20i64 {
         db.exec_ok(&format!(
             "INSERT INTO sensors (timestamp, val) VALUES ({}, {})",
-            i * 1_000_000_000, i
+            i * 1_000_000_000,
+            i
         ));
     }
 
@@ -271,9 +250,7 @@ fn questdb_5417_between_with_smallint() {
 #[test]
 fn questdb_5417_between_with_doubles() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE measures (timestamp TIMESTAMP, val DOUBLE)",
-    );
+    db.exec_ok("CREATE TABLE measures (timestamp TIMESTAMP, val DOUBLE)");
     for i in 0..10 {
         let v = (i as f64) * 1.5;
         let ts: i64 = (i + 1) * 1_000_000_000_i64;
@@ -314,7 +291,9 @@ fn questdb_5609_invalid_sql_produces_parse_error() {
     let err = db.exec_err("SELECTT * FROMM garbage_table_!!!;");
     let msg = err.to_string().to_lowercase();
     assert!(
-        msg.contains("parse") || msg.contains("syntax") || msg.contains("expected")
+        msg.contains("parse")
+            || msg.contains("syntax")
+            || msg.contains("expected")
             || msg.contains("unsupported"),
         "garbage SQL should produce a parse error, got: {msg}"
     );
@@ -338,10 +317,7 @@ fn questdb_5609_empty_query_is_parse_error() {
     let db = TestDb::new();
 
     let result = db.exec("");
-    assert!(
-        result.is_err(),
-        "empty query should be an error"
-    );
+    assert!(result.is_err(), "empty query should be an error");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -352,15 +328,11 @@ fn questdb_5609_empty_query_is_parse_error() {
 fn questdb_5064_quoted_table_name_with_period() {
     let db = TestDb::new();
 
-    let result = db.exec(
-        "CREATE TABLE \"my.table\" (timestamp TIMESTAMP, val DOUBLE)",
-    );
+    let result = db.exec("CREATE TABLE \"my.table\" (timestamp TIMESTAMP, val DOUBLE)");
     match result {
         Ok(_) => {
             // If CREATE succeeds, INSERT and SELECT should also work.
-            db.exec_ok(
-                "INSERT INTO \"my.table\" (timestamp, val) VALUES (1000000000000, 42.0)",
-            );
+            db.exec_ok("INSERT INTO \"my.table\" (timestamp, val) VALUES (1000000000000, 42.0)");
             let (_, rows) = db.query("SELECT val FROM \"my.table\"");
             assert_eq!(rows.len(), 1);
             assert_eq!(rows[0][0], Value::F64(42.0));
@@ -372,8 +344,11 @@ fn questdb_5064_quoted_table_name_with_period() {
             // If we don't support periods in table names, it should be a clear error.
             let msg = e.to_string();
             assert!(
-                msg.contains("period") || msg.contains("invalid") || msg.contains("character")
-                    || msg.contains("parse") || msg.contains("identifier"),
+                msg.contains("period")
+                    || msg.contains("invalid")
+                    || msg.contains("character")
+                    || msg.contains("parse")
+                    || msg.contains("identifier"),
                 "period in table name should produce a clear error, got: {msg}"
             );
         }
@@ -388,9 +363,7 @@ fn questdb_5064_quoted_table_name_with_period() {
 #[test]
 fn questdb_2025_sql_injection_in_values() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE users (timestamp TIMESTAMP, name VARCHAR, role VARCHAR)",
-    );
+    db.exec_ok("CREATE TABLE users (timestamp TIMESTAMP, name VARCHAR, role VARCHAR)");
     db.exec_ok(
         "INSERT INTO users (timestamp, name, role) VALUES (1000000000000, 'admin', 'admin')",
     );
@@ -414,12 +387,8 @@ fn questdb_2025_sql_injection_in_values() {
 #[test]
 fn questdb_2025_sql_injection_in_where_clause() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE data (timestamp TIMESTAMP, val DOUBLE)",
-    );
-    db.exec_ok(
-        "INSERT INTO data (timestamp, val) VALUES (1000000000000, 42.0)",
-    );
+    db.exec_ok("CREATE TABLE data (timestamp TIMESTAMP, val DOUBLE)");
+    db.exec_ok("INSERT INTO data (timestamp, val) VALUES (1000000000000, 42.0)");
 
     // Attempt injection via WHERE clause. This should be a single statement;
     // the engine should not execute the DROP TABLE part.
@@ -439,15 +408,9 @@ fn questdb_2025_sql_injection_in_where_clause() {
 #[test]
 fn questdb_5096_cast_symbol_to_int() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE instruments (timestamp TIMESTAMP, sym VARCHAR, code LONG)",
-    );
-    db.exec_ok(
-        "INSERT INTO instruments (timestamp, sym, code) VALUES (1000000000000, '123', 123)",
-    );
-    db.exec_ok(
-        "INSERT INTO instruments (timestamp, sym, code) VALUES (2000000000000, 'abc', 456)",
-    );
+    db.exec_ok("CREATE TABLE instruments (timestamp TIMESTAMP, sym VARCHAR, code LONG)");
+    db.exec_ok("INSERT INTO instruments (timestamp, sym, code) VALUES (1000000000000, '123', 123)");
+    db.exec_ok("INSERT INTO instruments (timestamp, sym, code) VALUES (2000000000000, 'abc', 456)");
 
     // Cast numeric string to int should work.
     let result = db.exec("SELECT CAST(sym AS INT) FROM instruments WHERE sym = '123'");
@@ -500,9 +463,7 @@ fn questdb_5096_cast_symbol_to_int() {
 #[test]
 fn questdb_5812_no_resource_leak_many_queries() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE stress (timestamp TIMESTAMP, val DOUBLE)",
-    );
+    db.exec_ok("CREATE TABLE stress (timestamp TIMESTAMP, val DOUBLE)");
     for i in 0..100i64 {
         let ts = (i + 1) * 1_000_000_000_i64;
         db.exec_ok(&format!(
@@ -514,10 +475,7 @@ fn questdb_5812_no_resource_leak_many_queries() {
     // this will eventually fail with "too many open files" or similar.
     for i in 0..200 {
         let (_, rows) = db.query("SELECT * FROM stress WHERE val > 50.0");
-        assert!(
-            rows.len() > 0,
-            "query iteration {i} should return rows"
-        );
+        assert!(rows.len() > 0, "query iteration {i} should return rows");
     }
 
     // Run queries with different patterns to exercise more code paths.
@@ -535,14 +493,10 @@ fn questdb_5812_no_resource_leak_many_queries() {
 #[test]
 fn questdb_5926_float_nan_handling() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE floats (timestamp TIMESTAMP, val DOUBLE)",
-    );
+    db.exec_ok("CREATE TABLE floats (timestamp TIMESTAMP, val DOUBLE)");
 
     // Insert NaN via expression.
-    let result = db.exec(
-        "INSERT INTO floats (timestamp, val) VALUES (1000000000000, NaN)",
-    );
+    let result = db.exec("INSERT INTO floats (timestamp, val) VALUES (1000000000000, NaN)");
     match result {
         Ok(_) => {
             let (_, rows) = db.query("SELECT val FROM floats");
@@ -570,18 +524,10 @@ fn questdb_5926_float_nan_handling() {
 #[test]
 fn questdb_5926_float_null_comparisons() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE fdata (timestamp TIMESTAMP, val DOUBLE)",
-    );
-    db.exec_ok(
-        "INSERT INTO fdata (timestamp, val) VALUES (1000000000000, 1.0)",
-    );
-    db.exec_ok(
-        "INSERT INTO fdata (timestamp, val) VALUES (2000000000000, NULL)",
-    );
-    db.exec_ok(
-        "INSERT INTO fdata (timestamp, val) VALUES (3000000000000, 999.0)",
-    );
+    db.exec_ok("CREATE TABLE fdata (timestamp TIMESTAMP, val DOUBLE)");
+    db.exec_ok("INSERT INTO fdata (timestamp, val) VALUES (1000000000000, 1.0)");
+    db.exec_ok("INSERT INTO fdata (timestamp, val) VALUES (2000000000000, NULL)");
+    db.exec_ok("INSERT INTO fdata (timestamp, val) VALUES (3000000000000, 999.0)");
 
     // NULL comparisons should follow SQL semantics.
     let (_, rows) = db.query("SELECT val FROM fdata WHERE val IS NULL");
@@ -601,9 +547,7 @@ fn questdb_5926_float_null_comparisons() {
 #[test]
 fn questdb_4544_sample_by_across_day_boundary() {
     let db = TestDb::new();
-    db.exec_ok(
-        "CREATE TABLE ticks (timestamp TIMESTAMP, price DOUBLE)",
-    );
+    db.exec_ok("CREATE TABLE ticks (timestamp TIMESTAMP, price DOUBLE)");
 
     // Insert data across a day boundary (midnight UTC).
     let base: i64 = 1710460800_000_000_000; // 2024-03-15 00:00:00 UTC
@@ -617,9 +561,7 @@ fn questdb_4544_sample_by_across_day_boundary() {
     }
 
     // SAMPLE BY 1d should produce 2 full days.
-    let result = db.exec(
-        "SELECT timestamp, AVG(price) FROM ticks SAMPLE BY 1d",
-    );
+    let result = db.exec("SELECT timestamp, AVG(price) FROM ticks SAMPLE BY 1d");
     match result {
         Ok(QueryResult::Rows { rows, .. }) => {
             assert!(
@@ -685,7 +627,11 @@ fn like_empty_string_and_pattern() {
 
     // Empty string should match '%'.
     let (_, rows) = db.query("SELECT val FROM strs WHERE val LIKE '%'");
-    assert_eq!(rows.len(), 2, "percent should match everything including empty string");
+    assert_eq!(
+        rows.len(),
+        2,
+        "percent should match everything including empty string"
+    );
 
     // Empty string should NOT match '_'.
     let (_, rows) = db.query("SELECT val FROM strs WHERE val LIKE '_'");
@@ -722,7 +668,8 @@ fn between_with_timestamps() {
     for i in 0..10 {
         db.exec_ok(&format!(
             "INSERT INTO events (timestamp, val) VALUES ({}, {}.0)",
-            base + i * 1_000_000_000, i
+            base + i * 1_000_000_000,
+            i
         ));
     }
 
@@ -731,5 +678,9 @@ fn between_with_timestamps() {
     let (_, rows) = db.query(&format!(
         "SELECT val FROM events WHERE timestamp BETWEEN {lo} AND {hi}"
     ));
-    assert_eq!(rows.len(), 5, "BETWEEN on timestamps should return 5 rows (3..=7)");
+    assert_eq!(
+        rows.len(),
+        5,
+        "BETWEEN on timestamps should return 5 rows (3..=7)"
+    );
 }

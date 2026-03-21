@@ -18,7 +18,12 @@ pub struct TeeCursor {
 
 impl TeeCursor {
     pub fn new(source: Box<dyn RecordCursor>) -> Self {
-        Self { source, captured: Vec::new(), done: false, replay_offset: 0 }
+        Self {
+            source,
+            captured: Vec::new(),
+            done: false,
+            replay_offset: 0,
+        }
     }
 
     /// Returns the captured batches so far (for the second consumer).
@@ -32,7 +37,11 @@ impl TeeCursor {
         let mut all_rows = Vec::new();
         for batch in &self.captured {
             for r in 0..batch.row_count() {
-                all_rows.push((0..batch.columns.len()).map(|c| batch.get_value(r, c)).collect());
+                all_rows.push(
+                    (0..batch.columns.len())
+                        .map(|c| batch.get_value(r, c))
+                        .collect(),
+                );
             }
         }
         crate::cursors::memory::MemoryCursor::from_rows(schema, &all_rows)
@@ -40,12 +49,19 @@ impl TeeCursor {
 }
 
 impl RecordCursor for TeeCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { self.source.schema() }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        self.source.schema()
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
-        if self.done { return Ok(None); }
+        if self.done {
+            return Ok(None);
+        }
         match self.source.next_batch(max_rows)? {
-            None => { self.done = true; Ok(None) }
+            None => {
+                self.done = true;
+                Ok(None)
+            }
             Some(b) => {
                 // Clone for capture: rebuild from rows.
                 let schema = b.schema.clone();

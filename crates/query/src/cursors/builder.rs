@@ -6,9 +6,9 @@ use exchange_common::error::Result;
 use exchange_common::types::ColumnType;
 use exchange_core::table::TableMeta;
 
-use crate::cursors::*;
 use super::except::ExceptCursor;
 use super::intersect::IntersectCursor;
+use crate::cursors::*;
 use crate::plan::{AggregateKind, QueryPlan, QueryResult, SelectColumn, SetOp, Value};
 use crate::record_cursor::RecordCursor;
 use crate::window::WindowFunction;
@@ -77,7 +77,9 @@ pub fn build_cursor(db_root: &Path, plan: &QueryPlan) -> Result<Box<dyn RecordCu
             };
 
             // 3. Aggregate cursor (GROUP BY).
-            let has_aggregates = columns.iter().any(|c| matches!(c, SelectColumn::Aggregate { .. }));
+            let has_aggregates = columns
+                .iter()
+                .any(|c| matches!(c, SelectColumn::Aggregate { .. }));
             let cursor: Box<dyn RecordCursor> = if !group_by.is_empty() || has_aggregates {
                 let aggs: Vec<(AggregateKind, String)> = columns
                     .iter()
@@ -293,12 +295,8 @@ pub fn build_cursor(db_root: &Path, plan: &QueryPlan) -> Result<Box<dyn RecordCu
                         ])))
                     }
                 }
-                SetOp::Intersect => {
-                    Ok(Box::new(IntersectCursor::new(left_cursor, right_cursor)))
-                }
-                SetOp::Except => {
-                    Ok(Box::new(ExceptCursor::new(left_cursor, right_cursor)))
-                }
+                SetOp::Intersect => Ok(Box::new(IntersectCursor::new(left_cursor, right_cursor))),
+                SetOp::Except => Ok(Box::new(ExceptCursor::new(left_cursor, right_cursor))),
             }
         }
 
@@ -412,14 +410,16 @@ pub fn build_cursor(db_root: &Path, plan: &QueryPlan) -> Result<Box<dyn RecordCu
             };
 
             // Aggregate.
-            let has_aggregates = columns.iter().any(|c| matches!(c, SelectColumn::Aggregate { .. }));
+            let has_aggregates = columns
+                .iter()
+                .any(|c| matches!(c, SelectColumn::Aggregate { .. }));
             let cursor: Box<dyn RecordCursor> = if !group_by.is_empty() || has_aggregates {
                 let aggs: Vec<(AggregateKind, String)> = columns
                     .iter()
                     .filter_map(|c| match c {
-                        SelectColumn::Aggregate { function, column, .. } => {
-                            Some((*function, column.clone()))
-                        }
+                        SelectColumn::Aggregate {
+                            function, column, ..
+                        } => Some((*function, column.clone())),
                         _ => None,
                     })
                     .collect();
@@ -518,10 +518,7 @@ pub fn build_cursor(db_root: &Path, plan: &QueryPlan) -> Result<Box<dyn RecordCu
 
             let _ = aggregate;
 
-            let pivot_values: Vec<String> = values
-                .iter()
-                .map(|pv| pv.alias.clone())
-                .collect();
+            let pivot_values: Vec<String> = values.iter().map(|pv| pv.alias.clone()).collect();
 
             Ok(Box::new(PivotedAggregateCursor::new(
                 source_cursor,
@@ -531,10 +528,7 @@ pub fn build_cursor(db_root: &Path, plan: &QueryPlan) -> Result<Box<dyn RecordCu
             )))
         }
 
-        QueryPlan::Values {
-            column_names,
-            rows,
-        } => {
+        QueryPlan::Values { column_names, rows } => {
             let schema: Vec<(String, ColumnType)> = column_names
                 .iter()
                 .enumerate()
@@ -568,9 +562,13 @@ pub fn build_cursor(db_root: &Path, plan: &QueryPlan) -> Result<Box<dyn RecordCu
             is_timestamp,
         } => {
             if *is_timestamp {
-                Ok(Box::new(GenerateSeriesCursor::new_timestamp(*start, *stop, *step)))
+                Ok(Box::new(GenerateSeriesCursor::new_timestamp(
+                    *start, *stop, *step,
+                )))
             } else {
-                Ok(Box::new(GenerateSeriesCursor::new_i64(*start, *stop, *step)))
+                Ok(Box::new(GenerateSeriesCursor::new_i64(
+                    *start, *stop, *step,
+                )))
             }
         }
 
@@ -608,7 +606,9 @@ pub fn build_cursor(db_root: &Path, plan: &QueryPlan) -> Result<Box<dyn RecordCu
             let left_key_cols: Vec<usize> = on_columns
                 .iter()
                 .filter_map(|(lcol, _)| {
-                    left_schema.iter().position(|(n, _)| n == lcol || n.ends_with(&format!(".{lcol}")))
+                    left_schema
+                        .iter()
+                        .position(|(n, _)| n == lcol || n.ends_with(&format!(".{lcol}")))
                 })
                 .collect();
             let right_key_cols: Vec<usize> = on_columns

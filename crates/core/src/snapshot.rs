@@ -64,10 +64,7 @@ pub fn create_snapshot(db_root: &Path, snapshot_dir: &Path) -> Result<SnapshotIn
             continue;
         }
 
-        let table_name = entry
-            .file_name()
-            .to_string_lossy()
-            .to_string();
+        let table_name = entry.file_name().to_string_lossy().to_string();
 
         let dest_table_dir = snapshot_dir.join(&table_name);
         let bytes = copy_dir_recursive(&path, &dest_table_dir)?;
@@ -197,8 +194,8 @@ pub fn verify_snapshot(snapshot_dir: &Path) -> Result<SnapshotInfo> {
     }
 
     let manifest_json = std::fs::read_to_string(&manifest_path)?;
-    let manifest: SnapshotManifest = serde_json::from_str(&manifest_json)
-        .map_err(|e| ExchangeDbError::Snapshot {
+    let manifest: SnapshotManifest =
+        serde_json::from_str(&manifest_json).map_err(|e| ExchangeDbError::Snapshot {
             detail: format!("invalid manifest.json: {e}"),
             path: manifest_path.display().to_string(),
         })?;
@@ -233,11 +230,9 @@ pub fn verify_snapshot(snapshot_dir: &Path) -> Result<SnapshotInfo> {
         }
 
         // Validate _meta can be loaded (structurally valid).
-        crate::table::TableMeta::load(&meta_path).map_err(|e| {
-            ExchangeDbError::Snapshot {
-                detail: format!("table '{}' has invalid _meta: {}", table_name, e),
-                path: meta_path.display().to_string(),
-            }
+        crate::table::TableMeta::load(&meta_path).map_err(|e| ExchangeDbError::Snapshot {
+            detail: format!("table '{}' has invalid _meta: {}", table_name, e),
+            path: meta_path.display().to_string(),
         })?;
     }
 
@@ -251,8 +246,8 @@ pub fn verify_snapshot(snapshot_dir: &Path) -> Result<SnapshotInfo> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
     use crate::table::{ColumnValue, TableBuilder, TableWriter};
+    use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 
     #[test]
     fn test_create_and_restore_snapshot() {
@@ -298,8 +293,8 @@ mod tests {
         assert!(restore_root.join("test_table").join("_meta").exists());
 
         // Verify metadata is valid
-        let meta = crate::table::TableMeta::load(&restore_root.join("test_table").join("_meta"))
-            .unwrap();
+        let meta =
+            crate::table::TableMeta::load(&restore_root.join("test_table").join("_meta")).unwrap();
         assert_eq!(meta.name, "test_table");
         assert_eq!(meta.columns.len(), 3);
     }
@@ -328,11 +323,7 @@ mod tests {
         let snapshot_dir = tempfile::tempdir().unwrap();
         let db_dir = tempfile::tempdir().unwrap();
 
-        std::fs::write(
-            snapshot_dir.path().join("manifest.json"),
-            "not valid json",
-        )
-        .unwrap();
+        std::fs::write(snapshot_dir.path().join("manifest.json"), "not valid json").unwrap();
 
         let result = restore_snapshot(snapshot_dir.path(), db_dir.path());
         assert!(result.is_err());
@@ -395,8 +386,8 @@ mod tests {
         // Restore should overwrite
         restore_snapshot(&snap_path, restore_root).unwrap();
 
-        let meta = crate::table::TableMeta::load(&restore_root.join("mytable").join("_meta"))
-            .unwrap();
+        let meta =
+            crate::table::TableMeta::load(&restore_root.join("mytable").join("_meta")).unwrap();
         // Should have "x" column from snapshot, not "different"
         assert!(meta.columns.iter().any(|c| c.name == "x"));
         assert!(!meta.columns.iter().any(|c| c.name == "different"));
@@ -404,10 +395,7 @@ mod tests {
 
     #[test]
     fn test_snapshot_nonexistent_db_root() {
-        let result = create_snapshot(
-            Path::new("/nonexistent/path/db"),
-            Path::new("/tmp/snap"),
-        );
+        let result = create_snapshot(Path::new("/nonexistent/path/db"), Path::new("/tmp/snap"));
         assert!(result.is_err());
     }
 }

@@ -161,8 +161,7 @@ mod tests {
 
         let _lock = TableWriteLock::try_acquire(&table_dir).unwrap();
 
-        let result =
-            TableWriteLock::acquire_timeout(&table_dir, Duration::from_millis(50));
+        let result = TableWriteLock::acquire_timeout(&table_dir, Duration::from_millis(50));
         assert!(result.is_err());
         match result.unwrap_err() {
             ExchangeDbError::LockTimeout(_) => {}

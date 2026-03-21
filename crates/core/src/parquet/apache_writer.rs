@@ -16,8 +16,8 @@
 //! which is the simplest valid Parquet file. All standard readers support this.
 
 use super::thrift::{
-    encode_data_page_header, encode_parquet_footer, ColumnChunkMeta, CompressionCodec,
-    ParquetEncoding, ParquetSchemaColumn, PhysicalType, Repetition, RowGroupMeta,
+    ColumnChunkMeta, CompressionCodec, ParquetEncoding, ParquetSchemaColumn, PhysicalType,
+    Repetition, RowGroupMeta, encode_data_page_header, encode_parquet_footer,
 };
 use crate::parquet::writer::{ParquetColumn, ParquetType, ParquetWriteStats};
 use crate::table::TableMeta;
@@ -217,15 +217,13 @@ fn read_column_plain(
 
         let mut result = Vec::new();
         for i in 0..num_values {
-            let offset =
-                u64::from_le_bytes(index[i * 8..(i + 1) * 8].try_into().unwrap()) as usize;
+            let offset = u64::from_le_bytes(index[i * 8..(i + 1) * 8].try_into().unwrap()) as usize;
             if offset + 4 > data.len() {
                 // Write empty value
                 result.extend_from_slice(&0u32.to_le_bytes());
                 continue;
             }
-            let val_len =
-                u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+            let val_len = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
             let val_end = (offset + 4 + val_len).min(data.len());
             let actual_len = val_end - offset - 4;
             // Parquet BYTE_ARRAY PLAIN: 4-byte LE length + bytes
@@ -244,8 +242,14 @@ fn read_column_plain(
         // E.g., I8/I16/Boolean -> Int32 in Parquet.
         match (col_type, physical_type) {
             // Already the right size - pass through
-            (ColumnType::I32 | ColumnType::Symbol | ColumnType::Date | ColumnType::IPv4, PhysicalType::Int32)
-            | (ColumnType::I64 | ColumnType::GeoHash | ColumnType::Timestamp, PhysicalType::Int64)
+            (
+                ColumnType::I32 | ColumnType::Symbol | ColumnType::Date | ColumnType::IPv4,
+                PhysicalType::Int32,
+            )
+            | (
+                ColumnType::I64 | ColumnType::GeoHash | ColumnType::Timestamp,
+                PhysicalType::Int64,
+            )
             | (ColumnType::F32, PhysicalType::Float)
             | (ColumnType::F64, PhysicalType::Double) => Ok(raw),
 
@@ -269,7 +273,10 @@ fn read_column_plain(
             }
 
             // Uuid/Long128/Long256: pass as BYTE_ARRAY with fixed-length values
-            (ColumnType::Uuid | ColumnType::Long128 | ColumnType::Long256, PhysicalType::ByteArray) => {
+            (
+                ColumnType::Uuid | ColumnType::Long128 | ColumnType::Long256,
+                PhysicalType::ByteArray,
+            ) => {
                 let elem_size = col_type.fixed_size().unwrap();
                 let num_values = raw.len() / elem_size;
                 let mut result = Vec::with_capacity(raw.len() + num_values * 4);

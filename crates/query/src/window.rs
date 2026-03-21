@@ -17,10 +17,16 @@ pub struct WindowSpec {
 /// Window frame specification (ROWS/RANGE BETWEEN ... AND ...).
 #[derive(Debug, Clone, PartialEq)]
 pub enum WindowFrame {
-    Rows { start: FrameBound, end: FrameBound },
+    Rows {
+        start: FrameBound,
+        end: FrameBound,
+    },
     /// RANGE frame: value-based windowing (e.g. RANGE BETWEEN INTERVAL '1 hour' PRECEDING AND CURRENT ROW).
     /// The bounds are expressed in the same unit as the ORDER BY column (nanoseconds for timestamps).
-    Range { start: FrameBound, end: FrameBound },
+    Range {
+        start: FrameBound,
+        end: FrameBound,
+    },
 }
 
 /// Boundary for a window frame.
@@ -89,9 +95,16 @@ pub enum WindowFuncArg {
 pub fn is_window_function(name: &str) -> bool {
     matches!(
         name.to_ascii_lowercase().as_str(),
-        "row_number" | "rank" | "dense_rank" | "lag" | "lead"
-            | "first_value" | "last_value"
-            | "sum" | "avg" | "count"
+        "row_number"
+            | "rank"
+            | "dense_rank"
+            | "lag"
+            | "lead"
+            | "first_value"
+            | "last_value"
+            | "sum"
+            | "avg"
+            | "count"
     )
 }
 
@@ -257,13 +270,34 @@ fn compute_for_partition(
             compute_first_last_value(rows, base_columns, wf, sorted_indices, result, false);
         }
         "sum" => {
-            compute_windowed_aggregate(rows, base_columns, wf, sorted_indices, result, AggKind::Sum);
+            compute_windowed_aggregate(
+                rows,
+                base_columns,
+                wf,
+                sorted_indices,
+                result,
+                AggKind::Sum,
+            );
         }
         "avg" => {
-            compute_windowed_aggregate(rows, base_columns, wf, sorted_indices, result, AggKind::Avg);
+            compute_windowed_aggregate(
+                rows,
+                base_columns,
+                wf,
+                sorted_indices,
+                result,
+                AggKind::Avg,
+            );
         }
         "count" => {
-            compute_windowed_aggregate(rows, base_columns, wf, sorted_indices, result, AggKind::Count);
+            compute_windowed_aggregate(
+                rows,
+                base_columns,
+                wf,
+                sorted_indices,
+                result,
+                AggKind::Count,
+            );
         }
         _ => {
             // Unknown function: leave as Null.
@@ -298,9 +332,9 @@ fn compute_rank_with_cols(
         let prev_idx = sorted_indices[i - 1];
         let curr_idx = sorted_indices[i];
 
-        let tied = order_col_indices.iter().all(|&col_idx| {
-            rows[prev_idx][col_idx] == rows[curr_idx][col_idx]
-        });
+        let tied = order_col_indices
+            .iter()
+            .all(|&col_idx| rows[prev_idx][col_idx] == rows[curr_idx][col_idx]);
 
         if tied {
             result[curr_idx] = result[prev_idx].clone();
@@ -394,21 +428,28 @@ fn compute_first_last_value(
 
     // Determine if we have a RANGE frame.
     let order_col_idx_for_range = if matches!(&wf.over.frame, Some(WindowFrame::Range { .. })) {
-        wf.over.order_by.first().and_then(|ob| {
-            base_columns.iter().position(|c| c == &ob.column)
-        })
+        wf.over
+            .order_by
+            .first()
+            .and_then(|ob| base_columns.iter().position(|c| c == &ob.column))
     } else {
         None
     };
 
     for (pos, &orig_idx) in sorted_indices.iter().enumerate() {
-        let (frame_start, frame_end) = if let (Some(WindowFrame::Range { start, end }), Some(oc_idx)) =
-            (&wf.over.frame, order_col_idx_for_range)
-        {
-            resolve_range_frame(rows, sorted_indices, oc_idx, pos, start, end)
-        } else {
-            resolve_frame(&wf.over.frame, pos, sorted_indices.len(), !wf.over.order_by.is_empty())
-        };
+        let (frame_start, frame_end) =
+            if let (Some(WindowFrame::Range { start, end }), Some(oc_idx)) =
+                (&wf.over.frame, order_col_idx_for_range)
+            {
+                resolve_range_frame(rows, sorted_indices, oc_idx, pos, start, end)
+            } else {
+                resolve_frame(
+                    &wf.over.frame,
+                    pos,
+                    sorted_indices.len(),
+                    !wf.over.order_by.is_empty(),
+                )
+            };
 
         let val = if is_first {
             rows[sorted_indices[frame_start]][col_idx].clone()
@@ -459,21 +500,28 @@ fn compute_windowed_aggregate(
 
     // Determine if we have a RANGE frame and need value-based windowing.
     let order_col_idx_for_range = if matches!(&wf.over.frame, Some(WindowFrame::Range { .. })) {
-        wf.over.order_by.first().and_then(|ob| {
-            base_columns.iter().position(|c| c == &ob.column)
-        })
+        wf.over
+            .order_by
+            .first()
+            .and_then(|ob| base_columns.iter().position(|c| c == &ob.column))
     } else {
         None
     };
 
     for (pos, &orig_idx) in sorted_indices.iter().enumerate() {
-        let (frame_start, frame_end) = if let (Some(WindowFrame::Range { start, end }), Some(oc_idx)) =
-            (&wf.over.frame, order_col_idx_for_range)
-        {
-            resolve_range_frame(rows, sorted_indices, oc_idx, pos, start, end)
-        } else {
-            resolve_frame(&wf.over.frame, pos, sorted_indices.len(), !wf.over.order_by.is_empty())
-        };
+        let (frame_start, frame_end) =
+            if let (Some(WindowFrame::Range { start, end }), Some(oc_idx)) =
+                (&wf.over.frame, order_col_idx_for_range)
+            {
+                resolve_range_frame(rows, sorted_indices, oc_idx, pos, start, end)
+            } else {
+                resolve_frame(
+                    &wf.over.frame,
+                    pos,
+                    sorted_indices.len(),
+                    !wf.over.order_by.is_empty(),
+                )
+            };
 
         let mut sum_i: i64 = 0;
         let mut sum_f: f64 = 0.0;
@@ -611,7 +659,9 @@ fn resolve_range_frame(
             let mut s = current_pos;
             while s > 0 {
                 let v = value_to_f64(&rows[sorted_indices[s - 1]][order_col_idx]);
-                if v < lower { break; }
+                if v < lower {
+                    break;
+                }
                 s -= 1;
             }
             s
@@ -621,7 +671,9 @@ fn resolve_range_frame(
             let mut s = current_pos;
             while s < sorted_indices.len() - 1 {
                 let v = value_to_f64(&rows[sorted_indices[s]][order_col_idx]);
-                if v >= lower { break; }
+                if v >= lower {
+                    break;
+                }
                 s += 1;
             }
             s
@@ -637,7 +689,9 @@ fn resolve_range_frame(
             let mut e = current_pos;
             while e < sorted_indices.len() - 1 {
                 let v = value_to_f64(&rows[sorted_indices[e + 1]][order_col_idx]);
-                if v > upper { break; }
+                if v > upper {
+                    break;
+                }
                 e += 1;
             }
             e
@@ -647,7 +701,9 @@ fn resolve_range_frame(
             let mut e = current_pos;
             while e > 0 {
                 let v = value_to_f64(&rows[sorted_indices[e]][order_col_idx]);
-                if v <= upper { break; }
+                if v <= upper {
+                    break;
+                }
                 e -= 1;
             }
             e
@@ -707,11 +763,36 @@ mod tests {
             "timestamp".to_string(),
         ];
         let rows = vec![
-            vec![Value::Str("BTC".into()), Value::F64(100.0), Value::F64(10.0), Value::I64(1)],
-            vec![Value::Str("BTC".into()), Value::F64(105.0), Value::F64(20.0), Value::I64(2)],
-            vec![Value::Str("ETH".into()), Value::F64(50.0), Value::F64(30.0), Value::I64(1)],
-            vec![Value::Str("BTC".into()), Value::F64(102.0), Value::F64(15.0), Value::I64(3)],
-            vec![Value::Str("ETH".into()), Value::F64(55.0), Value::F64(25.0), Value::I64(2)],
+            vec![
+                Value::Str("BTC".into()),
+                Value::F64(100.0),
+                Value::F64(10.0),
+                Value::I64(1),
+            ],
+            vec![
+                Value::Str("BTC".into()),
+                Value::F64(105.0),
+                Value::F64(20.0),
+                Value::I64(2),
+            ],
+            vec![
+                Value::Str("ETH".into()),
+                Value::F64(50.0),
+                Value::F64(30.0),
+                Value::I64(1),
+            ],
+            vec![
+                Value::Str("BTC".into()),
+                Value::F64(102.0),
+                Value::F64(15.0),
+                Value::I64(3),
+            ],
+            vec![
+                Value::Str("ETH".into()),
+                Value::F64(55.0),
+                Value::F64(25.0),
+                Value::I64(2),
+            ],
         ];
         (cols, rows)
     }
@@ -724,7 +805,10 @@ mod tests {
             args: vec![],
             over: WindowSpec {
                 partition_by: vec!["symbol".into()],
-                order_by: vec![OrderBy { column: "timestamp".into(), descending: false }],
+                order_by: vec![OrderBy {
+                    column: "timestamp".into(),
+                    descending: false,
+                }],
                 frame: None,
             },
             alias: Some("rn".into()),
@@ -758,7 +842,10 @@ mod tests {
             args: vec![],
             over: WindowSpec {
                 partition_by: vec![],
-                order_by: vec![OrderBy { column: "score".into(), descending: true }],
+                order_by: vec![OrderBy {
+                    column: "score".into(),
+                    descending: true,
+                }],
                 frame: None,
             },
             alias: Some("rnk".into()),
@@ -794,7 +881,10 @@ mod tests {
             args: vec![],
             over: WindowSpec {
                 partition_by: vec![],
-                order_by: vec![OrderBy { column: "score".into(), descending: true }],
+                order_by: vec![OrderBy {
+                    column: "score".into(),
+                    descending: true,
+                }],
                 frame: None,
             },
             alias: Some("drnk".into()),
@@ -818,10 +908,16 @@ mod tests {
         let (cols, mut rows) = make_rows();
         let wf = WindowFunction {
             name: "lag".into(),
-            args: vec![WindowFuncArg::Column("price".into()), WindowFuncArg::LiteralInt(1)],
+            args: vec![
+                WindowFuncArg::Column("price".into()),
+                WindowFuncArg::LiteralInt(1),
+            ],
             over: WindowSpec {
                 partition_by: vec!["symbol".into()],
-                order_by: vec![OrderBy { column: "timestamp".into(), descending: false }],
+                order_by: vec![OrderBy {
+                    column: "timestamp".into(),
+                    descending: false,
+                }],
                 frame: None,
             },
             alias: Some("prev_price".into()),
@@ -842,10 +938,7 @@ mod tests {
     #[test]
     fn test_lag_with_default() {
         let cols = vec!["val".to_string()];
-        let mut rows = vec![
-            vec![Value::I64(10)],
-            vec![Value::I64(20)],
-        ];
+        let mut rows = vec![vec![Value::I64(10)], vec![Value::I64(20)]];
 
         let wf = WindowFunction {
             name: "lag".into(),
@@ -873,10 +966,16 @@ mod tests {
         let (cols, mut rows) = make_rows();
         let wf = WindowFunction {
             name: "lead".into(),
-            args: vec![WindowFuncArg::Column("price".into()), WindowFuncArg::LiteralInt(1)],
+            args: vec![
+                WindowFuncArg::Column("price".into()),
+                WindowFuncArg::LiteralInt(1),
+            ],
             over: WindowSpec {
                 partition_by: vec!["symbol".into()],
-                order_by: vec![OrderBy { column: "timestamp".into(), descending: false }],
+                order_by: vec![OrderBy {
+                    column: "timestamp".into(),
+                    descending: false,
+                }],
                 frame: None,
             },
             alias: Some("next_price".into()),
@@ -902,7 +1001,10 @@ mod tests {
             args: vec![WindowFuncArg::Column("volume".into())],
             over: WindowSpec {
                 partition_by: vec!["symbol".into()],
-                order_by: vec![OrderBy { column: "timestamp".into(), descending: false }],
+                order_by: vec![OrderBy {
+                    column: "timestamp".into(),
+                    descending: false,
+                }],
                 frame: Some(WindowFrame::Rows {
                     start: FrameBound::UnboundedPreceding,
                     end: FrameBound::CurrentRow,
@@ -931,7 +1033,10 @@ mod tests {
             args: vec![],
             over: WindowSpec {
                 partition_by: vec!["symbol".into()],
-                order_by: vec![OrderBy { column: "timestamp".into(), descending: false }],
+                order_by: vec![OrderBy {
+                    column: "timestamp".into(),
+                    descending: false,
+                }],
                 frame: None,
             },
             alias: Some("rn".into()),
@@ -941,7 +1046,10 @@ mod tests {
             args: vec![WindowFuncArg::Column("volume".into())],
             over: WindowSpec {
                 partition_by: vec!["symbol".into()],
-                order_by: vec![OrderBy { column: "timestamp".into(), descending: false }],
+                order_by: vec![OrderBy {
+                    column: "timestamp".into(),
+                    descending: false,
+                }],
                 frame: Some(WindowFrame::Rows {
                     start: FrameBound::UnboundedPreceding,
                     end: FrameBound::CurrentRow,

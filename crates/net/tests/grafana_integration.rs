@@ -8,9 +8,9 @@
 
 use std::sync::Arc;
 
+use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use axum::Router;
 use tower::ServiceExt;
 
 use exchange_net::http::handlers::AppState;
@@ -288,10 +288,7 @@ async fn grafana_tag_keys() {
     let keys = json.as_array().unwrap();
     assert!(!keys.is_empty());
     // Each key has "type" and "text"
-    let texts: Vec<&str> = keys
-        .iter()
-        .filter_map(|k| k["text"].as_str())
-        .collect();
+    let texts: Vec<&str> = keys.iter().filter_map(|k| k["text"].as_str()).collect();
     assert!(texts.contains(&"timestamp"));
     assert!(texts.contains(&"price"));
 }
@@ -300,12 +297,8 @@ async fn grafana_tag_keys() {
 async fn grafana_tag_keys_no_target() {
     let (_dir, state) = test_state();
     let router = app(state);
-    let (status, json) = post_json(
-        &router,
-        "/api/v1/grafana/tag-keys",
-        serde_json::json!({}),
-    )
-    .await;
+    let (status, json) =
+        post_json(&router, "/api/v1/grafana/tag-keys", serde_json::json!({})).await;
     assert_eq!(status, StatusCode::OK);
     assert!(json.as_array().unwrap().is_empty());
 }
@@ -322,10 +315,19 @@ async fn metrics_returns_prometheus_format() {
     assert_eq!(status, StatusCode::OK);
 
     // Must contain key Prometheus metrics
-    assert!(body.contains("exchangedb_queries_total"), "missing queries_total");
-    assert!(body.contains("exchangedb_rows_written_total"), "missing rows_written");
+    assert!(
+        body.contains("exchangedb_queries_total"),
+        "missing queries_total"
+    );
+    assert!(
+        body.contains("exchangedb_rows_written_total"),
+        "missing rows_written"
+    );
     assert!(body.contains("exchangedb_uptime_seconds"), "missing uptime");
-    assert!(body.contains("exchangedb_connections_active"), "missing connections");
+    assert!(
+        body.contains("exchangedb_connections_active"),
+        "missing connections"
+    );
 }
 
 #[tokio::test]
@@ -342,10 +344,7 @@ async fn metrics_has_valid_prometheus_lines() {
         }
         // Basic format: name value or name{labels} value
         let parts: Vec<&str> = line.splitn(2, ' ').collect();
-        assert!(
-            parts.len() >= 2,
-            "invalid prometheus line: {line}"
-        );
+        assert!(parts.len() >= 2, "invalid prometheus line: {line}");
         // Value should be parseable as a number
         let value_str = parts[1].trim();
         assert!(

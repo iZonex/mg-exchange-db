@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{Context, Result};
-use serde::de::{self, Visitor};
 use serde::Deserialize;
+use serde::de::{self, Visitor};
 
 // ---------------------------------------------------------------------------
 // Human-readable byte sizes
@@ -483,7 +483,6 @@ impl Default for TlsSection {
     }
 }
 
-
 impl Default for ServerSection {
     fn default() -> Self {
         Self {
@@ -624,8 +623,8 @@ impl Default for O3Section {
 impl Default for MemorySection {
     fn default() -> Self {
         Self {
-            max_per_query: ByteSize(256 * 1024 * 1024), // 256MB
-            max_total: ByteSize(0),                      // unlimited
+            max_per_query: ByteSize(256 * 1024 * 1024),   // 256MB
+            max_total: ByteSize(0),                       // unlimited
             sort_key_max_size: ByteSize(2 * 1024 * 1024), // 2MB
         }
     }
@@ -684,7 +683,7 @@ impl Default for TieringSection {
     fn default() -> Self {
         Self {
             enabled: false,
-            hot_retention: HumanDuration(std::time::Duration::from_secs(7 * 86400)),  // 7d
+            hot_retention: HumanDuration(std::time::Duration::from_secs(7 * 86400)), // 7d
             warm_retention: HumanDuration(std::time::Duration::from_secs(30 * 86400)), // 30d
             cold_storage_path: String::new(),
             check_interval: HumanDuration(std::time::Duration::from_secs(1800)), // 30m
@@ -697,7 +696,7 @@ impl Default for PitrSection {
         Self {
             enabled: false,
             retention_window: HumanDuration(std::time::Duration::from_secs(7 * 86400)), // 7d
-            snapshot_interval: HumanDuration(std::time::Duration::from_secs(6 * 3600)),  // 6h
+            snapshot_interval: HumanDuration(std::time::Duration::from_secs(6 * 3600)), // 6h
         }
     }
 }
@@ -707,7 +706,7 @@ impl Default for TtlSection {
         Self {
             enabled: false,
             default_max_age: HumanDuration(std::time::Duration::from_secs(90 * 86400)), // 90d
-            check_interval: HumanDuration(std::time::Duration::from_secs(3600)),          // 1h
+            check_interval: HumanDuration(std::time::Duration::from_secs(3600)),        // 1h
         }
     }
 }
@@ -813,42 +812,49 @@ impl ExchangeDbConfig {
             self.http.bind = v;
         }
         if let Ok(v) = std::env::var("EXCHANGEDB_HTTP_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.http.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.http.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_PGWIRE_BIND") {
             self.pgwire.bind = v;
         }
         if let Ok(v) = std::env::var("EXCHANGEDB_PGWIRE_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.pgwire.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.pgwire.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_ILP_BIND") {
             self.ilp.bind = v;
         }
         if let Ok(v) = std::env::var("EXCHANGEDB_ILP_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.ilp.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.ilp.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_ILP_BATCH_SIZE")
-            && let Ok(n) = v.parse::<usize>() {
-                self.ilp.batch_size = n;
-            }
+            && let Ok(n) = v.parse::<usize>()
+        {
+            self.ilp.batch_size = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_WAL_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.storage.wal_enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.storage.wal_enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_QUERY_PARALLELISM")
-            && let Ok(n) = v.parse::<usize>() {
-                self.performance.query_parallelism = n;
-            }
+            && let Ok(n) = v.parse::<usize>()
+        {
+            self.performance.query_parallelism = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_WRITER_COMMIT_MODE") {
             self.performance.writer_commit_mode = v;
         }
         if let Ok(v) = std::env::var("EXCHANGEDB_TLS_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.tls.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.tls.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_TLS_CERT_PATH") {
             self.tls.cert_path = v;
         }
@@ -866,208 +872,255 @@ impl ExchangeDbConfig {
         }
         // Cairo section
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_MAX_UNCOMMITTED_ROWS")
-            && let Ok(n) = v.parse::<u64>() {
-                self.cairo.max_uncommitted_rows = n;
-            }
+            && let Ok(n) = v.parse::<u64>()
+        {
+            self.cairo.max_uncommitted_rows = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_COMMIT_LAG")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.cairo.commit_lag = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.cairo.commit_lag = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_O3_MAX_LAG")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.cairo.o3_max_lag = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.cairo.o3_max_lag = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_WRITER_DATA_APPEND_PAGE_SIZE")
-            && let Ok(b) = v.parse::<ByteSize>() {
-                self.cairo.writer_data_append_page_size = b;
-            }
+            && let Ok(b) = v.parse::<ByteSize>()
+        {
+            self.cairo.writer_data_append_page_size = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_READER_POOL_MAX_SEGMENTS")
-            && let Ok(n) = v.parse::<u32>() {
-                self.cairo.reader_pool_max_segments = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.cairo.reader_pool_max_segments = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_SPIN_LOCK_TIMEOUT")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.cairo.spin_lock_timeout = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.cairo.spin_lock_timeout = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_CHARACTER_STORE_CAPACITY")
-            && let Ok(n) = v.parse::<u32>() {
-                self.cairo.character_store_capacity = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.cairo.character_store_capacity = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_CHARACTER_STORE_SEQUENCE_POOL_CAPACITY")
-            && let Ok(n) = v.parse::<u32>() {
-                self.cairo.character_store_sequence_pool_capacity = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.cairo.character_store_sequence_pool_capacity = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_COLUMN_POOL_CAPACITY")
-            && let Ok(n) = v.parse::<u32>() {
-                self.cairo.column_pool_capacity = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.cairo.column_pool_capacity = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_COMPACT_MAP_LOAD_FACTOR")
-            && let Ok(n) = v.parse::<f64>() {
-                self.cairo.compact_map_load_factor = n;
-            }
+            && let Ok(n) = v.parse::<f64>()
+        {
+            self.cairo.compact_map_load_factor = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_DEFAULT_MAP_TYPE") {
             self.cairo.default_map_type = v;
         }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_DEFAULT_SYMBOL_CACHE_FLAG")
-            && let Ok(b) = v.parse::<bool>() {
-                self.cairo.default_symbol_cache_flag = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.cairo.default_symbol_cache_flag = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_DEFAULT_SYMBOL_CAPACITY")
-            && let Ok(n) = v.parse::<u32>() {
-                self.cairo.default_symbol_capacity = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.cairo.default_symbol_capacity = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_FILE_OPERATION_RETRY_COUNT")
-            && let Ok(n) = v.parse::<u32>() {
-                self.cairo.file_operation_retry_count = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.cairo.file_operation_retry_count = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_INACTIVE_READER_TTL")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.cairo.inactive_reader_ttl = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.cairo.inactive_reader_ttl = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_INACTIVE_WRITER_TTL")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.cairo.inactive_writer_ttl = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.cairo.inactive_writer_ttl = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_INDEX_VALUE_BLOCK_SIZE")
-            && let Ok(n) = v.parse::<u32>() {
-                self.cairo.index_value_block_size = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.cairo.index_value_block_size = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_MAX_SWAP_FILE_COUNT")
-            && let Ok(n) = v.parse::<u32>() {
-                self.cairo.max_swap_file_count = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.cairo.max_swap_file_count = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_MKDIR_MODE")
-            && let Ok(n) = u32::from_str_radix(v.trim_start_matches("0o").trim_start_matches("0"), 8) {
-                self.cairo.mkdir_mode = n;
-            }
+            && let Ok(n) =
+                u32::from_str_radix(v.trim_start_matches("0o").trim_start_matches("0"), 8)
+        {
+            self.cairo.mkdir_mode = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_PARALLEL_INDEX_THRESHOLD")
-            && let Ok(n) = v.parse::<u32>() {
-                self.cairo.parallel_index_threshold = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.cairo.parallel_index_threshold = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_SNAPSHOT_INSTANCE_ID") {
             self.cairo.snapshot_instance_id = v;
         }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_SQL_COPY_BUFFER_SIZE")
-            && let Ok(b) = v.parse::<ByteSize>() {
-                self.cairo.sql_copy_buffer_size = b;
-            }
+            && let Ok(b) = v.parse::<ByteSize>()
+        {
+            self.cairo.sql_copy_buffer_size = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_SYSTEM_TABLE_PREFIX") {
             self.cairo.system_table_prefix = v;
         }
         // WAL section
         if let Ok(v) = std::env::var("EXCHANGEDB_WAL_WAL_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.wal.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.wal.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_WAL_MAX_SEGMENT_SIZE")
-            && let Ok(b) = v.parse::<ByteSize>() {
-                self.wal.max_segment_size = b;
-            }
+            && let Ok(b) = v.parse::<ByteSize>()
+        {
+            self.wal.max_segment_size = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_WAL_APPLY_TABLE_TIME_QUOTA")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.wal.apply_table_time_quota = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.wal.apply_table_time_quota = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_WAL_PURGE_INTERVAL")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.wal.purge_interval = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.wal.purge_interval = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_WAL_SEGMENT_ROLLOVER_ROW_COUNT")
-            && let Ok(n) = v.parse::<u64>() {
-                self.wal.segment_rollover_row_count = n;
-            }
+            && let Ok(n) = v.parse::<u64>()
+        {
+            self.wal.segment_rollover_row_count = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_WAL_SQUASH_UNCOMMITTED_ROWS_MULTIPLIER")
-            && let Ok(n) = v.parse::<f64>() {
-                self.wal.squash_uncommitted_rows_multiplier = n;
-            }
+            && let Ok(n) = v.parse::<f64>()
+        {
+            self.wal.squash_uncommitted_rows_multiplier = n;
+        }
         // O3 section
         if let Ok(v) = std::env::var("EXCHANGEDB_O3_PARTITION_SPLIT_MIN_SIZE")
-            && let Ok(b) = v.parse::<ByteSize>() {
-                self.o3.partition_split_min_size = b;
-            }
+            && let Ok(b) = v.parse::<ByteSize>()
+        {
+            self.o3.partition_split_min_size = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_O3_LAST_PARTITION_MAX_SPLITS")
-            && let Ok(n) = v.parse::<u32>() {
-                self.o3.last_partition_max_splits = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.o3.last_partition_max_splits = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_O3_COLUMN_MEMORY_SIZE")
-            && let Ok(b) = v.parse::<ByteSize>() {
-                self.o3.column_memory_size = b;
-            }
+            && let Ok(b) = v.parse::<ByteSize>()
+        {
+            self.o3.column_memory_size = b;
+        }
         // Memory section
         if let Ok(v) = std::env::var("EXCHANGEDB_MEMORY_MAX_PER_QUERY")
-            && let Ok(b) = v.parse::<ByteSize>() {
-                self.memory.max_per_query = b;
-            }
+            && let Ok(b) = v.parse::<ByteSize>()
+        {
+            self.memory.max_per_query = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_MEMORY_MAX_TOTAL")
-            && let Ok(b) = v.parse::<ByteSize>() {
-                self.memory.max_total = b;
-            }
+            && let Ok(b) = v.parse::<ByteSize>()
+        {
+            self.memory.max_total = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_MEMORY_SORT_KEY_MAX_SIZE")
-            && let Ok(b) = v.parse::<ByteSize>() {
-                self.memory.sort_key_max_size = b;
-            }
+            && let Ok(b) = v.parse::<ByteSize>()
+        {
+            self.memory.sort_key_max_size = b;
+        }
         // Telemetry section
         if let Ok(v) = std::env::var("EXCHANGEDB_TELEMETRY_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.telemetry.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.telemetry.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_TELEMETRY_QUEUE_CAPACITY")
-            && let Ok(n) = v.parse::<u32>() {
-                self.telemetry.queue_capacity = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.telemetry.queue_capacity = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_TELEMETRY_HIDE_TABLES")
-            && let Ok(b) = v.parse::<bool>() {
-                self.telemetry.hide_tables = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.telemetry.hide_tables = b;
+        }
         // Security section
         if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_AUTH_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.security.auth_enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.security.auth_enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_RBAC_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.security.rbac_enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.security.rbac_enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_AUDIT_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.security.audit_enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.security.audit_enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_PASSWORD_MIN_LENGTH")
-            && let Ok(n) = v.parse::<u32>() {
-                self.security.password_min_length = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.security.password_min_length = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_SESSION_TIMEOUT")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.security.session_timeout = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.security.session_timeout = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_MAX_FAILED_LOGIN_ATTEMPTS")
-            && let Ok(n) = v.parse::<u32>() {
-                self.security.max_failed_login_attempts = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.security.max_failed_login_attempts = n;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_LOCKOUT_DURATION")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.security.lockout_duration = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.security.lockout_duration = d;
+        }
         // Cluster section
         if let Ok(v) = std::env::var("EXCHANGEDB_CLUSTER_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.cluster.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.cluster.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CLUSTER_NODE_ID") {
             self.cluster.node_id = v;
         }
         if let Ok(v) = std::env::var("EXCHANGEDB_CLUSTER_HEARTBEAT_INTERVAL")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.cluster.heartbeat_interval = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.cluster.heartbeat_interval = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CLUSTER_FAILURE_THRESHOLD")
-            && let Ok(n) = v.parse::<u32>() {
-                self.cluster.failure_threshold = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.cluster.failure_threshold = n;
+        }
         // Backup section
         if let Ok(v) = std::env::var("EXCHANGEDB_BACKUP_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.backup.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.backup.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_BACKUP_SCHEDULE") {
             self.backup.schedule = v;
         }
@@ -1075,60 +1128,72 @@ impl ExchangeDbConfig {
             self.backup.destination = v;
         }
         if let Ok(v) = std::env::var("EXCHANGEDB_BACKUP_RETENTION_COUNT")
-            && let Ok(n) = v.parse::<u32>() {
-                self.backup.retention_count = n;
-            }
+            && let Ok(n) = v.parse::<u32>()
+        {
+            self.backup.retention_count = n;
+        }
         // Tiering section
         if let Ok(v) = std::env::var("EXCHANGEDB_TIERING_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.tiering.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.tiering.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_TIERING_HOT_RETENTION")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.tiering.hot_retention = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.tiering.hot_retention = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_TIERING_WARM_RETENTION")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.tiering.warm_retention = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.tiering.warm_retention = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_TIERING_COLD_STORAGE_PATH") {
             self.tiering.cold_storage_path = v;
         }
         // PITR section
         if let Ok(v) = std::env::var("EXCHANGEDB_PITR_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.pitr.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.pitr.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_PITR_RETENTION_WINDOW")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.pitr.retention_window = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.pitr.retention_window = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_PITR_SNAPSHOT_INTERVAL")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.pitr.snapshot_interval = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.pitr.snapshot_interval = d;
+        }
         // TTL section
         if let Ok(v) = std::env::var("EXCHANGEDB_TTL_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.ttl.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.ttl.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_TTL_DEFAULT_MAX_AGE")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.ttl.default_max_age = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.ttl.default_max_age = d;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_TTL_CHECK_INTERVAL")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.ttl.check_interval = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.ttl.check_interval = d;
+        }
         // Downsampling section
         if let Ok(v) = std::env::var("EXCHANGEDB_DOWNSAMPLING_ENABLED")
-            && let Ok(b) = v.parse::<bool>() {
-                self.downsampling.enabled = b;
-            }
+            && let Ok(b) = v.parse::<bool>()
+        {
+            self.downsampling.enabled = b;
+        }
         if let Ok(v) = std::env::var("EXCHANGEDB_DOWNSAMPLING_CHECK_INTERVAL")
-            && let Ok(d) = v.parse::<HumanDuration>() {
-                self.downsampling.check_interval = d;
-            }
+            && let Ok(d) = v.parse::<HumanDuration>()
+        {
+            self.downsampling.check_interval = d;
+        }
         self
     }
 
@@ -1168,8 +1233,14 @@ mod tests {
     #[test]
     fn test_byte_size_parsing() {
         assert_eq!("4KB".parse::<ByteSize>().unwrap().bytes(), 4096);
-        assert_eq!("64MB".parse::<ByteSize>().unwrap().bytes(), 64 * 1024 * 1024);
-        assert_eq!("1GB".parse::<ByteSize>().unwrap().bytes(), 1024 * 1024 * 1024);
+        assert_eq!(
+            "64MB".parse::<ByteSize>().unwrap().bytes(),
+            64 * 1024 * 1024
+        );
+        assert_eq!(
+            "1GB".parse::<ByteSize>().unwrap().bytes(),
+            1024 * 1024 * 1024
+        );
         assert_eq!("100B".parse::<ByteSize>().unwrap().bytes(), 100);
         assert_eq!("512".parse::<ByteSize>().unwrap().bytes(), 512);
     }
@@ -1225,10 +1296,7 @@ max_age = "7d"
 check_interval = "30m"
 "#;
         let config: ExchangeDbConfig = toml::from_str(toml_str).unwrap();
-        assert_eq!(
-            config.server.data_dir,
-            PathBuf::from("/var/lib/exchangedb")
-        );
+        assert_eq!(config.server.data_dir, PathBuf::from("/var/lib/exchangedb"));
         assert_eq!(config.server.log_level, "debug");
         assert_eq!(config.http.bind, "127.0.0.1:8080");
         assert_eq!(
@@ -1247,9 +1315,18 @@ check_interval = "30m"
     fn test_cairo_defaults() {
         let config = ExchangeDbConfig::default();
         assert_eq!(config.cairo.max_uncommitted_rows, 500_000);
-        assert_eq!(config.cairo.commit_lag.as_duration(), std::time::Duration::from_secs(10));
-        assert_eq!(config.cairo.o3_max_lag.as_duration(), std::time::Duration::from_secs(600));
-        assert_eq!(config.cairo.writer_data_append_page_size.bytes(), 16 * 1024 * 1024);
+        assert_eq!(
+            config.cairo.commit_lag.as_duration(),
+            std::time::Duration::from_secs(10)
+        );
+        assert_eq!(
+            config.cairo.o3_max_lag.as_duration(),
+            std::time::Duration::from_secs(600)
+        );
+        assert_eq!(
+            config.cairo.writer_data_append_page_size.bytes(),
+            16 * 1024 * 1024
+        );
         assert_eq!(config.cairo.reader_pool_max_segments, 5);
         assert_eq!(config.cairo.column_pool_capacity, 4096);
         assert_eq!(config.cairo.compact_map_load_factor, 0.7);
@@ -1269,8 +1346,14 @@ check_interval = "30m"
         let config = ExchangeDbConfig::default();
         assert!(config.wal.enabled);
         assert_eq!(config.wal.max_segment_size.bytes(), 64 * 1024 * 1024);
-        assert_eq!(config.wal.apply_table_time_quota.as_duration(), std::time::Duration::from_secs(30));
-        assert_eq!(config.wal.purge_interval.as_duration(), std::time::Duration::from_secs(30));
+        assert_eq!(
+            config.wal.apply_table_time_quota.as_duration(),
+            std::time::Duration::from_secs(30)
+        );
+        assert_eq!(
+            config.wal.purge_interval.as_duration(),
+            std::time::Duration::from_secs(30)
+        );
         assert_eq!(config.wal.segment_rollover_row_count, 200_000);
         assert_eq!(config.wal.squash_uncommitted_rows_multiplier, 20.0);
     }
@@ -1306,9 +1389,15 @@ check_interval = "30m"
         assert!(!config.security.rbac_enabled);
         assert!(!config.security.audit_enabled);
         assert_eq!(config.security.password_min_length, 8);
-        assert_eq!(config.security.session_timeout.as_duration(), std::time::Duration::from_secs(3600));
+        assert_eq!(
+            config.security.session_timeout.as_duration(),
+            std::time::Duration::from_secs(3600)
+        );
         assert_eq!(config.security.max_failed_login_attempts, 5);
-        assert_eq!(config.security.lockout_duration.as_duration(), std::time::Duration::from_secs(900));
+        assert_eq!(
+            config.security.lockout_duration.as_duration(),
+            std::time::Duration::from_secs(900)
+        );
     }
 
     #[test]
@@ -1317,7 +1406,10 @@ check_interval = "30m"
         assert!(!config.cluster.enabled);
         assert!(config.cluster.node_id.is_empty());
         assert!(config.cluster.seed_nodes.is_empty());
-        assert_eq!(config.cluster.heartbeat_interval.as_duration(), std::time::Duration::from_secs(5));
+        assert_eq!(
+            config.cluster.heartbeat_interval.as_duration(),
+            std::time::Duration::from_secs(5)
+        );
         assert_eq!(config.cluster.failure_threshold, 3);
     }
 
@@ -1377,14 +1469,20 @@ retention_count = 14
 "#;
         let config: ExchangeDbConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.cairo.max_uncommitted_rows, 1_000_000);
-        assert_eq!(config.cairo.commit_lag.as_duration(), std::time::Duration::from_secs(20));
+        assert_eq!(
+            config.cairo.commit_lag.as_duration(),
+            std::time::Duration::from_secs(20)
+        );
         assert_eq!(config.cairo.default_map_type, "compact");
         assert!(!config.cairo.default_symbol_cache_flag);
         assert_eq!(config.cairo.compact_map_load_factor, 0.5);
         assert!(!config.wal.enabled);
         assert_eq!(config.wal.max_segment_size.bytes(), 128 * 1024 * 1024);
         assert_eq!(config.wal.segment_rollover_row_count, 500_000);
-        assert_eq!(config.o3.partition_split_min_size.bytes(), 100 * 1024 * 1024);
+        assert_eq!(
+            config.o3.partition_split_min_size.bytes(),
+            100 * 1024 * 1024
+        );
         assert_eq!(config.o3.last_partition_max_splits, 10);
         assert_eq!(config.memory.max_per_query.bytes(), 512 * 1024 * 1024);
         assert_eq!(config.memory.sort_key_max_size.bytes(), 4 * 1024 * 1024);
@@ -1393,11 +1491,20 @@ retention_count = 14
         assert!(config.security.auth_enabled);
         assert!(config.security.rbac_enabled);
         assert_eq!(config.security.password_min_length, 12);
-        assert_eq!(config.security.session_timeout.as_duration(), std::time::Duration::from_secs(7200));
+        assert_eq!(
+            config.security.session_timeout.as_duration(),
+            std::time::Duration::from_secs(7200)
+        );
         assert!(config.cluster.enabled);
         assert_eq!(config.cluster.node_id, "node-1");
-        assert_eq!(config.cluster.seed_nodes, vec!["10.0.0.1:9100", "10.0.0.2:9100"]);
-        assert_eq!(config.cluster.heartbeat_interval.as_duration(), std::time::Duration::from_secs(10));
+        assert_eq!(
+            config.cluster.seed_nodes,
+            vec!["10.0.0.1:9100", "10.0.0.2:9100"]
+        );
+        assert_eq!(
+            config.cluster.heartbeat_interval.as_duration(),
+            std::time::Duration::from_secs(10)
+        );
         assert!(config.backup.enabled);
         assert_eq!(config.backup.schedule, "0 3 * * 0");
         assert_eq!(config.backup.destination, "/backups/exchangedb");

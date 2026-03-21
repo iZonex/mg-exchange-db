@@ -61,17 +61,17 @@ pub enum ColumnType {
     Varchar = 9,
     Binary = 10,
     Uuid = 11,
-    Date = 12,      // i32, days since epoch (like QuestDB)
-    Char = 13,      // u16, single UTF-16 character
-    IPv4 = 14,      // u32, IPv4 address
-    Long128 = 15,   // i128, 128-bit integer
-    Long256 = 16,   // [u64; 4], 256-bit integer
-    GeoHash = 17,   // i64, geospatial hash
+    Date = 12,    // i32, days since epoch (like QuestDB)
+    Char = 13,    // u16, single UTF-16 character
+    IPv4 = 14,    // u32, IPv4 address
+    Long128 = 15, // i128, 128-bit integer
+    Long256 = 16, // [u64; 4], 256-bit integer
+    GeoHash = 17, // i64, geospatial hash
 
     // --- New types (18–39) to match QuestDB's full 41-type catalog ---
 
     // String variant
-    String = 18,         // Same as Varchar but explicit (QuestDB distinction)
+    String = 18, // Same as Varchar but explicit (QuestDB distinction)
 
     // Temporal variants
     TimestampMicro = 19, // Microsecond precision timestamp
@@ -79,34 +79,34 @@ pub enum ColumnType {
     Interval = 21,       // Time interval (two i64: start, duration)
 
     // Decimal variants
-    Decimal8 = 22,       // 1-byte decimal
-    Decimal16 = 23,      // 2-byte decimal
-    Decimal32 = 24,      // 4-byte decimal
-    Decimal64 = 25,      // 8-byte decimal
-    Decimal128 = 26,     // 16-byte decimal
-    Decimal256 = 27,     // 32-byte decimal
+    Decimal8 = 22,   // 1-byte decimal
+    Decimal16 = 23,  // 2-byte decimal
+    Decimal32 = 24,  // 4-byte decimal
+    Decimal64 = 25,  // 8-byte decimal
+    Decimal128 = 26, // 16-byte decimal
+    Decimal256 = 27, // 32-byte decimal
 
     // Geospatial variants (sized geohash)
-    GeoByte = 28,        // 1-byte geohash (1-7 bits)
-    GeoShort = 29,       // 2-byte geohash (8-15 bits)
-    GeoInt = 30,         // 4-byte geohash (16-31 bits)
+    GeoByte = 28,  // 1-byte geohash (1-7 bits)
+    GeoShort = 29, // 2-byte geohash (8-15 bits)
+    GeoInt = 30,   // 4-byte geohash (16-31 bits)
 
     // Container types
-    Array = 31,          // Array type (variable-length, length-prefixed binary)
-    Cursor = 32,         // Cursor reference (internal)
-    Record = 33,         // Record reference (internal)
+    Array = 31,  // Array type (variable-length, length-prefixed binary)
+    Cursor = 32, // Cursor reference (internal)
+    Record = 33, // Record reference (internal)
 
     // PostgreSQL compatibility
-    RegClass = 34,       // pg regclass
-    RegProcedure = 35,   // pg regprocedure
-    ArrayString = 36,    // pg text[]
+    RegClass = 34,     // pg regclass
+    RegProcedure = 35, // pg regprocedure
+    ArrayString = 36,  // pg text[]
 
     // Special / internal
-    Null = 37,           // Explicit NULL type
-    VarArg = 38,         // Variable arguments (internal)
-    Parameter = 39,      // Bind parameter (internal)
-    VarcharSlice = 40,   // Transient in-memory slice into varchar data (internal use)
-    IPv6 = 41,           // [u8; 16], IPv6 address
+    Null = 37,         // Explicit NULL type
+    VarArg = 38,       // Variable arguments (internal)
+    Parameter = 39,    // Bind parameter (internal)
+    VarcharSlice = 40, // Transient in-memory slice into varchar data (internal use)
+    IPv6 = 41,         // [u8; 16], IPv6 address
 }
 
 impl ColumnType {
@@ -116,9 +116,15 @@ impl ColumnType {
             Self::Boolean | Self::I8 => Some(1),
             Self::I16 | Self::Char => Some(2),
             Self::I32 | Self::F32 | Self::Symbol | Self::Date | Self::IPv4 => Some(4),
-            Self::I64 | Self::F64 | Self::Timestamp | Self::GeoHash
-            | Self::TimestampMicro | Self::TimestampMilli | Self::Decimal64
-            | Self::Cursor | Self::Record => Some(8),
+            Self::I64
+            | Self::F64
+            | Self::Timestamp
+            | Self::GeoHash
+            | Self::TimestampMicro
+            | Self::TimestampMilli
+            | Self::Decimal64
+            | Self::Cursor
+            | Self::Record => Some(8),
             Self::Uuid | Self::Long128 | Self::Decimal128 | Self::Interval => Some(16),
             Self::Long256 | Self::Decimal256 => Some(32),
             Self::Decimal8 | Self::GeoByte => Some(1),
@@ -126,7 +132,11 @@ impl ColumnType {
             Self::Decimal32 | Self::GeoInt | Self::RegClass | Self::RegProcedure => Some(4),
             Self::Null | Self::VarArg | Self::Parameter => Some(0),
             Self::IPv6 => Some(16),
-            Self::Varchar | Self::Binary | Self::String | Self::Array | Self::ArrayString
+            Self::Varchar
+            | Self::Binary
+            | Self::String
+            | Self::Array
+            | Self::ArrayString
             | Self::VarcharSlice => None,
         }
     }

@@ -34,9 +34,7 @@ pub fn columnar_aggregate(
 
     // For COUNT(*), we only need the file size.
     if matches!(agg_kind, AggregateKind::Count) {
-        let file_len = std::fs::metadata(column_path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let file_len = std::fs::metadata(column_path).map(|m| m.len()).unwrap_or(0);
         let count = file_len / element_size as u64;
         return Ok(Value::I64(count as i64));
     }
@@ -451,9 +449,7 @@ fn filter_scan_i64(values: &[i64], filter: &crate::plan::Filter) -> Result<Vec<u
             }
             Ok(result)
         }
-        _ => {
-            Ok((0..values.len() as u32).collect())
-        }
+        _ => Ok((0..values.len() as u32).collect()),
     }
 }
 
@@ -540,7 +536,11 @@ impl ColumnProjectReader {
                 ColumnType::I64 => Value::I64(r.read_i64(row)),
                 ColumnType::F64 => {
                     let v = r.read_f64(row);
-                    if v.is_nan() { Value::Null } else { Value::F64(v) }
+                    if v.is_nan() {
+                        Value::Null
+                    } else {
+                        Value::F64(v)
+                    }
                 }
                 ColumnType::I32 | ColumnType::Symbol => Value::I64(r.read_i32(row) as i64),
                 ColumnType::Timestamp => Value::Timestamp(r.read_i64(row)),
@@ -551,7 +551,11 @@ impl ColumnProjectReader {
             },
             ColumnProjectReader::Var(r, _) => {
                 let s = r.read_str(row);
-                if s == "\0" { Value::Null } else { Value::Str(s.to_string()) }
+                if s == "\0" {
+                    Value::Null
+                } else {
+                    Value::Str(s.to_string())
+                }
             }
             ColumnProjectReader::Missing => Value::Null,
         }
@@ -740,10 +744,7 @@ mod tests {
         // Scalar reference.
         let scalar_sum: f64 = values.iter().sum();
         let scalar_min: f64 = values.iter().cloned().fold(f64::INFINITY, f64::min);
-        let scalar_max: f64 = values
-            .iter()
-            .cloned()
-            .fold(f64::NEG_INFINITY, f64::max);
+        let scalar_max: f64 = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
         match col_sum {
             Value::F64(v) => assert!((v - scalar_sum).abs() < 1e-6),
@@ -839,13 +840,9 @@ mod tests {
         write_f64_column(&p1.join("price.d"), &[10.0, 20.0]);
         write_f64_column(&p2.join("price.d"), &[30.0, 40.0]);
 
-        let result = columnar_aggregate_partitions(
-            &[p1, p2],
-            "price",
-            ColumnType::F64,
-            AggregateKind::Sum,
-        )
-        .unwrap();
+        let result =
+            columnar_aggregate_partitions(&[p1, p2], "price", ColumnType::F64, AggregateKind::Sum)
+                .unwrap();
 
         assert_eq!(result, Value::F64(100.0));
     }
@@ -861,13 +858,9 @@ mod tests {
         write_i64_column(&p1.join("ts.d"), &[1, 2, 3]);
         write_i64_column(&p2.join("ts.d"), &[4, 5]);
 
-        let result = columnar_aggregate_partitions(
-            &[p1, p2],
-            "ts",
-            ColumnType::I64,
-            AggregateKind::Count,
-        )
-        .unwrap();
+        let result =
+            columnar_aggregate_partitions(&[p1, p2], "ts", ColumnType::I64, AggregateKind::Count)
+                .unwrap();
 
         assert_eq!(result, Value::I64(5));
     }
@@ -883,13 +876,9 @@ mod tests {
         write_f64_column(&p1.join("price.d"), &[10.0, 20.0]);
         write_f64_column(&p2.join("price.d"), &[30.0, 40.0]);
 
-        let result = columnar_aggregate_partitions(
-            &[p1, p2],
-            "price",
-            ColumnType::F64,
-            AggregateKind::Avg,
-        )
-        .unwrap();
+        let result =
+            columnar_aggregate_partitions(&[p1, p2], "price", ColumnType::F64, AggregateKind::Avg)
+                .unwrap();
 
         assert_eq!(result, Value::F64(25.0));
     }

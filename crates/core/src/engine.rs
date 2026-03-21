@@ -104,8 +104,7 @@ impl Engine {
 
         // SAFETY: The MutexGuard borrows from `writer_mutex`, which we keep
         // alive in the WriterHandle. Guard is dropped before the Arc.
-        let guard: MutexGuard<'static, TableWriter> =
-            unsafe { std::mem::transmute(guard) };
+        let guard: MutexGuard<'static, TableWriter> = unsafe { std::mem::transmute(guard) };
 
         Ok(WriterHandle {
             writer: Some(guard),
@@ -255,8 +254,8 @@ impl ReaderHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
     use crate::table::ColumnValue;
+    use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
     use std::sync::{Arc, Barrier};
     use tempfile::tempdir;
 
@@ -464,7 +463,10 @@ mod tests {
                 let ts = Timestamp::from_secs(1710513000 + (i + 1) * 86400);
                 handle
                     .writer()
-                    .write_row(ts, &[ColumnValue::F64(100.0 + i as f64), ColumnValue::F64(1.0)])
+                    .write_row(
+                        ts,
+                        &[ColumnValue::F64(100.0 + i as f64), ColumnValue::F64(1.0)],
+                    )
                     .unwrap();
                 handle.writer().flush().unwrap();
                 drop(handle);

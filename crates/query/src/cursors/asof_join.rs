@@ -63,16 +63,17 @@ impl AsofJoinCursor {
     }
 
     fn build(&mut self) -> Result<()> {
-        let mut right = self.right_source.take().expect("right source already consumed");
+        let mut right = self
+            .right_source
+            .take()
+            .expect("right source already consumed");
         loop {
             match right.next_batch(1024)? {
                 None => break,
                 Some(batch) => {
                     let ncols = batch.columns.len();
                     for r in 0..batch.row_count() {
-                        let row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> = (0..ncols).map(|c| batch.get_value(r, c)).collect();
 
                         let ts = match &row[self.right_ts_col] {
                             Value::Timestamp(n) | Value::I64(n) => *n,
@@ -114,11 +115,7 @@ impl AsofJoinCursor {
                 hi = mid;
             }
         }
-        if lo == 0 {
-            None
-        } else {
-            Some(&rows[lo - 1].1)
-        }
+        if lo == 0 { None } else { Some(&rows[lo - 1].1) }
     }
 }
 
@@ -169,9 +166,8 @@ impl RecordCursor for AsofJoinCursor {
                 Some(batch) => {
                     let ncols = batch.columns.len();
                     for r in 0..batch.row_count() {
-                        let left_row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(r, c))
-                            .collect();
+                        let left_row: Vec<Value> =
+                            (0..ncols).map(|c| batch.get_value(r, c)).collect();
 
                         let left_ts = match &left_row[self.left_ts_col] {
                             Value::Timestamp(n) | Value::I64(n) => *n,
@@ -238,17 +234,29 @@ mod tests {
         let right = MemoryCursor::from_rows(
             right_schema,
             &[
-                vec![Value::Timestamp(50), Value::Str("BTC".into()), Value::F64(100.0)],
-                vec![Value::Timestamp(200), Value::Str("BTC".into()), Value::F64(200.0)],
-                vec![Value::Timestamp(300), Value::Str("BTC".into()), Value::F64(300.0)],
+                vec![
+                    Value::Timestamp(50),
+                    Value::Str("BTC".into()),
+                    Value::F64(100.0),
+                ],
+                vec![
+                    Value::Timestamp(200),
+                    Value::Str("BTC".into()),
+                    Value::F64(200.0),
+                ],
+                vec![
+                    Value::Timestamp(300),
+                    Value::Str("BTC".into()),
+                    Value::F64(300.0),
+                ],
             ],
         );
 
         let mut cursor = AsofJoinCursor::new(
             Box::new(left),
             Box::new(right),
-            0, // left ts col
-            0, // right ts col
+            0,       // left ts col
+            0,       // right ts col
             vec![1], // left partition key: symbol
             vec![1], // right partition key: symbol
         );

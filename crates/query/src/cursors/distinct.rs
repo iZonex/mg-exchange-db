@@ -65,9 +65,8 @@ impl RecordCursor for DistinctCursor {
                 None => break,
                 Some(b) => {
                     for r in 0..b.row_count() {
-                        let row: Vec<Value> = (0..b.columns.len())
-                            .map(|c| b.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> =
+                            (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                         let key = Self::row_key(&row);
                         if self.seen.insert(key) {
                             result.append_row(&row);

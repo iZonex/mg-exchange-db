@@ -33,10 +33,7 @@ pub enum Permission {
     /// Create / drop / alter tables.
     DDL,
     /// Read only specific columns from a table.
-    ColumnRead {
-        table: String,
-        columns: Vec<String>,
-    },
+    ColumnRead { table: String, columns: Vec<String> },
     /// System operations (VACUUM, snapshot, replication, etc.).
     System,
 }
@@ -55,9 +52,7 @@ impl SecurityContext {
         self.permissions.iter().any(|p| match p {
             Permission::Admin => true,
             Permission::Read { table: None } => true,
-            Permission::Read {
-                table: Some(t),
-            } => t == table,
+            Permission::Read { table: Some(t) } => t == table,
             Permission::ColumnRead { table: t, .. } => t == table,
             _ => false,
         })
@@ -68,9 +63,7 @@ impl SecurityContext {
         self.permissions.iter().any(|p| match p {
             Permission::Admin => true,
             Permission::Write { table: None } => true,
-            Permission::Write {
-                table: Some(t),
-            } => t == table,
+            Permission::Write { table: Some(t) } => t == table,
             _ => false,
         })
     }
@@ -84,13 +77,8 @@ impl SecurityContext {
             match p {
                 Permission::Admin => return true,
                 Permission::Read { table: None } => return true,
-                Permission::Read {
-                    table: Some(t),
-                } if t == table => return true,
-                Permission::ColumnRead {
-                    table: t,
-                    columns,
-                } if t == table => {
+                Permission::Read { table: Some(t) } if t == table => return true,
+                Permission::ColumnRead { table: t, columns } if t == table => {
                     if columns.iter().any(|c| c == column) {
                         return true;
                     }

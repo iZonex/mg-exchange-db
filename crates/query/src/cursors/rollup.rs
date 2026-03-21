@@ -22,9 +22,16 @@ pub struct RollupCursor {
 impl RollupCursor {
     pub fn new(source: Box<dyn RecordCursor>, key_cols: Vec<usize>) -> Self {
         let src = source.schema();
-        let mut schema: Vec<(String, ColumnType)> = key_cols.iter().map(|&i| src[i].clone()).collect();
+        let mut schema: Vec<(String, ColumnType)> =
+            key_cols.iter().map(|&i| src[i].clone()).collect();
         schema.push(("count".to_string(), ColumnType::I64));
-        Self { source: Some(source), key_cols, schema, result: None, offset: 0 }
+        Self {
+            source: Some(source),
+            key_cols,
+            schema,
+            result: None,
+            offset: 0,
+        }
     }
 
     fn materialize(&mut self) -> Result<()> {
@@ -60,12 +67,18 @@ impl RollupCursor {
 }
 
 impl RecordCursor for RollupCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
-        if self.result.is_none() { self.materialize()?; }
+        if self.result.is_none() {
+            self.materialize()?;
+        }
         let mat = self.result.as_ref().unwrap();
-        if self.offset >= mat.row_count() { return Ok(None); }
+        if self.offset >= mat.row_count() {
+            return Ok(None);
+        }
         let n = max_rows.min(mat.row_count() - self.offset);
         let batch = mat.slice(self.offset, n);
         self.offset += n;
@@ -80,7 +93,10 @@ mod tests {
 
     #[test]
     fn rollup_with_total() {
-        let schema = vec![("g".to_string(), ColumnType::I64), ("v".to_string(), ColumnType::I64)];
+        let schema = vec![
+            ("g".to_string(), ColumnType::I64),
+            ("v".to_string(), ColumnType::I64),
+        ];
         let rows = vec![
             vec![Value::I64(1), Value::I64(10)],
             vec![Value::I64(1), Value::I64(20)],
@@ -89,7 +105,9 @@ mod tests {
         let source = MemoryCursor::from_rows(schema, &rows);
         let mut cursor = RollupCursor::new(Box::new(source), vec![0]);
         let mut total_rows = 0;
-        while let Some(b) = cursor.next_batch(100).unwrap() { total_rows += b.row_count(); }
+        while let Some(b) = cursor.next_batch(100).unwrap() {
+            total_rows += b.row_count();
+        }
         // 2 groups + 1 grand total = 3
         assert_eq!(total_rows, 3);
     }

@@ -18,7 +18,7 @@ fn ts(offset_secs: i64) -> i64 {
 fn setup_trades_db() -> TestDb {
     let db = TestDb::new();
     db.exec_ok(
-        "CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE, volume DOUBLE)"
+        "CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE, volume DOUBLE)",
     );
 
     let data = [
@@ -33,7 +33,10 @@ fn setup_trades_db() -> TestDb {
     for (i, symbol, price, volume) in data {
         db.exec_ok(&format!(
             "INSERT INTO trades VALUES ({}, '{}', {}, {})",
-            ts(i), symbol, price, volume
+            ts(i),
+            symbol,
+            price,
+            volume
         ));
     }
 
@@ -49,9 +52,7 @@ mod filter_clause {
     #[test]
     fn count_with_filter() {
         let db = setup_trades_db();
-        let (_, rows) = db.query(
-            "SELECT count(*) FILTER (WHERE price > 100) FROM trades"
-        );
+        let (_, rows) = db.query("SELECT count(*) FILTER (WHERE price > 100) FROM trades");
         // Only BTC 150, BTC 200 have price > 100 => count = 2
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], Value::I64(2));
@@ -73,9 +74,7 @@ mod filter_clause {
     #[test]
     fn sum_with_filter() {
         let db = setup_trades_db();
-        let (_, rows) = db.query(
-            "SELECT sum(volume) FILTER (WHERE symbol = 'BTC') FROM trades"
-        );
+        let (_, rows) = db.query("SELECT sum(volume) FILTER (WHERE symbol = 'BTC') FROM trades");
         // BTC volumes: 10 + 20 + 30 = 60
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], Value::F64(60.0));
@@ -90,9 +89,15 @@ mod filter_clause {
         // BTC: 100, 150, 200 all > 50 => 3
         // ETH: 75 > 50 => 1 (50 is not > 50)
         // SOL: none > 50 => 0
-        let btc_row = rows.iter().find(|r| r[0] == Value::Str("BTC".into())).unwrap();
+        let btc_row = rows
+            .iter()
+            .find(|r| r[0] == Value::Str("BTC".into()))
+            .unwrap();
         assert_eq!(btc_row[1], Value::I64(3));
-        let eth_row = rows.iter().find(|r| r[0] == Value::Str("ETH".into())).unwrap();
+        let eth_row = rows
+            .iter()
+            .find(|r| r[0] == Value::Str("ETH".into()))
+            .unwrap();
         assert_eq!(eth_row[1], Value::I64(1));
     }
 }
@@ -110,11 +115,12 @@ mod window_frames {
             "SELECT symbol, price, \
              avg(price) OVER (PARTITION BY symbol ORDER BY timestamp \
                ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS moving_avg \
-             FROM trades"
+             FROM trades",
         );
         // BTC rows in order: 100, 150, 200
         // moving_avg(1 preceding + current): 100, 125, 175
-        let btc_rows: Vec<&Vec<Value>> = rows.iter()
+        let btc_rows: Vec<&Vec<Value>> = rows
+            .iter()
             .filter(|r| r[0] == Value::Str("BTC".into()))
             .collect();
         assert_eq!(btc_rows.len(), 3);
@@ -133,7 +139,7 @@ mod window_frames {
             "SELECT price, \
              sum(price) OVER (ORDER BY timestamp \
                ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS moving_sum \
-             FROM trades"
+             FROM trades",
         );
         // All 6 rows: 100, 150, 200, 50, 75, 10
         // Row 0: sum(100, 150) = 250
@@ -158,7 +164,7 @@ mod window_frames {
             "SELECT price, \
              sum(price) OVER (ORDER BY timestamp \
                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumsum \
-             FROM trades"
+             FROM trades",
         );
         // 100, 250, 450, 500, 575, 585
         assert_eq!(rows[0][1], Value::F64(100.0));
@@ -185,20 +191,25 @@ mod within_group {
     fn percentile_cont_within_group_plans() {
         let db = setup_trades_db();
         // This tests that the query parses and plans without error.
-        let result = db.exec(
-            "SELECT percentile_cont(price) WITHIN GROUP (ORDER BY price) FROM trades"
+        let result =
+            db.exec("SELECT percentile_cont(price) WITHIN GROUP (ORDER BY price) FROM trades");
+        assert!(
+            result.is_ok(),
+            "percentile_cont WITHIN GROUP should parse and plan: {:?}",
+            result.err()
         );
-        assert!(result.is_ok(), "percentile_cont WITHIN GROUP should parse and plan: {:?}", result.err());
     }
 
     #[test]
     fn mode_within_group_plans() {
         let db = setup_trades_db();
-        let result = db.exec(
-            "SELECT mode(symbol) WITHIN GROUP (ORDER BY symbol) FROM trades"
-        );
+        let result = db.exec("SELECT mode(symbol) WITHIN GROUP (ORDER BY symbol) FROM trades");
         // mode() should return 'BTC' since it appears 3 times
-        assert!(result.is_ok(), "mode WITHIN GROUP should parse and plan: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "mode WITHIN GROUP should parse and plan: {:?}",
+            result.err()
+        );
     }
 }
 
@@ -216,32 +227,40 @@ mod grouping_sets {
         // sqlparser 0.55 uses "WITH ROLLUP" modifier syntax for MySQL dialect.
         // Standard SQL ROLLUP(a, b) needs specific dialect support.
         // Test the plan structure directly.
-        let plan = plan_query(
-            "SELECT symbol, sum(volume) FROM trades GROUP BY symbol WITH ROLLUP"
-        );
+        let plan = plan_query("SELECT symbol, sum(volume) FROM trades GROUP BY symbol WITH ROLLUP");
         match plan {
-            Ok(QueryPlan::Select { group_by_mode: GroupByMode::Rollup(cols), .. }) => {
+            Ok(QueryPlan::Select {
+                group_by_mode: GroupByMode::Rollup(cols),
+                ..
+            }) => {
                 assert_eq!(cols, vec!["symbol".to_string()]);
             }
             Ok(QueryPlan::Select { group_by_mode, .. }) => {
                 // Some dialects may not parse WITH ROLLUP; that's OK for now.
-                println!("GROUP BY mode was: {:?} (dialect may not support WITH ROLLUP)", group_by_mode);
+                println!(
+                    "GROUP BY mode was: {:?} (dialect may not support WITH ROLLUP)",
+                    group_by_mode
+                );
             }
             Ok(other) => panic!("expected Select, got {:?}", other),
             Err(e) => {
                 // The query might fail to parse depending on dialect settings.
-                println!("ROLLUP query parse error (expected for some dialects): {}", e);
+                println!(
+                    "ROLLUP query parse error (expected for some dialects): {}",
+                    e
+                );
             }
         }
     }
 
     #[test]
     fn cube_plan() {
-        let plan = plan_query(
-            "SELECT symbol, sum(volume) FROM trades GROUP BY symbol WITH CUBE"
-        );
+        let plan = plan_query("SELECT symbol, sum(volume) FROM trades GROUP BY symbol WITH CUBE");
         match plan {
-            Ok(QueryPlan::Select { group_by_mode: GroupByMode::Cube(cols), .. }) => {
+            Ok(QueryPlan::Select {
+                group_by_mode: GroupByMode::Cube(cols),
+                ..
+            }) => {
                 assert_eq!(cols, vec!["symbol".to_string()]);
             }
             Ok(QueryPlan::Select { group_by_mode, .. }) => {
@@ -267,10 +286,14 @@ mod lateral_join {
     fn lateral_join_plans_correctly() {
         let plan = plan_query(
             "SELECT t.*, l.avg_price FROM trades t, \
-             LATERAL (SELECT avg(price) AS avg_price FROM trades t2 WHERE t2.symbol = t.symbol) l"
+             LATERAL (SELECT avg(price) AS avg_price FROM trades t2 WHERE t2.symbol = t.symbol) l",
         );
         match plan {
-            Ok(QueryPlan::LateralJoin { left_table, subquery_alias, .. }) => {
+            Ok(QueryPlan::LateralJoin {
+                left_table,
+                subquery_alias,
+                ..
+            }) => {
                 assert_eq!(left_table, "trades");
                 assert_eq!(subquery_alias, "l");
             }
@@ -302,7 +325,7 @@ mod integration {
         let (_, rows) = db.query(
             "SELECT price, \
              count(*) OVER (ORDER BY timestamp ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS cnt \
-             FROM trades"
+             FROM trades",
         );
         // Row 0: count of rows [0..0] = 1
         // Row 1: count of rows [0..1] = 2

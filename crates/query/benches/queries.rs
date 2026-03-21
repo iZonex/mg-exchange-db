@@ -1,9 +1,7 @@
-use criterion::{
-    black_box, criterion_group, criterion_main, Criterion, Throughput,
-};
+use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::table::{ColumnValue, TableBuilder, TableMeta, TableWriter};
-use exchange_query::{execute, plan_query, QueryResult};
+use exchange_query::{QueryResult, execute, plan_query};
 use std::path::Path;
 use tempfile::TempDir;
 
@@ -132,8 +130,7 @@ fn insert_throughput(c: &mut Criterion) {
 
                 for i in 0..HUNDRED_K {
                     let ts = Timestamp(base_ts + i as i64 * 1_000_000);
-                    let delta =
-                        ((i.wrapping_mul(7).wrapping_add(3)) % 11) as f64 * 0.5 - 2.5;
+                    let delta = ((i.wrapping_mul(7).wrapping_add(3)) % 11) as f64 * 0.5 - 2.5;
                     price += delta;
 
                     writer
@@ -192,8 +189,7 @@ fn select_with_filter(c: &mut Criterion) {
 
     group.bench_function("1M_rows_price_gt_50000", |b| {
         b.iter(|| {
-            let result =
-                run_sql(dir.path(), "SELECT * FROM trades WHERE price > 50000");
+            let result = run_sql(dir.path(), "SELECT * FROM trades WHERE price > 50000");
             black_box(result);
         });
     });
@@ -378,8 +374,7 @@ fn parallel_vs_sequential(c: &mut Criterion) {
     group.bench_function("sequential_30_partitions", |b| {
         b.iter(|| {
             let table_dir = dir.path().join("trades");
-            let meta =
-                exchange_core::table::TableMeta::load(&table_dir.join("_meta")).unwrap();
+            let meta = exchange_core::table::TableMeta::load(&table_dir.join("_meta")).unwrap();
             let selected_cols: Vec<(usize, String)> = meta
                 .columns
                 .iter()
@@ -387,15 +382,14 @@ fn parallel_vs_sequential(c: &mut Criterion) {
                 .map(|(i, c)| (i, c.name.clone()))
                 .collect();
 
-            let rows =
-                exchange_query::parallel::parallel_scan_partitions_with_threads(
-                    &table_dir,
-                    &meta,
-                    &selected_cols,
-                    None,
-                    Some(1),
-                )
-                .unwrap();
+            let rows = exchange_query::parallel::parallel_scan_partitions_with_threads(
+                &table_dir,
+                &meta,
+                &selected_cols,
+                None,
+                Some(1),
+            )
+            .unwrap();
             black_box(rows);
         });
     });

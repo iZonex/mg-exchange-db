@@ -166,29 +166,26 @@ fn run_sqllogictest(input: &str) -> SltResult {
 
     for (idx, directive) in directives.iter().enumerate() {
         match directive {
-            Directive::StatementOk(sql) => {
-                match exec_sql(&db_root, sql) {
-                    Ok(_) => passed += 1,
-                    Err(e) => {
-                        failed += 1;
-                        errors.push(format!(
-                            "Directive {}: statement ok failed for `{sql}`: {e}"
-                        , idx + 1));
-                    }
+            Directive::StatementOk(sql) => match exec_sql(&db_root, sql) {
+                Ok(_) => passed += 1,
+                Err(e) => {
+                    failed += 1;
+                    errors.push(format!(
+                        "Directive {}: statement ok failed for `{sql}`: {e}",
+                        idx + 1
+                    ));
                 }
-            }
-            Directive::StatementError(sql) => {
-                match exec_sql(&db_root, sql) {
-                    Ok(_) => {
-                        failed += 1;
-                        errors.push(format!(
-                            "Directive {}: expected error for `{sql}`, but got Ok",
-                            idx + 1
-                        ));
-                    }
-                    Err(_) => passed += 1,
+            },
+            Directive::StatementError(sql) => match exec_sql(&db_root, sql) {
+                Ok(_) => {
+                    failed += 1;
+                    errors.push(format!(
+                        "Directive {}: expected error for `{sql}`, but got Ok",
+                        idx + 1
+                    ));
                 }
-            }
+                Err(_) => passed += 1,
+            },
             Directive::Query {
                 sql,
                 sort_mode,
@@ -297,10 +294,7 @@ fn sqllogictest_basic_suite() {
         );
     }
 
-    assert!(
-        result.passed > 0,
-        "expected at least one test case to pass"
-    );
+    assert!(result.passed > 0, "expected at least one test case to pass");
     eprintln!(
         "sqllogictest: {} passed, {} failed",
         result.passed, result.failed

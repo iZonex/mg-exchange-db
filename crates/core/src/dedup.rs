@@ -64,10 +64,7 @@ fn extract_key(row: &[ColumnValue<'_>], key_col_indices: &[usize]) -> String {
 }
 
 /// Return indices of unique rows, keeping the last occurrence for each key.
-pub fn unique_row_indices(
-    rows: &[Vec<ColumnValue<'_>>],
-    key_col_indices: &[usize],
-) -> Vec<usize> {
+pub fn unique_row_indices(rows: &[Vec<ColumnValue<'_>>], key_col_indices: &[usize]) -> Vec<usize> {
     // Map from key -> last index.
     let mut last_seen: HashMap<String, usize> = HashMap::new();
     for (i, row) in rows.iter().enumerate() {
@@ -89,10 +86,26 @@ mod tests {
     #[test]
     fn dedup_keeps_last_occurrence() {
         let rows: Vec<Vec<ColumnValue<'_>>> = vec![
-            vec![ColumnValue::I64(1), ColumnValue::Str("BTC"), ColumnValue::F64(100.0)],
-            vec![ColumnValue::I64(2), ColumnValue::Str("ETH"), ColumnValue::F64(200.0)],
-            vec![ColumnValue::I64(3), ColumnValue::Str("BTC"), ColumnValue::F64(150.0)],
-            vec![ColumnValue::I64(4), ColumnValue::Str("ETH"), ColumnValue::F64(250.0)],
+            vec![
+                ColumnValue::I64(1),
+                ColumnValue::Str("BTC"),
+                ColumnValue::F64(100.0),
+            ],
+            vec![
+                ColumnValue::I64(2),
+                ColumnValue::Str("ETH"),
+                ColumnValue::F64(200.0),
+            ],
+            vec![
+                ColumnValue::I64(3),
+                ColumnValue::Str("BTC"),
+                ColumnValue::F64(150.0),
+            ],
+            vec![
+                ColumnValue::I64(4),
+                ColumnValue::Str("ETH"),
+                ColumnValue::F64(250.0),
+            ],
         ];
 
         // Dedup by column 1 (symbol).
@@ -122,9 +135,21 @@ mod tests {
     #[test]
     fn dedup_composite_key() {
         let rows: Vec<Vec<ColumnValue<'_>>> = vec![
-            vec![ColumnValue::Str("BTC"), ColumnValue::Str("binance"), ColumnValue::F64(100.0)],
-            vec![ColumnValue::Str("BTC"), ColumnValue::Str("kraken"), ColumnValue::F64(101.0)],
-            vec![ColumnValue::Str("BTC"), ColumnValue::Str("binance"), ColumnValue::F64(102.0)],
+            vec![
+                ColumnValue::Str("BTC"),
+                ColumnValue::Str("binance"),
+                ColumnValue::F64(100.0),
+            ],
+            vec![
+                ColumnValue::Str("BTC"),
+                ColumnValue::Str("kraken"),
+                ColumnValue::F64(101.0),
+            ],
+            vec![
+                ColumnValue::Str("BTC"),
+                ColumnValue::Str("binance"),
+                ColumnValue::F64(102.0),
+            ],
         ];
 
         // Dedup by columns 0 and 1 (symbol + exchange).

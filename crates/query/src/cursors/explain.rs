@@ -37,12 +37,7 @@ impl ExplainCursor {
         Self::new(lines)
     }
 
-    fn describe(
-        cursor: &dyn RecordCursor,
-        label: &str,
-        depth: usize,
-        lines: &mut Vec<String>,
-    ) {
+    fn describe(cursor: &dyn RecordCursor, label: &str, depth: usize, lines: &mut Vec<String>) {
         let indent = "  ".repeat(depth);
         let est = cursor
             .estimated_rows()

@@ -15,8 +15,8 @@ pub mod ws;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use http::handlers::AppState;
 
@@ -127,19 +127,19 @@ pub async fn start_http_server(config: &ServerConfig) -> std::io::Result<()> {
 
     // Initialize resource manager for query admission control.
     let resource_limits = exchange_core::resource::ResourceLimits::default();
-    app_state.resource_mgr = Some(Arc::new(
-        exchange_core::resource::ResourceManager::new(resource_limits),
-    ));
+    app_state.resource_mgr = Some(Arc::new(exchange_core::resource::ResourceManager::new(
+        resource_limits,
+    )));
 
     // Initialize usage meter for per-tenant metering.
-    app_state.usage_meter = Some(Arc::new(
-        exchange_core::metering::UsageMeter::new(config.db_root.clone()),
-    ));
+    app_state.usage_meter = Some(Arc::new(exchange_core::metering::UsageMeter::new(
+        config.db_root.clone(),
+    )));
 
     // Initialize tenant manager for multi-tenant namespace isolation.
-    app_state.tenant_manager = Some(Arc::new(
-        exchange_core::tenant::TenantManager::new(config.db_root.clone()),
-    ));
+    app_state.tenant_manager = Some(Arc::new(exchange_core::tenant::TenantManager::new(
+        config.db_root.clone(),
+    )));
 
     // Initialize hot table registry — keeps all tables open in memory.
     exchange_query::table_registry::init_global(config.db_root.clone());
@@ -176,10 +176,11 @@ pub async fn start_http_server(config: &ServerConfig) -> std::io::Result<()> {
 
     // Check if TLS is enabled.
     if let Some(ref tls_config) = config.tls
-        && tls_config.enabled {
-            let rustls_config = tls::load_tls_config(tls_config).await?;
-            return tls::serve_tls(config.bind_addr, router, rustls_config).await;
-        }
+        && tls_config.enabled
+    {
+        let rustls_config = tls::load_tls_config(tls_config).await?;
+        return tls::serve_tls(config.bind_addr, router, rustls_config).await;
+    }
 
     // Plain HTTP fallback.
     tracing::info!(addr = %config.bind_addr, "starting HTTP server");
@@ -228,9 +229,7 @@ pub async fn start_all_servers(config: ServerConfig) -> std::io::Result<()> {
 
     if config.http_enabled {
         let cfg = config.clone();
-        handles.push(tokio::spawn(async move {
-            start_http_server(&cfg).await
-        }));
+        handles.push(tokio::spawn(async move { start_http_server(&cfg).await }));
         tracing::info!(addr = %config.bind_addr, "HTTP server enabled");
     } else {
         tracing::info!("HTTP server disabled");
@@ -325,9 +324,7 @@ pub async fn start_all_servers(config: ServerConfig) -> std::io::Result<()> {
 /// 3. Flush all WAL writers to ensure no data loss.
 /// 4. Abort any remaining server tasks that did not exit in time.
 /// 5. Log completion.
-async fn graceful_shutdown(
-    handles: &[tokio::task::JoinHandle<std::io::Result<()>>],
-) {
+async fn graceful_shutdown(handles: &[tokio::task::JoinHandle<std::io::Result<()>>]) {
     tracing::info!("initiating graceful shutdown sequence");
 
     // Step 1: signal all components to stop accepting new connections/queries.
@@ -358,14 +355,11 @@ async fn graceful_shutdown(
 
         // Also wait for server task handles to finish.
         for handle in handles {
-            let _ = tokio::time::timeout(
-                std::time::Duration::from_secs(5),
-                async {
-                    while !handle.is_finished() {
-                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                    }
-                },
-            )
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                while !handle.is_finished() {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+            })
             .await;
         }
     })

@@ -22,14 +22,22 @@ pub struct MarkJoinCursor {
 
 impl MarkJoinCursor {
     pub fn new(
-        left: Box<dyn RecordCursor>, right: Box<dyn RecordCursor>,
-        left_key_col: usize, right_key_col: usize, mark_col_name: &str,
+        left: Box<dyn RecordCursor>,
+        right: Box<dyn RecordCursor>,
+        left_key_col: usize,
+        right_key_col: usize,
+        mark_col_name: &str,
     ) -> Self {
         let mut schema = left.schema().to_vec();
         schema.push((mark_col_name.to_string(), ColumnType::Boolean));
         Self {
-            left, right_keys: HashSet::new(), left_key_col, built: false,
-            right_source: Some(right), right_key_col, schema,
+            left,
+            right_keys: HashSet::new(),
+            left_key_col,
+            built: false,
+            right_source: Some(right),
+            right_key_col,
+            schema,
         }
     }
 
@@ -37,7 +45,10 @@ impl MarkJoinCursor {
         let mut right = self.right_source.take().unwrap();
         while let Some(b) = right.next_batch(1024)? {
             for r in 0..b.row_count() {
-                self.right_keys.insert(crate::cursors::semi_join::serialize_value(&b.get_value(r, self.right_key_col)));
+                self.right_keys
+                    .insert(crate::cursors::semi_join::serialize_value(
+                        &b.get_value(r, self.right_key_col),
+                    ));
             }
         }
         self.built = true;
@@ -46,18 +57,25 @@ impl MarkJoinCursor {
 }
 
 impl RecordCursor for MarkJoinCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
-        if !self.built { self.build()?; }
+        if !self.built {
+            self.build()?;
+        }
         match self.left.next_batch(max_rows)? {
             None => Ok(None),
             Some(b) => {
                 let mut result = RecordBatch::new(self.schema.clone());
                 for r in 0..b.row_count() {
-                    let k = crate::cursors::semi_join::serialize_value(&b.get_value(r, self.left_key_col));
+                    let k = crate::cursors::semi_join::serialize_value(
+                        &b.get_value(r, self.left_key_col),
+                    );
                     let matched = self.right_keys.contains(&k);
-                    let mut row: Vec<Value> = (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
+                    let mut row: Vec<Value> =
+                        (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                     row.push(Value::I64(if matched { 1 } else { 0 }));
                     result.append_row(&row);
                 }

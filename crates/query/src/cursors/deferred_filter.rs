@@ -110,9 +110,8 @@ impl RecordCursor for DeferredFilterCursor {
                     for r in 0..batch.row_count() {
                         let val = batch.get_value(r, self.filter_col);
                         if self.allowed.contains(&Self::serialize(&val)) {
-                            let row: Vec<Value> = (0..ncols)
-                                .map(|c| batch.get_value(r, c))
-                                .collect();
+                            let row: Vec<Value> =
+                                (0..ncols).map(|c| batch.get_value(r, c)).collect();
                             result.append_row(&row);
                             if result.row_count() >= max_rows {
                                 break;
@@ -152,10 +151,8 @@ mod tests {
                 vec![Value::I64(3), Value::Str("Carol".into())],
             ],
         );
-        let subquery = MemoryCursor::from_rows(
-            sub_schema,
-            &[vec![Value::I64(1)], vec![Value::I64(3)]],
-        );
+        let subquery =
+            MemoryCursor::from_rows(sub_schema, &[vec![Value::I64(1)], vec![Value::I64(3)]]);
 
         let mut cursor = DeferredFilterCursor::new(
             Box::new(source),

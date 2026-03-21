@@ -10,10 +10,7 @@ pub enum ExchangeDbError {
 
     /// Table not found with additional context (database path).
     #[error("table '{table}' not found in database at '{db_path}'")]
-    TableNotFoundAt {
-        table: String,
-        db_path: String,
-    },
+    TableNotFoundAt { table: String, db_path: String },
 
     #[error("table '{0}' already exists")]
     TableAlreadyExists(String),
@@ -30,13 +27,12 @@ pub enum ExchangeDbError {
     },
 
     #[error("type mismatch: expected {expected}, got {actual}")]
-    TypeMismatch {
-        expected: String,
-        actual: String,
-    },
+    TypeMismatch { expected: String, actual: String },
 
     /// Type mismatch with column context.
-    #[error("type mismatch for column '{column}' in table '{table}': expected {expected}, got {actual}")]
+    #[error(
+        "type mismatch for column '{column}' in table '{table}': expected {expected}, got {actual}"
+    )]
     TypeMismatchInColumn {
         column: String,
         table: String,
@@ -74,10 +70,7 @@ pub enum ExchangeDbError {
 
     /// Query error with SQL context.
     #[error("query error: {detail} [SQL: {sql}]")]
-    QueryDetailed {
-        detail: String,
-        sql: String,
-    },
+    QueryDetailed { detail: String, sql: String },
 
     #[error("parse error: {0}")]
     Parse(String),
@@ -95,10 +88,7 @@ pub enum ExchangeDbError {
 
     /// Corruption with file context.
     #[error("corrupted data in '{file}': {detail}")]
-    CorruptionInFile {
-        file: String,
-        detail: String,
-    },
+    CorruptionInFile { file: String, detail: String },
 
     #[error("column '{0}' already exists in table '{1}'")]
     ColumnAlreadyExists(String, String),
@@ -121,7 +111,9 @@ pub enum ExchangeDbError {
     LockTimeout(String),
 
     /// Lock timeout with table/partition context.
-    #[error("lock timeout on table '{table}', partition '{partition}' after {waited_ms}ms: {detail}")]
+    #[error(
+        "lock timeout on table '{table}', partition '{partition}' after {waited_ms}ms: {detail}"
+    )]
     LockTimeoutDetailed {
         table: String,
         partition: String,
@@ -140,41 +132,35 @@ pub enum ExchangeDbError {
 
     /// Snapshot/restore error with context.
     #[error("snapshot error: {detail} [path: {path}]")]
-    Snapshot {
-        detail: String,
-        path: String,
-    },
+    Snapshot { detail: String, path: String },
 
     /// Recovery error with context.
     #[error("recovery error in table '{table}': {detail}")]
-    Recovery {
-        table: String,
-        detail: String,
-    },
+    Recovery { table: String, detail: String },
 
     /// Table writer is locked by another operation.
-    #[error("could not acquire writer for table '{table}': the table is currently locked by another concurrent write operation. Retry after the other operation completes.")]
-    WriterLocked {
-        table: String,
-    },
+    #[error(
+        "could not acquire writer for table '{table}': the table is currently locked by another concurrent write operation. Retry after the other operation completes."
+    )]
+    WriterLocked { table: String },
 
     /// Partition is not available for read-only access.
-    #[error("could not open partition '{partition}' of table '{table}' for reading: the partition may be detached, being compacted, or in an incomplete state. Check partition status with `SELECT * FROM table_partitions('{table}')`.")]
-    PartitionReadOnly {
-        table: String,
-        partition: String,
-    },
+    #[error(
+        "could not open partition '{partition}' of table '{table}' for reading: the partition may be detached, being compacted, or in an incomplete state. Check partition status with `SELECT * FROM table_partitions('{table}')`."
+    )]
+    PartitionReadOnly { table: String, partition: String },
 
     /// Invalid table name or alias with guidance.
-    #[error("invalid table name or alias '{name}': {reason}. Table and alias names must start with a letter or underscore, and contain only letters, digits, or underscores.")]
-    InvalidTableNameOrAlias {
-        name: String,
-        reason: String,
-    },
+    #[error(
+        "invalid table name or alias '{name}': {reason}. Table and alias names must start with a letter or underscore, and contain only letters, digits, or underscores."
+    )]
+    InvalidTableNameOrAlias { name: String, reason: String },
 
     /// Disk is full or the filesystem has insufficient space for the requested
     /// operation.
-    #[error("disk full: need {needed_bytes} bytes but only {available_bytes} bytes available at '{path}'")]
+    #[error(
+        "disk full: need {needed_bytes} bytes but only {available_bytes} bytes available at '{path}'"
+    )]
     DiskFull {
         path: String,
         needed_bytes: u64,
@@ -207,7 +193,10 @@ mod tests {
         assert!(msg.contains("trades"), "should mention table");
         assert!(msg.contains("2024-01"), "should mention partition");
         assert!(msg.contains("detached"), "should mention possible causes");
-        assert!(msg.contains("table_partitions"), "should suggest diagnostic");
+        assert!(
+            msg.contains("table_partitions"),
+            "should suggest diagnostic"
+        );
     }
 
     #[test]
@@ -218,8 +207,14 @@ mod tests {
         };
         let msg = err.to_string();
         assert!(msg.contains("123bad"), "should show the invalid name");
-        assert!(msg.contains("starts with a digit"), "should explain what's wrong");
-        assert!(msg.contains("must start with a letter"), "should give valid format");
+        assert!(
+            msg.contains("starts with a digit"),
+            "should explain what's wrong"
+        );
+        assert!(
+            msg.contains("must start with a letter"),
+            "should give valid format"
+        );
     }
 
     #[test]
@@ -232,7 +227,10 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("prce"), "should show the wrong column name");
         assert!(msg.contains("trades"), "should show table");
-        assert!(msg.contains("price"), "should list available columns for user to spot typo");
+        assert!(
+            msg.contains("price"),
+            "should list available columns for user to spot typo"
+        );
     }
 
     #[test]

@@ -21,17 +21,39 @@ const NANOS_PER_DAY: i64 = 86_400_000_000_000;
 
 /// Logical type names matching QuestDB's type system.
 const SOURCE_TYPES: &[&str] = &[
-    "boolean", "byte", "short", "int", "long",
-    "float", "double", "str", "varchar",
-    "timestamp", "date", "symbol",
-    "uuid", "ipv4", "geohash",
+    "boolean",
+    "byte",
+    "short",
+    "int",
+    "long",
+    "float",
+    "double",
+    "str",
+    "varchar",
+    "timestamp",
+    "date",
+    "symbol",
+    "uuid",
+    "ipv4",
+    "geohash",
 ];
 
 const TARGET_TYPES: &[&str] = &[
-    "boolean", "byte", "short", "int", "long",
-    "float", "double", "str", "varchar",
-    "timestamp", "date", "symbol",
-    "uuid", "ipv4", "geohash",
+    "boolean",
+    "byte",
+    "short",
+    "int",
+    "long",
+    "float",
+    "double",
+    "str",
+    "varchar",
+    "timestamp",
+    "date",
+    "symbol",
+    "uuid",
+    "ipv4",
+    "geohash",
 ];
 
 // ---------------------------------------------------------------------------
@@ -57,8 +79,12 @@ impl ScalarFunction for CastFn {
         convert_to_target(intermediate, self.target)
     }
 
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// Interpret a Value in the context of a logical source type.
@@ -68,8 +94,8 @@ enum Intermediate {
     Integer(i64),
     Float(f64),
     Str(String),
-    Timestamp(i64),   // nanos since epoch
-    Date(i64),        // days since epoch (internally stored as nanos in Value::Timestamp)
+    Timestamp(i64), // nanos since epoch
+    Date(i64),      // days since epoch (internally stored as nanos in Value::Timestamp)
 }
 
 fn interpret_as_source(v: &Value, source: &str) -> Result<Intermediate, String> {
@@ -91,7 +117,8 @@ fn interpret_as_source(v: &Value, source: &str) -> Result<Intermediate, String> 
             let n = match v {
                 Value::I64(n) => *n,
                 Value::F64(f) => *f as i64,
-                Value::Str(s) => s.parse::<i64>()
+                Value::Str(s) => s
+                    .parse::<i64>()
                     .or_else(|_| s.parse::<f64>().map(|f| f as i64))
                     .map_err(|_| format!("cannot cast '{s}' to integer"))?,
                 Value::Timestamp(ns) => *ns,
@@ -110,12 +137,17 @@ fn interpret_as_source(v: &Value, source: &str) -> Result<Intermediate, String> 
             let f = match v {
                 Value::F64(f) => *f,
                 Value::I64(n) => *n as f64,
-                Value::Str(s) => s.parse::<f64>()
+                Value::Str(s) => s
+                    .parse::<f64>()
                     .map_err(|_| format!("cannot cast '{s}' to float"))?,
                 Value::Timestamp(ns) => *ns as f64,
                 Value::Null => 0.0,
             };
-            let f = if source == "float" { (f as f32) as f64 } else { f };
+            let f = if source == "float" {
+                (f as f32) as f64
+            } else {
+                f
+            };
             Ok(Intermediate::Float(f))
         }
         "str" | "varchar" | "symbol" => {
@@ -133,7 +165,8 @@ fn interpret_as_source(v: &Value, source: &str) -> Result<Intermediate, String> 
                 Value::Timestamp(ns) => *ns,
                 Value::I64(n) => *n,
                 Value::F64(f) => *f as i64,
-                Value::Str(s) => s.parse::<i64>()
+                Value::Str(s) => s
+                    .parse::<i64>()
                     .map_err(|_| format!("cannot cast '{s}' to timestamp"))?,
                 Value::Null => 0,
             };
@@ -145,7 +178,8 @@ fn interpret_as_source(v: &Value, source: &str) -> Result<Intermediate, String> 
                 Value::Timestamp(ns) => *ns,
                 Value::I64(n) => *n,
                 Value::F64(f) => *f as i64,
-                Value::Str(s) => s.parse::<i64>()
+                Value::Str(s) => s
+                    .parse::<i64>()
                     .map_err(|_| format!("cannot cast '{s}' to date"))?,
                 Value::Null => 0,
             };
@@ -161,23 +195,19 @@ fn interpret_as_source(v: &Value, source: &str) -> Result<Intermediate, String> 
             };
             Ok(Intermediate::Str(s))
         }
-        "ipv4" => {
-            match v {
-                Value::Str(s) => Ok(Intermediate::Str(s.clone())),
-                Value::I64(n) => {
-                    let ip = ipv4_from_int(*n as u32);
-                    Ok(Intermediate::Str(ip))
-                }
-                _ => Ok(Intermediate::Str(value_display(v))),
+        "ipv4" => match v {
+            Value::Str(s) => Ok(Intermediate::Str(s.clone())),
+            Value::I64(n) => {
+                let ip = ipv4_from_int(*n as u32);
+                Ok(Intermediate::Str(ip))
             }
-        }
-        "geohash" => {
-            match v {
-                Value::Str(s) => Ok(Intermediate::Str(s.clone())),
-                Value::I64(n) => Ok(Intermediate::Integer(*n)),
-                _ => Ok(Intermediate::Str(value_display(v))),
-            }
-        }
+            _ => Ok(Intermediate::Str(value_display(v))),
+        },
+        "geohash" => match v {
+            Value::Str(s) => Ok(Intermediate::Str(s.clone())),
+            Value::I64(n) => Ok(Intermediate::Integer(*n)),
+            _ => Ok(Intermediate::Str(value_display(v))),
+        },
         _ => Err(format!("unknown source type: {source}")),
     }
 }
@@ -232,8 +262,15 @@ fn convert_to_target(intermediate: Intermediate, target: &str) -> Result<Value, 
                 Intermediate::Date(days) => days * NANOS_PER_DAY,
                 Intermediate::Integer(n) => n,
                 Intermediate::Float(f) => f as i64,
-                Intermediate::Bool(b) => if b { 1 } else { 0 },
-                Intermediate::Str(s) => s.parse::<i64>()
+                Intermediate::Bool(b) => {
+                    if b {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                Intermediate::Str(s) => s
+                    .parse::<i64>()
                     .map_err(|_| format!("cannot cast '{s}' to timestamp"))?,
             };
             Ok(Value::Timestamp(ns))
@@ -244,9 +281,16 @@ fn convert_to_target(intermediate: Intermediate, target: &str) -> Result<Value, 
                 Intermediate::Timestamp(ns) => ns / NANOS_PER_DAY,
                 Intermediate::Integer(n) => n / NANOS_PER_DAY,
                 Intermediate::Float(f) => (f as i64) / NANOS_PER_DAY,
-                Intermediate::Bool(b) => if b { 1 } else { 0 },
+                Intermediate::Bool(b) => {
+                    if b {
+                        1
+                    } else {
+                        0
+                    }
+                }
                 Intermediate::Str(s) => {
-                    let n: i64 = s.parse()
+                    let n: i64 = s
+                        .parse()
                         .map_err(|_| format!("cannot cast '{s}' to date"))?;
                     n / NANOS_PER_DAY
                 }
@@ -271,7 +315,9 @@ fn convert_to_target(intermediate: Intermediate, target: &str) -> Result<Value, 
                     }
                 }
                 _ => {
-                    let n = intermediate_to_i64(&Intermediate::Float(intermediate_to_f64(&intermediate)?))?;
+                    let n = intermediate_to_i64(&Intermediate::Float(intermediate_to_f64(
+                        &intermediate,
+                    )?))?;
                     Ok(Value::Str(ipv4_from_int(n as u32)))
                 }
             }
@@ -282,7 +328,9 @@ fn convert_to_target(intermediate: Intermediate, target: &str) -> Result<Value, 
                 Intermediate::Integer(n) => Ok(Value::I64(n)),
                 Intermediate::Str(s) => Ok(Value::Str(s)),
                 _ => {
-                    let n = intermediate_to_i64(&Intermediate::Float(intermediate_to_f64(&intermediate)?))?;
+                    let n = intermediate_to_i64(&Intermediate::Float(intermediate_to_f64(
+                        &intermediate,
+                    )?))?;
                     Ok(Value::I64(n))
                 }
             }
@@ -300,7 +348,8 @@ fn intermediate_to_i64(i: &Intermediate) -> Result<i64, String> {
         Intermediate::Bool(b) => Ok(if *b { 1 } else { 0 }),
         Intermediate::Integer(n) => Ok(*n),
         Intermediate::Float(f) => Ok(*f as i64),
-        Intermediate::Str(s) => s.parse::<i64>()
+        Intermediate::Str(s) => s
+            .parse::<i64>()
             .or_else(|_| s.parse::<f64>().map(|f| f as i64))
             .map_err(|_| format!("cannot convert '{s}' to integer")),
         Intermediate::Timestamp(ns) => Ok(*ns),
@@ -313,7 +362,8 @@ fn intermediate_to_f64(i: &Intermediate) -> Result<f64, String> {
         Intermediate::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
         Intermediate::Integer(n) => Ok(*n as f64),
         Intermediate::Float(f) => Ok(*f),
-        Intermediate::Str(s) => s.parse::<f64>()
+        Intermediate::Str(s) => s
+            .parse::<f64>()
             .map_err(|_| format!("cannot convert '{s}' to float")),
         Intermediate::Timestamp(ns) => Ok(*ns as f64),
         Intermediate::Date(d) => Ok(*d as f64),
@@ -322,7 +372,13 @@ fn intermediate_to_f64(i: &Intermediate) -> Result<f64, String> {
 
 fn intermediate_to_string(i: &Intermediate) -> String {
     match i {
-        Intermediate::Bool(b) => if *b { "true".into() } else { "false".into() },
+        Intermediate::Bool(b) => {
+            if *b {
+                "true".into()
+            } else {
+                "false".into()
+            }
+        }
         Intermediate::Integer(n) => n.to_string(),
         Intermediate::Float(f) => f.to_string(),
         Intermediate::Str(s) => s.clone(),
@@ -358,7 +414,8 @@ fn ipv4_to_int(s: &str) -> Result<u32, String> {
     }
     let mut result: u32 = 0;
     for (i, part) in parts.iter().enumerate() {
-        let octet: u32 = part.parse()
+        let octet: u32 = part
+            .parse()
             .map_err(|_| format!("invalid IPv4 octet: {part}"))?;
         if octet > 255 {
             return Err(format!("IPv4 octet out of range: {octet}"));
@@ -418,7 +475,13 @@ pub fn register_all_casts(registry: &mut ScalarRegistry) {
         // Use "str" as source since the CastFn handles any Value regardless.
         // The source type is used to interpret the input; using "str" is the
         // most permissive interpretation.
-        registry.register_public(alias, Box::new(CastFn { source: "str", target }));
+        registry.register_public(
+            alias,
+            Box::new(CastFn {
+                source: "str",
+                target,
+            }),
+        );
     }
 }
 
@@ -436,8 +499,12 @@ impl ScalarFunction for ServerVersionFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::Str("ExchangeDB 1.0.0".into()))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 struct ServerVersionNumFn;
@@ -445,8 +512,12 @@ impl ScalarFunction for ServerVersionNumFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::I64(100_000))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 struct PgBackendPidFn;
@@ -454,8 +525,12 @@ impl ScalarFunction for PgBackendPidFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::I64(std::process::id() as i64))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 struct PgColumnSizeFn;
@@ -470,8 +545,12 @@ impl ScalarFunction for PgColumnSizeFn {
         };
         Ok(Value::I64(size))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct PgTableSizeFn;
@@ -480,8 +559,12 @@ impl ScalarFunction for PgTableSizeFn {
         // Placeholder: return 0 for now.
         Ok(Value::I64(0))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct PgIndexesSizeFn;
@@ -489,8 +572,12 @@ impl ScalarFunction for PgIndexesSizeFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::I64(0))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct PgTotalRelationSizeFn;
@@ -498,8 +585,12 @@ impl ScalarFunction for PgTotalRelationSizeFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::I64(0))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct PgRelationSizeFn;
@@ -507,8 +598,12 @@ impl ScalarFunction for PgRelationSizeFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::I64(0))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct HasTablePrivilegeFn;
@@ -517,8 +612,12 @@ impl ScalarFunction for HasTablePrivilegeFn {
         // Always return true (single-user mode).
         Ok(Value::I64(1))
     }
-    fn min_args(&self) -> usize { 3 }
-    fn max_args(&self) -> usize { 3 }
+    fn min_args(&self) -> usize {
+        3
+    }
+    fn max_args(&self) -> usize {
+        3
+    }
 }
 
 struct CurrentSettingFn;
@@ -541,8 +640,12 @@ impl ScalarFunction for CurrentSettingFn {
         };
         Ok(Value::Str(val.into()))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct SetConfigFn;
@@ -555,8 +658,12 @@ impl ScalarFunction for SetConfigFn {
             Ok(Value::Null)
         }
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 3 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        3
+    }
 }
 
 struct ObjDescriptionFn;
@@ -564,8 +671,12 @@ impl ScalarFunction for ObjDescriptionFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::Null)
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 struct ColDescriptionFn;
@@ -573,8 +684,12 @@ impl ScalarFunction for ColDescriptionFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::Null)
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 struct FormatTypeFn;
@@ -599,8 +714,12 @@ impl ScalarFunction for FormatTypeFn {
         };
         Ok(Value::Str(name.into()))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 struct PgGetExprFn;
@@ -611,8 +730,12 @@ impl ScalarFunction for PgGetExprFn {
             _ => Ok(Value::Null),
         }
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 struct PgGetConstraintdefFn;
@@ -620,8 +743,12 @@ impl ScalarFunction for PgGetConstraintdefFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::Str(String::new()))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct ClockTimestampFn;
@@ -633,8 +760,12 @@ impl ScalarFunction for ClockTimestampFn {
             .as_nanos() as i64;
         Ok(Value::Timestamp(ns))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 struct StatementTimestampFn;
@@ -646,8 +777,12 @@ impl ScalarFunction for StatementTimestampFn {
             .as_nanos() as i64;
         Ok(Value::Timestamp(ns))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 struct TransactionTimestampFn;
@@ -659,8 +794,12 @@ impl ScalarFunction for TransactionTimestampFn {
             .as_nanos() as i64;
         Ok(Value::Timestamp(ns))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 struct TimeofdayFn;
@@ -676,8 +815,12 @@ impl ScalarFunction for TimeofdayFn {
         let s = secs % 60;
         Ok(Value::Str(format!("{h:02}:{m:02}:{s:02}")))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 struct IsFiniteTimestampFn;
@@ -693,8 +836,12 @@ impl ScalarFunction for IsFiniteTimestampFn {
             _ => Ok(Value::I64(1)),
         }
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct InetAtonFn;
@@ -708,8 +855,12 @@ impl ScalarFunction for InetAtonFn {
         let n = ipv4_to_int(s)?;
         Ok(Value::I64(n as i64))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct InetNtoaFn;
@@ -721,8 +872,12 @@ impl ScalarFunction for InetNtoaFn {
             _ => Err("inet_ntoa expects an integer".into()),
         }
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct HostFn;
@@ -738,8 +893,12 @@ impl ScalarFunction for HostFn {
             _ => Err("host expects a string inet".into()),
         }
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct MasklenFn;
@@ -748,7 +907,8 @@ impl ScalarFunction for MasklenFn {
         match &args[0] {
             Value::Str(s) => {
                 if let Some(slash) = s.find('/') {
-                    let bits: i64 = s[slash+1..].parse()
+                    let bits: i64 = s[slash + 1..]
+                        .parse()
                         .map_err(|_| format!("invalid mask length in '{s}'"))?;
                     Ok(Value::I64(bits))
                 } else {
@@ -759,8 +919,12 @@ impl ScalarFunction for MasklenFn {
             _ => Err("masklen expects a string inet".into()),
         }
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct NetworkFn;
@@ -769,13 +933,17 @@ impl ScalarFunction for NetworkFn {
         match &args[0] {
             Value::Str(s) => {
                 let (addr, mask) = if let Some(slash) = s.find('/') {
-                    let bits: u32 = s[slash+1..].parse().unwrap_or(32);
+                    let bits: u32 = s[slash + 1..].parse().unwrap_or(32);
                     (&s[..slash], bits)
                 } else {
                     (s.as_str(), 32)
                 };
                 let ip = ipv4_to_int(addr)?;
-                let net_mask = if mask >= 32 { 0xFFFF_FFFFu32 } else { !((1u32 << (32 - mask)) - 1) };
+                let net_mask = if mask >= 32 {
+                    0xFFFF_FFFFu32
+                } else {
+                    !((1u32 << (32 - mask)) - 1)
+                };
                 let network = ip & net_mask;
                 Ok(Value::Str(format!("{}/{mask}", ipv4_from_int(network))))
             }
@@ -783,8 +951,12 @@ impl ScalarFunction for NetworkFn {
             _ => Err("network expects a string inet".into()),
         }
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 struct BroadcastFn;
@@ -793,13 +965,17 @@ impl ScalarFunction for BroadcastFn {
         match &args[0] {
             Value::Str(s) => {
                 let (addr, mask) = if let Some(slash) = s.find('/') {
-                    let bits: u32 = s[slash+1..].parse().unwrap_or(32);
+                    let bits: u32 = s[slash + 1..].parse().unwrap_or(32);
                     (&s[..slash], bits)
                 } else {
                     (s.as_str(), 32)
                 };
                 let ip = ipv4_to_int(addr)?;
-                let host_bits = if mask >= 32 { 0u32 } else { (1u32 << (32 - mask)) - 1 };
+                let host_bits = if mask >= 32 {
+                    0u32
+                } else {
+                    (1u32 << (32 - mask)) - 1
+                };
                 let broadcast = ip | host_bits;
                 Ok(Value::Str(ipv4_from_int(broadcast)))
             }
@@ -807,8 +983,12 @@ impl ScalarFunction for BroadcastFn {
             _ => Err("broadcast expects a string inet".into()),
         }
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 // String pattern functions
@@ -816,7 +996,9 @@ impl ScalarFunction for BroadcastFn {
 struct LikeFn;
 impl ScalarFunction for LikeFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        if matches!(args[0], Value::Null) { return Ok(Value::Null); }
+        if matches!(args[0], Value::Null) {
+            return Ok(Value::Null);
+        }
         let s = match &args[0] {
             Value::Str(s) => s.as_str(),
             _ => return Ok(Value::I64(0)),
@@ -828,14 +1010,20 @@ impl ScalarFunction for LikeFn {
         let matched = sql_like_match(s, pattern, false);
         Ok(Value::I64(if matched { 1 } else { 0 }))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 struct IlikeFn;
 impl ScalarFunction for IlikeFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        if matches!(args[0], Value::Null) { return Ok(Value::Null); }
+        if matches!(args[0], Value::Null) {
+            return Ok(Value::Null);
+        }
         let s = match &args[0] {
             Value::Str(s) => s.as_str(),
             _ => return Ok(Value::I64(0)),
@@ -847,14 +1035,20 @@ impl ScalarFunction for IlikeFn {
         let matched = sql_like_match(s, pattern, true);
         Ok(Value::I64(if matched { 1 } else { 0 }))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 struct SimilarToFn;
 impl ScalarFunction for SimilarToFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        if matches!(args[0], Value::Null) { return Ok(Value::Null); }
+        if matches!(args[0], Value::Null) {
+            return Ok(Value::Null);
+        }
         let s = match &args[0] {
             Value::Str(s) => s.as_str(),
             _ => return Ok(Value::I64(0)),
@@ -869,14 +1063,20 @@ impl ScalarFunction for SimilarToFn {
             .map_err(|e| format!("similar_to: invalid pattern: {e}"))?;
         Ok(Value::I64(if re.is_match(s) { 1 } else { 0 }))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 struct GlobFn;
 impl ScalarFunction for GlobFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        if matches!(args[0], Value::Null) { return Ok(Value::Null); }
+        if matches!(args[0], Value::Null) {
+            return Ok(Value::Null);
+        }
         let s = match &args[0] {
             Value::Str(s) => s.as_str(),
             _ => return Ok(Value::I64(0)),
@@ -888,8 +1088,12 @@ impl ScalarFunction for GlobFn {
         let matched = glob_match(s, pattern);
         Ok(Value::I64(if matched { 1 } else { 0 }))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -992,7 +1196,9 @@ fn glob_dp(s: &[char], p: &[char], si: usize, pi: usize) -> bool {
         }
         let mut j = pi + 1;
         let negate = j < p.len() && p[j] == '!';
-        if negate { j += 1; }
+        if negate {
+            j += 1;
+        }
         let mut matched = false;
         while j < p.len() && p[j] != ']' {
             if j + 2 < p.len() && p[j + 1] == '-' {
@@ -1007,7 +1213,9 @@ fn glob_dp(s: &[char], p: &[char], si: usize, pi: usize) -> bool {
                 j += 1;
             }
         }
-        if negate { matched = !matched; }
+        if negate {
+            matched = !matched;
+        }
         if matched && j < p.len() {
             glob_dp(s, p, si + 1, j + 1)
         } else {
@@ -1131,49 +1339,64 @@ mod tests {
 
     #[test]
     fn test_like_fn() {
-        let result = evaluate_scalar("like", &[
-            Value::Str("hello world".into()),
-            Value::Str("hello%".into()),
-        ]).unwrap();
+        let result = evaluate_scalar(
+            "like",
+            &[
+                Value::Str("hello world".into()),
+                Value::Str("hello%".into()),
+            ],
+        )
+        .unwrap();
         assert_eq!(result, Value::I64(1));
 
-        let result = evaluate_scalar("like", &[
-            Value::Str("hello world".into()),
-            Value::Str("world%".into()),
-        ]).unwrap();
+        let result = evaluate_scalar(
+            "like",
+            &[
+                Value::Str("hello world".into()),
+                Value::Str("world%".into()),
+            ],
+        )
+        .unwrap();
         assert_eq!(result, Value::I64(0));
     }
 
     #[test]
     fn test_ilike_fn() {
-        let result = evaluate_scalar("ilike", &[
-            Value::Str("Hello World".into()),
-            Value::Str("hello%".into()),
-        ]).unwrap();
+        let result = evaluate_scalar(
+            "ilike",
+            &[
+                Value::Str("Hello World".into()),
+                Value::Str("hello%".into()),
+            ],
+        )
+        .unwrap();
         assert_eq!(result, Value::I64(1));
     }
 
     #[test]
     fn test_similar_to_fn() {
-        let result = evaluate_scalar("similar_to", &[
-            Value::Str("abc123".into()),
-            Value::Str("abc%".into()),
-        ]).unwrap();
+        let result = evaluate_scalar(
+            "similar_to",
+            &[Value::Str("abc123".into()), Value::Str("abc%".into())],
+        )
+        .unwrap();
         assert_eq!(result, Value::I64(1));
     }
 
     #[test]
     fn test_glob_fn() {
-        let result = evaluate_scalar("glob", &[
-            Value::Str("hello.txt".into()),
-            Value::Str("*.txt".into()),
-        ]).unwrap();
+        let result = evaluate_scalar(
+            "glob",
+            &[Value::Str("hello.txt".into()), Value::Str("*.txt".into())],
+        )
+        .unwrap();
         assert_eq!(result, Value::I64(1));
 
-        let result = evaluate_scalar("glob", &[
-            Value::Str("hello.rs".into()),
-            Value::Str("*.txt".into()),
-        ]).unwrap();
+        let result = evaluate_scalar(
+            "glob",
+            &[Value::Str("hello.rs".into()), Value::Str("*.txt".into())],
+        )
+        .unwrap();
         assert_eq!(result, Value::I64(0));
     }
 
@@ -1202,7 +1425,8 @@ mod tests {
 
     #[test]
     fn test_current_setting() {
-        let result = evaluate_scalar("current_setting", &[Value::Str("server_encoding".into())]).unwrap();
+        let result =
+            evaluate_scalar("current_setting", &[Value::Str("server_encoding".into())]).unwrap();
         assert_eq!(result, Value::Str("UTF8".into()));
     }
 

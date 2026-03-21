@@ -402,13 +402,19 @@ pub struct PercentileCont {
 
 impl Default for PercentileCont {
     fn default() -> Self {
-        Self { values: Vec::new(), percentile: 0.5 }
+        Self {
+            values: Vec::new(),
+            percentile: 0.5,
+        }
     }
 }
 
 impl PercentileCont {
     pub fn new(percentile: f64) -> Self {
-        Self { values: Vec::new(), percentile: percentile.clamp(0.0, 1.0) }
+        Self {
+            values: Vec::new(),
+            percentile: percentile.clamp(0.0, 1.0),
+        }
     }
 }
 
@@ -457,13 +463,19 @@ pub struct PercentileDisc {
 
 impl Default for PercentileDisc {
     fn default() -> Self {
-        Self { values: Vec::new(), percentile: 0.5 }
+        Self {
+            values: Vec::new(),
+            percentile: 0.5,
+        }
     }
 }
 
 impl PercentileDisc {
     pub fn new(percentile: f64) -> Self {
-        Self { values: Vec::new(), percentile: percentile.clamp(0.0, 1.0) }
+        Self {
+            values: Vec::new(),
+            percentile: percentile.clamp(0.0, 1.0),
+        }
     }
 }
 
@@ -501,7 +513,9 @@ pub struct Mode {
 
 impl AggregateFunction for Mode {
     fn add(&mut self, value: &Value) {
-        if matches!(value, Value::Null) { return; }
+        if matches!(value, Value::Null) {
+            return;
+        }
         let key = format!("{value}");
         let entry = self.counts.entry(key).or_insert((0, value.clone()));
         entry.0 += 1;
@@ -724,12 +738,10 @@ impl AggregateFunction for RegrIntercept {
 }
 
 /// `BOOL_AND` aggregate. Returns 1 if all non-null values are truthy, 0 otherwise.
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct BoolAnd {
     result: Option<bool>,
 }
-
 
 impl AggregateFunction for BoolAnd {
     fn add(&mut self, value: &Value) {
@@ -756,12 +768,10 @@ impl AggregateFunction for BoolAnd {
 }
 
 /// `BOOL_OR` aggregate. Returns 1 if any non-null value is truthy.
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct BoolOr {
     result: Option<bool>,
 }
-
 
 impl AggregateFunction for BoolOr {
     fn add(&mut self, value: &Value) {
@@ -833,15 +843,27 @@ impl AggregateFunction for Vwap {
         // Accumulates values as a single column: sum(value). Paired usage
         // (price*volume pre-multiplied) is the typical pattern.
         match value {
-            Value::I64(v) => { self.sum_pv += *v as f64; self.sum_v += 1.0; }
-            Value::F64(v) => { self.sum_pv += *v; self.sum_v += 1.0; }
+            Value::I64(v) => {
+                self.sum_pv += *v as f64;
+                self.sum_v += 1.0;
+            }
+            Value::F64(v) => {
+                self.sum_pv += *v;
+                self.sum_v += 1.0;
+            }
             _ => {}
         }
     }
     fn result(&self) -> Value {
-        if self.sum_v == 0.0 { Value::Null } else { Value::F64(self.sum_pv / self.sum_v) }
+        if self.sum_v == 0.0 {
+            Value::Null
+        } else {
+            Value::F64(self.sum_pv / self.sum_v)
+        }
     }
-    fn reset(&mut self) { *self = Self::default(); }
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 /// `SMA` aggregate. Simple Moving Average over all values fed.
@@ -853,13 +875,19 @@ pub struct Sma {
 
 impl Default for Sma {
     fn default() -> Self {
-        Self { values: Vec::new(), period: usize::MAX }
+        Self {
+            values: Vec::new(),
+            period: usize::MAX,
+        }
     }
 }
 
 impl Sma {
     pub fn new(period: usize) -> Self {
-        Self { values: Vec::new(), period: if period == 0 { 1 } else { period } }
+        Self {
+            values: Vec::new(),
+            period: if period == 0 { 1 } else { period },
+        }
     }
 }
 
@@ -873,14 +901,18 @@ impl AggregateFunction for Sma {
         }
     }
     fn result(&self) -> Value {
-        if self.values.is_empty() { return Value::Null; }
+        if self.values.is_empty() {
+            return Value::Null;
+        }
         let n = self.values.len();
         let start = n.saturating_sub(self.period);
         let window = &self.values[start..];
         let avg = window.iter().sum::<f64>() / window.len() as f64;
         Value::F64(avg)
     }
-    fn reset(&mut self) { self.values.clear(); }
+    fn reset(&mut self) {
+        self.values.clear();
+    }
 }
 
 /// `EMA` aggregate. Exponential Moving Average.
@@ -891,13 +923,21 @@ pub struct Ema {
 }
 
 impl Default for Ema {
-    fn default() -> Self { Self { ema: None, alpha: 2.0 / 21.0 } } // default period=20
+    fn default() -> Self {
+        Self {
+            ema: None,
+            alpha: 2.0 / 21.0,
+        }
+    } // default period=20
 }
 
 impl Ema {
     pub fn new(period: usize) -> Self {
         let p = if period == 0 { 1 } else { period };
-        Self { ema: None, alpha: 2.0 / (p as f64 + 1.0) }
+        Self {
+            ema: None,
+            alpha: 2.0 / (p as f64 + 1.0),
+        }
     }
 }
 
@@ -916,7 +956,9 @@ impl AggregateFunction for Ema {
     fn result(&self) -> Value {
         self.ema.map(Value::F64).unwrap_or(Value::Null)
     }
-    fn reset(&mut self) { self.ema = None; }
+    fn reset(&mut self) {
+        self.ema = None;
+    }
 }
 
 /// `WMA` aggregate. Weighted Moving Average.
@@ -928,13 +970,19 @@ pub struct Wma {
 
 impl Default for Wma {
     fn default() -> Self {
-        Self { values: Vec::new(), period: usize::MAX }
+        Self {
+            values: Vec::new(),
+            period: usize::MAX,
+        }
     }
 }
 
 impl Wma {
     pub fn new(period: usize) -> Self {
-        Self { values: Vec::new(), period: if period == 0 { 1 } else { period } }
+        Self {
+            values: Vec::new(),
+            period: if period == 0 { 1 } else { period },
+        }
     }
 }
 
@@ -947,16 +995,24 @@ impl AggregateFunction for Wma {
         }
     }
     fn result(&self) -> Value {
-        if self.values.is_empty() { return Value::Null; }
+        if self.values.is_empty() {
+            return Value::Null;
+        }
         let n = self.values.len();
         let start = n.saturating_sub(self.period);
         let window = &self.values[start..];
         let len = window.len();
         let denom = (len * (len + 1)) as f64 / 2.0;
-        let num: f64 = window.iter().enumerate().map(|(i, v)| (i + 1) as f64 * v).sum();
+        let num: f64 = window
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (i + 1) as f64 * v)
+            .sum();
         Value::F64(num / denom)
     }
-    fn reset(&mut self) { self.values.clear(); }
+    fn reset(&mut self) {
+        self.values.clear();
+    }
 }
 
 /// `RSI` aggregate. Relative Strength Index.
@@ -968,13 +1024,19 @@ pub struct Rsi {
 
 impl Default for Rsi {
     fn default() -> Self {
-        Self { values: Vec::new(), period: 14 }
+        Self {
+            values: Vec::new(),
+            period: 14,
+        }
     }
 }
 
 impl Rsi {
     pub fn new(period: usize) -> Self {
-        Self { values: Vec::new(), period: if period == 0 { 14 } else { period } }
+        Self {
+            values: Vec::new(),
+            period: if period == 0 { 14 } else { period },
+        }
     }
 }
 
@@ -987,15 +1049,25 @@ impl AggregateFunction for Rsi {
         }
     }
     fn result(&self) -> Value {
-        if self.values.len() < 2 { return Value::Null; }
+        if self.values.len() < 2 {
+            return Value::Null;
+        }
         let mut gains = 0.0_f64;
         let mut losses = 0.0_f64;
         let n = self.values.len();
-        let start = if n > self.period + 1 { n - self.period - 1 } else { 0 };
+        let start = if n > self.period + 1 {
+            n - self.period - 1
+        } else {
+            0
+        };
         let window = &self.values[start..];
         for w in window.windows(2) {
             let diff = w[1] - w[0];
-            if diff > 0.0 { gains += diff; } else { losses -= diff; }
+            if diff > 0.0 {
+                gains += diff;
+            } else {
+                losses -= diff;
+            }
         }
         let periods = (window.len() - 1) as f64;
         let avg_gain = gains / periods;
@@ -1007,7 +1079,9 @@ impl AggregateFunction for Rsi {
             Value::F64(100.0 - 100.0 / (1.0 + rs))
         }
     }
-    fn reset(&mut self) { self.values.clear(); }
+    fn reset(&mut self) {
+        self.values.clear();
+    }
 }
 
 /// `MACD_SIGNAL` aggregate. MACD signal line.
@@ -1031,7 +1105,9 @@ impl MacdSignal {
 }
 
 fn compute_ema_series(data: &[f64], period: usize) -> Vec<f64> {
-    if data.is_empty() { return vec![]; }
+    if data.is_empty() {
+        return vec![];
+    }
     let alpha = 2.0 / (period as f64 + 1.0);
     let mut result = Vec::with_capacity(data.len());
     result.push(data[0]);
@@ -1051,14 +1127,26 @@ impl AggregateFunction for MacdSignal {
         }
     }
     fn result(&self) -> Value {
-        if self.values.len() < self.slow { return Value::Null; }
+        if self.values.len() < self.slow {
+            return Value::Null;
+        }
         let fast_ema = compute_ema_series(&self.values, self.fast);
         let slow_ema = compute_ema_series(&self.values, self.slow);
-        let macd: Vec<f64> = fast_ema.iter().zip(slow_ema.iter()).map(|(f, s)| f - s).collect();
+        let macd: Vec<f64> = fast_ema
+            .iter()
+            .zip(slow_ema.iter())
+            .map(|(f, s)| f - s)
+            .collect();
         let signal_ema = compute_ema_series(&macd, self.signal);
-        signal_ema.last().copied().map(Value::F64).unwrap_or(Value::Null)
+        signal_ema
+            .last()
+            .copied()
+            .map(Value::F64)
+            .unwrap_or(Value::Null)
     }
-    fn reset(&mut self) { self.values.clear(); }
+    fn reset(&mut self) {
+        self.values.clear();
+    }
 }
 
 /// `BOLLINGER_UPPER` aggregate.
@@ -1071,13 +1159,21 @@ pub struct BollingerUpper {
 
 impl Default for BollingerUpper {
     fn default() -> Self {
-        Self { values: Vec::new(), period: 20, mult: 2.0 }
+        Self {
+            values: Vec::new(),
+            period: 20,
+            mult: 2.0,
+        }
     }
 }
 
 impl BollingerUpper {
     pub fn new(period: usize, mult: f64) -> Self {
-        Self { values: Vec::new(), period: if period == 0 { 20 } else { period }, mult: if mult == 0.0 { 2.0 } else { mult } }
+        Self {
+            values: Vec::new(),
+            period: if period == 0 { 20 } else { period },
+            mult: if mult == 0.0 { 2.0 } else { mult },
+        }
     }
 }
 
@@ -1090,7 +1186,9 @@ impl AggregateFunction for BollingerUpper {
         }
     }
     fn result(&self) -> Value {
-        if self.values.is_empty() { return Value::Null; }
+        if self.values.is_empty() {
+            return Value::Null;
+        }
         let n = self.values.len();
         let start = n.saturating_sub(self.period);
         let window = &self.values[start..];
@@ -1098,7 +1196,9 @@ impl AggregateFunction for BollingerUpper {
         let var = window.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / window.len() as f64;
         Value::F64(mean + self.mult * var.sqrt())
     }
-    fn reset(&mut self) { self.values.clear(); }
+    fn reset(&mut self) {
+        self.values.clear();
+    }
 }
 
 /// `BOLLINGER_LOWER` aggregate.
@@ -1111,13 +1211,21 @@ pub struct BollingerLower {
 
 impl Default for BollingerLower {
     fn default() -> Self {
-        Self { values: Vec::new(), period: 20, mult: 2.0 }
+        Self {
+            values: Vec::new(),
+            period: 20,
+            mult: 2.0,
+        }
     }
 }
 
 impl BollingerLower {
     pub fn new(period: usize, mult: f64) -> Self {
-        Self { values: Vec::new(), period: if period == 0 { 20 } else { period }, mult: if mult == 0.0 { 2.0 } else { mult } }
+        Self {
+            values: Vec::new(),
+            period: if period == 0 { 20 } else { period },
+            mult: if mult == 0.0 { 2.0 } else { mult },
+        }
     }
 }
 
@@ -1130,7 +1238,9 @@ impl AggregateFunction for BollingerLower {
         }
     }
     fn result(&self) -> Value {
-        if self.values.is_empty() { return Value::Null; }
+        if self.values.is_empty() {
+            return Value::Null;
+        }
         let n = self.values.len();
         let start = n.saturating_sub(self.period);
         let window = &self.values[start..];
@@ -1138,7 +1248,9 @@ impl AggregateFunction for BollingerLower {
         let var = window.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / window.len() as f64;
         Value::F64(mean - self.mult * var.sqrt())
     }
-    fn reset(&mut self) { self.values.clear(); }
+    fn reset(&mut self) {
+        self.values.clear();
+    }
 }
 
 /// `ATR` aggregate. Average True Range (single-column: range of consecutive values).
@@ -1150,13 +1262,19 @@ pub struct Atr {
 
 impl Default for Atr {
     fn default() -> Self {
-        Self { values: Vec::new(), period: 14 }
+        Self {
+            values: Vec::new(),
+            period: 14,
+        }
     }
 }
 
 impl Atr {
     pub fn new(period: usize) -> Self {
-        Self { values: Vec::new(), period: if period == 0 { 14 } else { period } }
+        Self {
+            values: Vec::new(),
+            period: if period == 0 { 14 } else { period },
+        }
     }
 }
 
@@ -1169,14 +1287,22 @@ impl AggregateFunction for Atr {
         }
     }
     fn result(&self) -> Value {
-        if self.values.len() < 2 { return Value::Null; }
-        let trs: Vec<f64> = self.values.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
+        if self.values.len() < 2 {
+            return Value::Null;
+        }
+        let trs: Vec<f64> = self
+            .values
+            .windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .collect();
         let n = trs.len();
         let start = n.saturating_sub(self.period);
         let window = &trs[start..];
         Value::F64(window.iter().sum::<f64>() / window.len() as f64)
     }
-    fn reset(&mut self) { self.values.clear(); }
+    fn reset(&mut self) {
+        self.values.clear();
+    }
 }
 
 /// `DRAWDOWN` aggregate. Maximum drawdown from peak.
@@ -1198,15 +1324,25 @@ impl AggregateFunction for Drawdown {
             self.peak = v;
             self.has_value = true;
         } else {
-            if v > self.peak { self.peak = v; }
+            if v > self.peak {
+                self.peak = v;
+            }
             let dd = (self.peak - v) / self.peak;
-            if dd > self.max_dd { self.max_dd = dd; }
+            if dd > self.max_dd {
+                self.max_dd = dd;
+            }
         }
     }
     fn result(&self) -> Value {
-        if !self.has_value { Value::Null } else { Value::F64(self.max_dd) }
+        if !self.has_value {
+            Value::Null
+        } else {
+            Value::F64(self.max_dd)
+        }
     }
-    fn reset(&mut self) { *self = Self::default(); }
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 // ===========================================================================
@@ -1244,7 +1380,9 @@ impl AggregateFunction for Twap {
         let sum: f64 = self.prices.iter().map(|(_, p)| p).sum();
         Value::F64(sum / self.prices.len() as f64)
     }
-    fn reset(&mut self) { self.prices.clear(); }
+    fn reset(&mut self) {
+        self.prices.clear();
+    }
 }
 
 /// `REALIZED_VOL` — Annualized realized volatility from log returns.
@@ -1267,7 +1405,9 @@ impl AggregateFunction for RealizedVol {
             return Value::Null;
         }
         // Compute log returns
-        let log_returns: Vec<f64> = self.prices.windows(2)
+        let log_returns: Vec<f64> = self
+            .prices
+            .windows(2)
             .filter_map(|w| {
                 if w[0] > 0.0 && w[1] > 0.0 {
                     Some((w[1] / w[0]).ln())
@@ -1289,7 +1429,9 @@ impl AggregateFunction for RealizedVol {
         // Annualize: assume 252 trading days
         Value::F64(daily_vol * (252.0_f64).sqrt())
     }
-    fn reset(&mut self) { self.prices.clear(); }
+    fn reset(&mut self) {
+        self.prices.clear();
+    }
 }
 
 /// `SHARPE_RATIO` — (mean return - risk_free_rate) / stddev(returns).
@@ -1311,9 +1453,15 @@ impl AggregateFunction for SharpeRatio {
         if self.prices.len() < 2 {
             return Value::Null;
         }
-        let returns: Vec<f64> = self.prices.windows(2)
+        let returns: Vec<f64> = self
+            .prices
+            .windows(2)
             .filter_map(|w| {
-                if w[0] != 0.0 { Some((w[1] - w[0]) / w[0]) } else { None }
+                if w[0] != 0.0 {
+                    Some((w[1] - w[0]) / w[0])
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -1333,7 +1481,9 @@ impl AggregateFunction for SharpeRatio {
         // Annualize: sharpe * sqrt(252)
         Value::F64((mean / stddev) * (252.0_f64).sqrt())
     }
-    fn reset(&mut self) { self.prices.clear(); }
+    fn reset(&mut self) {
+        self.prices.clear();
+    }
 }
 
 /// `ORDER_IMBALANCE` — (bid_volume - ask_volume) / (bid_volume + ask_volume).
@@ -1363,11 +1513,15 @@ impl AggregateFunction for OrderImbalance {
     }
     fn result(&self) -> Value {
         let total = self.bid_vol + self.ask_vol;
-        if total == 0.0 { Value::Null } else {
+        if total == 0.0 {
+            Value::Null
+        } else {
             Value::F64((self.bid_vol - self.ask_vol) / total)
         }
     }
-    fn reset(&mut self) { *self = Self::default(); }
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 /// `TRADE_FLOW` — Buy volume ratio = buy_volume / total_volume.
@@ -1391,11 +1545,15 @@ impl AggregateFunction for TradeFlow {
         }
     }
     fn result(&self) -> Value {
-        if self.total_vol == 0.0 { Value::Null } else {
+        if self.total_vol == 0.0 {
+            Value::Null
+        } else {
             Value::F64(self.buy_vol / self.total_vol)
         }
     }
-    fn reset(&mut self) { *self = Self::default(); }
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 /// `PRICE_IMPACT` — Estimated market impact / slippage.
@@ -1429,7 +1587,9 @@ impl AggregateFunction for PriceImpact {
             _ => Value::Null,
         }
     }
-    fn reset(&mut self) { *self = Self::default(); }
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 /// `OHLCV` — Open/High/Low/Close/Volume as JSON object.
@@ -1455,24 +1615,28 @@ impl AggregateFunction for OhlcvAgg {
             self.high = v;
             self.low = v;
         } else {
-            if v > self.high { self.high = v; }
-            if v < self.low { self.low = v; }
+            if v > self.high {
+                self.high = v;
+            }
+            if v < self.low {
+                self.low = v;
+            }
         }
         self.close = v;
         self.count += 1;
     }
     fn result(&self) -> Value {
         match self.open {
-            Some(o) => {
-                Value::Str(format!(
-                    r#"{{"o":{},"h":{},"l":{},"c":{},"count":{}}}"#,
-                    o, self.high, self.low, self.close, self.count
-                ))
-            }
+            Some(o) => Value::Str(format!(
+                r#"{{"o":{},"h":{},"l":{},"c":{},"count":{}}}"#,
+                o, self.high, self.low, self.close, self.count
+            )),
             None => Value::Null,
         }
     }
-    fn reset(&mut self) { *self = Self::default(); }
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 // ===========================================================================
@@ -1489,14 +1653,31 @@ pub struct SumDouble {
 impl AggregateFunction for SumDouble {
     fn add(&mut self, value: &Value) {
         match value {
-            Value::I64(v) => { self.sum += *v as f64; self.has_value = true; }
-            Value::F64(v) => { self.sum += v; self.has_value = true; }
-            Value::Timestamp(ns) => { self.sum += *ns as f64; self.has_value = true; }
+            Value::I64(v) => {
+                self.sum += *v as f64;
+                self.has_value = true;
+            }
+            Value::F64(v) => {
+                self.sum += v;
+                self.has_value = true;
+            }
+            Value::Timestamp(ns) => {
+                self.sum += *ns as f64;
+                self.has_value = true;
+            }
             _ => {}
         }
     }
-    fn result(&self) -> Value { if self.has_value { Value::F64(self.sum) } else { Value::Null } }
-    fn reset(&mut self) { *self = Self::default(); }
+    fn result(&self) -> Value {
+        if self.has_value {
+            Value::F64(self.sum)
+        } else {
+            Value::Null
+        }
+    }
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 /// `SUM_LONG` aggregate. Forces i64 accumulation.
@@ -1509,14 +1690,31 @@ pub struct SumLong {
 impl AggregateFunction for SumLong {
     fn add(&mut self, value: &Value) {
         match value {
-            Value::I64(v) => { self.sum += v; self.has_value = true; }
-            Value::F64(v) => { self.sum += *v as i64; self.has_value = true; }
-            Value::Timestamp(ns) => { self.sum += ns; self.has_value = true; }
+            Value::I64(v) => {
+                self.sum += v;
+                self.has_value = true;
+            }
+            Value::F64(v) => {
+                self.sum += *v as i64;
+                self.has_value = true;
+            }
+            Value::Timestamp(ns) => {
+                self.sum += ns;
+                self.has_value = true;
+            }
             _ => {}
         }
     }
-    fn result(&self) -> Value { if self.has_value { Value::I64(self.sum) } else { Value::Null } }
-    fn reset(&mut self) { *self = Self::default(); }
+    fn result(&self) -> Value {
+        if self.has_value {
+            Value::I64(self.sum)
+        } else {
+            Value::Null
+        }
+    }
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 /// `AVG_DOUBLE` aggregate. Explicit f64 average.
@@ -1529,13 +1727,27 @@ pub struct AvgDouble {
 impl AggregateFunction for AvgDouble {
     fn add(&mut self, value: &Value) {
         match value {
-            Value::I64(v) => { self.sum += *v as f64; self.count += 1; }
-            Value::F64(v) => { self.sum += v; self.count += 1; }
+            Value::I64(v) => {
+                self.sum += *v as f64;
+                self.count += 1;
+            }
+            Value::F64(v) => {
+                self.sum += v;
+                self.count += 1;
+            }
             _ => {}
         }
     }
-    fn result(&self) -> Value { if self.count == 0 { Value::Null } else { Value::F64(self.sum / self.count as f64) } }
-    fn reset(&mut self) { *self = Self::default(); }
+    fn result(&self) -> Value {
+        if self.count == 0 {
+            Value::Null
+        } else {
+            Value::F64(self.sum / self.count as f64)
+        }
+    }
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 /// `MIN_LONG` aggregate. I64-specific min.
@@ -1553,8 +1765,12 @@ impl AggregateFunction for MinLong {
         };
         self.min = Some(self.min.map_or(v, |cur| cur.min(v)));
     }
-    fn result(&self) -> Value { self.min.map(Value::I64).unwrap_or(Value::Null) }
-    fn reset(&mut self) { self.min = None; }
+    fn result(&self) -> Value {
+        self.min.map(Value::I64).unwrap_or(Value::Null)
+    }
+    fn reset(&mut self) {
+        self.min = None;
+    }
 }
 
 /// `MAX_LONG` aggregate. I64-specific max.
@@ -1572,8 +1788,12 @@ impl AggregateFunction for MaxLong {
         };
         self.max = Some(self.max.map_or(v, |cur| cur.max(v)));
     }
-    fn result(&self) -> Value { self.max.map(Value::I64).unwrap_or(Value::Null) }
-    fn reset(&mut self) { self.max = None; }
+    fn result(&self) -> Value {
+        self.max.map(Value::I64).unwrap_or(Value::Null)
+    }
+    fn reset(&mut self) {
+        self.max = None;
+    }
 }
 
 /// `KSUM` aggregate. Kahan (compensated) summation for better floating-point precision.
@@ -1597,8 +1817,16 @@ impl AggregateFunction for Ksum {
         self.compensation = (t - self.sum) - y;
         self.sum = t;
     }
-    fn result(&self) -> Value { if self.has_value { Value::F64(self.sum) } else { Value::Null } }
-    fn reset(&mut self) { *self = Self::default(); }
+    fn result(&self) -> Value {
+        if self.has_value {
+            Value::F64(self.sum)
+        } else {
+            Value::Null
+        }
+    }
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 /// `NSUM` aggregate. Neumaier (improved Kahan) summation.
@@ -1626,9 +1854,15 @@ impl AggregateFunction for Nsum {
         self.sum = t;
     }
     fn result(&self) -> Value {
-        if self.has_value { Value::F64(self.sum + self.compensation) } else { Value::Null }
+        if self.has_value {
+            Value::F64(self.sum + self.compensation)
+        } else {
+            Value::Null
+        }
     }
-    fn reset(&mut self) { *self = Self::default(); }
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 /// `APPROX_COUNT_DISTINCT` aggregate. Uses a simple HyperLogLog-like sketch.
@@ -1659,8 +1893,12 @@ impl AggregateFunction for ApproxCountDistinct {
             self.seen.insert(Self::hash_value(value));
         }
     }
-    fn result(&self) -> Value { Value::I64(self.seen.len() as i64) }
-    fn reset(&mut self) { self.seen.clear(); }
+    fn result(&self) -> Value {
+        Value::I64(self.seen.len() as i64)
+    }
+    fn reset(&mut self) {
+        self.seen.clear();
+    }
 }
 
 /// `STDDEV_SAMP` aggregate. Sample standard deviation (N-1).
@@ -1678,13 +1916,17 @@ impl AggregateFunction for StdDevSamp {
         }
     }
     fn result(&self) -> Value {
-        if self.values.len() < 2 { return Value::Null; }
+        if self.values.len() < 2 {
+            return Value::Null;
+        }
         let n = self.values.len() as f64;
         let mean = self.values.iter().sum::<f64>() / n;
         let var = self.values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (n - 1.0);
         Value::F64(var.sqrt())
     }
-    fn reset(&mut self) { self.values.clear(); }
+    fn reset(&mut self) {
+        self.values.clear();
+    }
 }
 
 /// `VARIANCE_SAMP` aggregate. Sample variance (N-1).
@@ -1702,13 +1944,17 @@ impl AggregateFunction for VarianceSamp {
         }
     }
     fn result(&self) -> Value {
-        if self.values.len() < 2 { return Value::Null; }
+        if self.values.len() < 2 {
+            return Value::Null;
+        }
         let n = self.values.len() as f64;
         let mean = self.values.iter().sum::<f64>() / n;
         let var = self.values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (n - 1.0);
         Value::F64(var)
     }
-    fn reset(&mut self) { self.values.clear(); }
+    fn reset(&mut self) {
+        self.values.clear();
+    }
 }
 
 /// Create a boxed aggregate function from a kind.
@@ -2085,7 +2331,9 @@ mod tests {
         // WMA(3): (1*10 + 2*20 + 3*30) / (1+2+3) = (10+40+90)/6 = 140/6 ~= 23.333
         if let Value::F64(r) = wma.result() {
             assert!((r - 23.333333333333332).abs() < 1e-10);
-        } else { panic!("expected F64"); }
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
@@ -2106,8 +2354,10 @@ mod tests {
         dd.add(&Value::F64(90.0)); // drawdown from peak 110: (110-90)/110 = 0.1818...
         dd.add(&Value::F64(105.0));
         if let Value::F64(r) = dd.result() {
-            assert!((r - 20.0/110.0).abs() < 1e-10);
-        } else { panic!("expected F64"); }
+            assert!((r - 20.0 / 110.0).abs() < 1e-10);
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
@@ -2128,8 +2378,13 @@ mod tests {
             ks.add(&Value::F64(0.1));
         }
         if let Value::F64(r) = ks.result() {
-            assert!((r - 100.0).abs() < 1e-10, "ksum result {r} should be close to 100.0");
-        } else { panic!("expected F64"); }
+            assert!(
+                (r - 100.0).abs() < 1e-10,
+                "ksum result {r} should be close to 100.0"
+            );
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
@@ -2139,8 +2394,13 @@ mod tests {
             ns.add(&Value::F64(0.1));
         }
         if let Value::F64(r) = ns.result() {
-            assert!((r - 100.0).abs() < 1e-10, "nsum result {r} should be close to 100.0");
-        } else { panic!("expected F64"); }
+            assert!(
+                (r - 100.0).abs() < 1e-10,
+                "nsum result {r} should be close to 100.0"
+            );
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
@@ -2192,7 +2452,9 @@ mod tests {
             // Sample stddev of these values: sqrt(32/7) ~= 2.138
             let expected = (32.0_f64 / 7.0).sqrt();
             assert!((result - expected).abs() < 1e-10);
-        } else { panic!("expected F64"); }
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
@@ -2204,7 +2466,9 @@ mod tests {
         if let Value::F64(result) = v.result() {
             let expected = 32.0 / 7.0;
             assert!((result - expected).abs() < 1e-10);
-        } else { panic!("expected F64"); }
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
@@ -2234,7 +2498,9 @@ mod tests {
             assert!(l < 20.0, "lower should be below mean");
             // Verify symmetry
             assert!((u - 20.0 - (20.0 - l)).abs() < 1e-10);
-        } else { panic!("expected F64"); }
+        } else {
+            panic!("expected F64");
+        }
     }
 
     // ── Exchange aggregates Phase 2 ──────────────────────────────────
@@ -2247,7 +2513,9 @@ mod tests {
         twap.add(&Value::F64(101.0));
         if let Value::F64(v) = twap.result() {
             assert!((v - 101.0).abs() < 1e-10);
-        } else { panic!("expected F64"); }
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
@@ -2258,8 +2526,13 @@ mod tests {
             rv.add(&Value::F64(100.0));
         }
         if let Value::F64(v) = rv.result() {
-            assert!(v.abs() < 1e-10, "constant prices should have ~0 vol, got {v}");
-        } else { panic!("expected F64"); }
+            assert!(
+                v.abs() < 1e-10,
+                "constant prices should have ~0 vol, got {v}"
+            );
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
@@ -2272,7 +2545,9 @@ mod tests {
         if let Value::F64(v) = rv.result() {
             assert!(v > 0.0, "volatile prices should have positive vol");
             assert!(v < 5.0, "annualized vol should be reasonable, got {v}");
-        } else { panic!("expected F64"); }
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
@@ -2283,32 +2558,47 @@ mod tests {
             sr.add(&Value::F64(100.0 + i as f64));
         }
         if let Value::F64(v) = sr.result() {
-            assert!(v > 0.0, "rising prices should have positive sharpe, got {v}");
-        } else { panic!("expected F64"); }
+            assert!(
+                v > 0.0,
+                "rising prices should have positive sharpe, got {v}"
+            );
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
     fn test_order_imbalance() {
         let mut oi = OrderImbalance::default();
-        oi.add(&Value::F64(100.0));  // bid
-        oi.add(&Value::F64(50.0));   // bid
-        oi.add(&Value::F64(-30.0));  // ask
+        oi.add(&Value::F64(100.0)); // bid
+        oi.add(&Value::F64(50.0)); // bid
+        oi.add(&Value::F64(-30.0)); // ask
         // bid=150, ask=30 → (150-30)/(150+30) = 120/180 = 0.6667
         if let Value::F64(v) = oi.result() {
-            assert!((v - 0.6667).abs() < 0.01, "imbalance should be ~0.667, got {v}");
-        } else { panic!("expected F64"); }
+            assert!(
+                (v - 0.6667).abs() < 0.01,
+                "imbalance should be ~0.667, got {v}"
+            );
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
     fn test_trade_flow() {
         let mut tf = TradeFlow::default();
-        tf.add(&Value::F64(100.0));   // buy
-        tf.add(&Value::F64(-50.0));   // sell
-        tf.add(&Value::F64(50.0));    // buy
+        tf.add(&Value::F64(100.0)); // buy
+        tf.add(&Value::F64(-50.0)); // sell
+        tf.add(&Value::F64(50.0)); // buy
         // buy=150, total=200 → 0.75
         if let Value::F64(v) = tf.result() {
-            assert!((v - 0.75).abs() < 1e-10, "buy ratio should be 0.75, got {v}");
-        } else { panic!("expected F64"); }
+            assert!(
+                (v - 0.75).abs() < 1e-10,
+                "buy ratio should be 0.75, got {v}"
+            );
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
@@ -2320,7 +2610,9 @@ mod tests {
         // (105 - 100) / 100 = 0.05
         if let Value::F64(v) = pi.result() {
             assert!((v - 0.05).abs() < 1e-10, "impact should be 0.05, got {v}");
-        } else { panic!("expected F64"); }
+        } else {
+            panic!("expected F64");
+        }
     }
 
     #[test]
@@ -2328,7 +2620,7 @@ mod tests {
         let mut ohlcv = OhlcvAgg::default();
         ohlcv.add(&Value::F64(100.0)); // open
         ohlcv.add(&Value::F64(105.0)); // high
-        ohlcv.add(&Value::F64(95.0));  // low
+        ohlcv.add(&Value::F64(95.0)); // low
         ohlcv.add(&Value::F64(102.0)); // close
 
         if let Value::Str(json) = ohlcv.result() {
@@ -2338,7 +2630,9 @@ mod tests {
             assert_eq!(v["l"], 95.0);
             assert_eq!(v["c"], 102.0);
             assert_eq!(v["count"], 4);
-        } else { panic!("expected Str (JSON)"); }
+        } else {
+            panic!("expected Str (JSON)");
+        }
     }
 
     #[test]

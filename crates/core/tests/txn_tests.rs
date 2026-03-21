@@ -3,9 +3,7 @@
 //! 50 tests covering persistent transaction state, lock-free reader tracking,
 //! and coordinated read/write transactions.
 
-use exchange_core::txn::{
-    PartitionEntry, Scoreboard, TxnFile, TxnHeader, TxnManager,
-};
+use exchange_core::txn::{PartitionEntry, Scoreboard, TxnFile, TxnHeader, TxnManager};
 use std::sync::{Arc, Barrier};
 use tempfile::tempdir;
 
@@ -46,8 +44,16 @@ mod txn_file {
         let dir = tempdir().unwrap();
         let mut txn = TxnFile::open(dir.path()).unwrap();
         let parts = vec![
-            PartitionEntry { timestamp: 1000, row_count: 500, name_offset: 0 },
-            PartitionEntry { timestamp: 2000, row_count: 300, name_offset: 20 },
+            PartitionEntry {
+                timestamp: 1000,
+                row_count: 500,
+                name_offset: 0,
+            },
+            PartitionEntry {
+                timestamp: 2000,
+                row_count: 300,
+                name_offset: 20,
+            },
         ];
         let hdr = TxnHeader {
             version: 1,
@@ -73,7 +79,11 @@ mod txn_file {
             max_timestamp: 200,
             partition_count: 1,
         };
-        let parts = vec![PartitionEntry { timestamp: -100, row_count: 42, name_offset: 0 }];
+        let parts = vec![PartitionEntry {
+            timestamp: -100,
+            row_count: 42,
+            name_offset: 0,
+        }];
         {
             let mut txn = TxnFile::open(dir.path()).unwrap();
             txn.commit(&hdr, &parts).unwrap();
@@ -90,20 +100,44 @@ mod txn_file {
         let mut txn = TxnFile::open(dir.path()).unwrap();
         // Write 3 partitions
         let parts3 = vec![
-            PartitionEntry { timestamp: 1, row_count: 1, name_offset: 0 },
-            PartitionEntry { timestamp: 2, row_count: 2, name_offset: 0 },
-            PartitionEntry { timestamp: 3, row_count: 3, name_offset: 0 },
+            PartitionEntry {
+                timestamp: 1,
+                row_count: 1,
+                name_offset: 0,
+            },
+            PartitionEntry {
+                timestamp: 2,
+                row_count: 2,
+                name_offset: 0,
+            },
+            PartitionEntry {
+                timestamp: 3,
+                row_count: 3,
+                name_offset: 0,
+            },
         ];
         let hdr3 = TxnHeader {
-            version: 1, row_count: 6, min_timestamp: 1, max_timestamp: 3, partition_count: 3,
+            version: 1,
+            row_count: 6,
+            min_timestamp: 1,
+            max_timestamp: 3,
+            partition_count: 3,
         };
         txn.commit(&hdr3, &parts3).unwrap();
         assert_eq!(txn.read_partitions().len(), 3);
 
         // Overwrite with 1 partition
-        let parts1 = vec![PartitionEntry { timestamp: 10, row_count: 10, name_offset: 0 }];
+        let parts1 = vec![PartitionEntry {
+            timestamp: 10,
+            row_count: 10,
+            name_offset: 0,
+        }];
         let hdr1 = TxnHeader {
-            version: 2, row_count: 10, min_timestamp: 10, max_timestamp: 10, partition_count: 1,
+            version: 2,
+            row_count: 10,
+            min_timestamp: 10,
+            max_timestamp: 10,
+            partition_count: 1,
         };
         txn.commit(&hdr1, &parts1).unwrap();
         let read = txn.read_partitions();
@@ -116,11 +150,23 @@ mod txn_file {
         let dir = tempdir().unwrap();
         let mut txn = TxnFile::open(dir.path()).unwrap();
         let parts = vec![
-            PartitionEntry { timestamp: 100, row_count: 10, name_offset: 0 },
-            PartitionEntry { timestamp: 200, row_count: 20, name_offset: 0 },
+            PartitionEntry {
+                timestamp: 100,
+                row_count: 10,
+                name_offset: 0,
+            },
+            PartitionEntry {
+                timestamp: 200,
+                row_count: 20,
+                name_offset: 0,
+            },
         ];
         let hdr = TxnHeader {
-            version: 1, row_count: 30, min_timestamp: 100, max_timestamp: 200, partition_count: 2,
+            version: 1,
+            row_count: 30,
+            min_timestamp: 100,
+            max_timestamp: 200,
+            partition_count: 2,
         };
         txn.commit(&hdr, &parts).unwrap();
         let p0 = txn.read_partition(0);
@@ -135,16 +181,32 @@ mod txn_file {
         let dir = tempdir().unwrap();
         let mut txn = TxnFile::open(dir.path()).unwrap();
         let parts = vec![
-            PartitionEntry { timestamp: 1, row_count: 1, name_offset: 0 },
-            PartitionEntry { timestamp: 2, row_count: 2, name_offset: 0 },
+            PartitionEntry {
+                timestamp: 1,
+                row_count: 1,
+                name_offset: 0,
+            },
+            PartitionEntry {
+                timestamp: 2,
+                row_count: 2,
+                name_offset: 0,
+            },
         ];
         let hdr = TxnHeader {
-            version: 1, row_count: 3, min_timestamp: 1, max_timestamp: 2, partition_count: 2,
+            version: 1,
+            row_count: 3,
+            min_timestamp: 1,
+            max_timestamp: 2,
+            partition_count: 2,
         };
         txn.commit(&hdr, &parts).unwrap();
 
         // Overwrite partition 1
-        let new_entry = PartitionEntry { timestamp: 2, row_count: 99, name_offset: 0 };
+        let new_entry = PartitionEntry {
+            timestamp: 2,
+            row_count: 99,
+            name_offset: 0,
+        };
         txn.write_partition(1, &new_entry).unwrap();
         let read = txn.read_partition(1);
         assert_eq!(read.row_count, 99);
@@ -155,7 +217,11 @@ mod txn_file {
         let dir = tempdir().unwrap();
         let mut txn = TxnFile::open(dir.path()).unwrap();
         let hdr = TxnHeader {
-            version: 1, row_count: 0, min_timestamp: i64::MAX, max_timestamp: i64::MIN, partition_count: 0,
+            version: 1,
+            row_count: 0,
+            min_timestamp: i64::MAX,
+            max_timestamp: i64::MIN,
+            partition_count: 0,
         };
         txn.commit(&hdr, &[]).unwrap();
         assert_eq!(txn.read_header(), hdr);
@@ -167,7 +233,11 @@ mod txn_file {
         let dir = tempdir().unwrap();
         let mut txn = TxnFile::open(dir.path()).unwrap();
         let hdr = TxnHeader {
-            version: 1, row_count: 1, min_timestamp: i64::MIN, max_timestamp: -1, partition_count: 0,
+            version: 1,
+            row_count: 1,
+            min_timestamp: i64::MIN,
+            max_timestamp: -1,
+            partition_count: 0,
         };
         txn.write_header(&hdr).unwrap();
         let read = txn.read_header();
@@ -396,7 +466,11 @@ mod txn_manager {
         assert_eq!(read_txn.version(), 0);
         assert_eq!(mgr.scoreboard().active_count(), 1);
 
-        let parts = vec![PartitionEntry { timestamp: 1000, row_count: 100, name_offset: 0 }];
+        let parts = vec![PartitionEntry {
+            timestamp: 1000,
+            row_count: 100,
+            name_offset: 0,
+        }];
         let v = mgr.commit_write(100, 1000, 2000, &parts).unwrap();
         assert_eq!(v, 1);
         assert_eq!(mgr.current_version(), 1);
@@ -478,7 +552,9 @@ mod txn_manager {
         let writer = std::thread::spawn(move || {
             barrier_w.wait();
             for i in 1..=50u64 {
-                mgr_w.commit_write_simple(i * 10, i as i64, (i * 100) as i64).unwrap();
+                mgr_w
+                    .commit_write_simple(i * 10, i as i64, (i * 100) as i64)
+                    .unwrap();
             }
         });
 
@@ -513,8 +589,16 @@ mod txn_manager {
         {
             let mgr = TxnManager::open(dir.path()).unwrap();
             let parts = vec![
-                PartitionEntry { timestamp: 10, row_count: 5, name_offset: 0 },
-                PartitionEntry { timestamp: 20, row_count: 7, name_offset: 0 },
+                PartitionEntry {
+                    timestamp: 10,
+                    row_count: 5,
+                    name_offset: 0,
+                },
+                PartitionEntry {
+                    timestamp: 20,
+                    row_count: 7,
+                    name_offset: 0,
+                },
             ];
             mgr.commit_write(12, 10, 20, &parts).unwrap();
         }
@@ -605,9 +689,21 @@ mod txn_manager {
         let dir = tempdir().unwrap();
         let mgr = TxnManager::open(dir.path()).unwrap();
         let parts = vec![
-            PartitionEntry { timestamp: 100, row_count: 10, name_offset: 0 },
-            PartitionEntry { timestamp: 200, row_count: 20, name_offset: 0 },
-            PartitionEntry { timestamp: 300, row_count: 30, name_offset: 0 },
+            PartitionEntry {
+                timestamp: 100,
+                row_count: 10,
+                name_offset: 0,
+            },
+            PartitionEntry {
+                timestamp: 200,
+                row_count: 20,
+                name_offset: 0,
+            },
+            PartitionEntry {
+                timestamp: 300,
+                row_count: 30,
+                name_offset: 0,
+            },
         ];
         mgr.commit_write(60, 100, 300, &parts).unwrap();
         let hdr = mgr.read_header();

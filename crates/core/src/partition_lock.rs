@@ -40,8 +40,7 @@ impl PartitionLockManager {
         // `_mutex`, and the guard is dropped before `_mutex` (field order).
         // We transmute the lifetime to 'static so it can be stored alongside
         // its owning Arc.
-        let guard: std::sync::MutexGuard<'static, ()> =
-            unsafe { std::mem::transmute(guard) };
+        let guard: std::sync::MutexGuard<'static, ()> = unsafe { std::mem::transmute(guard) };
 
         PartitionGuard {
             _guard: Some(guard),

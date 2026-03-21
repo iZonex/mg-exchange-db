@@ -17,30 +17,46 @@ pub struct BufferCursor {
 impl BufferCursor {
     pub fn new(source: Box<dyn RecordCursor>, buffer_size: usize) -> Self {
         let schema = source.schema().to_vec();
-        Self { source, buffer_size: buffer_size.max(1), schema }
+        Self {
+            source,
+            buffer_size: buffer_size.max(1),
+            schema,
+        }
     }
 }
 
 impl RecordCursor for BufferCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, _max_rows: usize) -> Result<Option<RecordBatch>> {
         let mut result = RecordBatch::new(self.schema.clone());
 
         while result.row_count() < self.buffer_size {
-            match self.source.next_batch(self.buffer_size - result.row_count())? {
+            match self
+                .source
+                .next_batch(self.buffer_size - result.row_count())?
+            {
                 None => break,
                 Some(b) => {
                     for r in 0..b.row_count() {
-                        let row: Vec<Value> = (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
+                        let row: Vec<Value> =
+                            (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                         result.append_row(&row);
-                        if result.row_count() >= self.buffer_size { break; }
+                        if result.row_count() >= self.buffer_size {
+                            break;
+                        }
                     }
                 }
             }
         }
 
-        if result.row_count() == 0 { Ok(None) } else { Ok(Some(result)) }
+        if result.row_count() == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(result))
+        }
     }
 }
 

@@ -332,8 +332,7 @@ impl BitmapIndexReader {
         while block_offset != 0 {
             let count = self.read_block_count(block_offset);
             for i in 0..count {
-                let rid_offset =
-                    block_offset + VALUE_BLOCK_HEADER_SIZE + i as u64 * 8;
+                let rid_offset = block_offset + VALUE_BLOCK_HEADER_SIZE + i as u64 * 8;
                 let b = self.values.read_at(rid_offset, 8);
                 let row_id = u64::from_le_bytes(b.try_into().unwrap());
                 result.push(row_id);

@@ -7,7 +7,7 @@ use tokio::net::TcpStream;
 
 use super::config::{ReplicationConfig, ReplicationSyncMode};
 use super::protocol::{self, ReplicationMessage};
-use crate::wal::segment::{WalSegment, SEGMENT_HEADER_SIZE};
+use crate::wal::segment::{SEGMENT_HEADER_SIZE, WalSegment};
 
 /// Statistics returned after shipping a WAL segment to replicas.
 #[derive(Debug, Clone)]
@@ -75,11 +75,7 @@ impl WalShipper {
     /// every replica that is behind.  This is called automatically by
     /// `ship_segment` before sending WAL data so replicas always have the
     /// schema they need to merge.
-    pub async fn ensure_schema_synced(
-        &mut self,
-        table: &str,
-        table_dir: &Path,
-    ) -> Result<()> {
+    pub async fn ensure_schema_synced(&mut self, table: &str, table_dir: &Path) -> Result<()> {
         use crate::table::TableMeta;
 
         let meta_path = table_dir.join("_meta");
@@ -89,9 +85,7 @@ impl WalShipper {
 
         let meta = TableMeta::load(&meta_path)?;
         let meta_json = std::fs::read_to_string(&meta_path).map_err(|e| {
-            ExchangeDbError::Wal(format!(
-                "failed to read _meta for table {table}: {e}"
-            ))
+            ExchangeDbError::Wal(format!("failed to read _meta for table {table}: {e}"))
         })?;
 
         let addrs: Vec<String> = self.config.replica_addrs.clone();
@@ -160,11 +154,7 @@ impl WalShipper {
     /// `segment_path`, wraps it in a `WalSegment` replication message,
     /// and sends it over TCP to each replica.  Depending on the configured
     /// sync mode, the method may wait for acknowledgments.
-    pub async fn ship_segment(
-        &mut self,
-        table: &str,
-        segment_path: &Path,
-    ) -> Result<ShipStats> {
+    pub async fn ship_segment(&mut self, table: &str, segment_path: &Path) -> Result<ShipStats> {
         let data = std::fs::read(segment_path).map_err(|e| {
             ExchangeDbError::Wal(format!(
                 "failed to read WAL segment {}: {e}",
@@ -251,11 +241,7 @@ impl WalShipper {
     /// Unlike `ship_segment` which reads from a file path, this accepts raw
     /// bytes directly. This avoids race conditions where the file is deleted
     /// by a merge before the async shipping task runs.
-    pub async fn ship_segment_bytes(
-        &mut self,
-        table: &str,
-        data: &[u8],
-    ) -> Result<ShipStats> {
+    pub async fn ship_segment_bytes(&mut self, table: &str, data: &[u8]) -> Result<ShipStats> {
         let data_len = data.len() as u64;
 
         let msg = ReplicationMessage::WalSegment {
@@ -334,9 +320,10 @@ impl WalShipper {
     /// Record an acknowledgment from a replica.
     pub fn record_ack(&mut self, replica_addr: &str, txn_id: u64) {
         if let Some(pos) = self.replica_positions.get_mut(replica_addr)
-            && txn_id > *pos {
-                *pos = txn_id;
-            }
+            && txn_id > *pos
+        {
+            *pos = txn_id;
+        }
     }
 
     /// Get the replica positions map (for testing/diagnostics).
@@ -418,9 +405,7 @@ fn parse_segment_id_from_path(path: &Path) -> Result<u32> {
     let id_str = filename
         .strip_prefix("wal-")
         .and_then(|s| s.strip_suffix(".wal"))
-        .ok_or_else(|| {
-            ExchangeDbError::Wal(format!("unexpected segment filename: {filename}"))
-        })?;
+        .ok_or_else(|| ExchangeDbError::Wal(format!("unexpected segment filename: {filename}")))?;
 
     id_str
         .parse::<u32>()
@@ -452,50 +437,29 @@ mod tests {
         );
 
         assert_eq!(shipper.replica_positions().len(), 2);
-        assert_eq!(
-            shipper.replica_positions().get("10.0.0.2:9100"),
-            Some(&0)
-        );
-        assert_eq!(
-            shipper.replica_positions().get("10.0.0.3:9100"),
-            Some(&0)
-        );
+        assert_eq!(shipper.replica_positions().get("10.0.0.2:9100"), Some(&0));
+        assert_eq!(shipper.replica_positions().get("10.0.0.3:9100"), Some(&0));
     }
 
     #[test]
     fn record_ack_updates_position() {
-        let mut shipper = make_shipper(
-            vec!["10.0.0.2:9100"],
-            ReplicationSyncMode::Async,
-        );
+        let mut shipper = make_shipper(vec!["10.0.0.2:9100"], ReplicationSyncMode::Async);
 
         shipper.record_ack("10.0.0.2:9100", 42);
-        assert_eq!(
-            shipper.replica_positions().get("10.0.0.2:9100"),
-            Some(&42)
-        );
+        assert_eq!(shipper.replica_positions().get("10.0.0.2:9100"), Some(&42));
 
         // Ack with a lower txn should not regress.
         shipper.record_ack("10.0.0.2:9100", 10);
-        assert_eq!(
-            shipper.replica_positions().get("10.0.0.2:9100"),
-            Some(&42)
-        );
+        assert_eq!(shipper.replica_positions().get("10.0.0.2:9100"), Some(&42));
 
         // Ack with a higher txn updates.
         shipper.record_ack("10.0.0.2:9100", 100);
-        assert_eq!(
-            shipper.replica_positions().get("10.0.0.2:9100"),
-            Some(&100)
-        );
+        assert_eq!(shipper.replica_positions().get("10.0.0.2:9100"), Some(&100));
     }
 
     #[test]
     fn all_replicas_caught_up() {
-        let mut shipper = make_shipper(
-            vec!["r1:9100", "r2:9100"],
-            ReplicationSyncMode::Async,
-        );
+        let mut shipper = make_shipper(vec!["r1:9100", "r2:9100"], ReplicationSyncMode::Async);
 
         assert!(!shipper.all_replicas_caught_up(10));
 
@@ -511,10 +475,7 @@ mod tests {
 
     #[test]
     fn replication_lag_empty() {
-        let shipper = make_shipper(
-            vec!["r1:9100", "r2:9100"],
-            ReplicationSyncMode::Async,
-        );
+        let shipper = make_shipper(vec!["r1:9100", "r2:9100"], ReplicationSyncMode::Async);
 
         let lags = shipper.replication_lag();
         assert_eq!(lags.len(), 2);

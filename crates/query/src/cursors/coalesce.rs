@@ -19,17 +19,25 @@ pub struct CoalesceCursor {
 impl CoalesceCursor {
     pub fn new(source: Box<dyn RecordCursor>, col_indices: Vec<usize>, output_name: &str) -> Self {
         let mut schema = source.schema().to_vec();
-        let ct = col_indices.first()
+        let ct = col_indices
+            .first()
             .and_then(|&i| source.schema().get(i))
             .map(|(_, ct)| *ct)
             .unwrap_or(ColumnType::Varchar);
         schema.push((output_name.to_string(), ct));
-        Self { source, col_indices, output_name: output_name.to_string(), schema }
+        Self {
+            source,
+            col_indices,
+            output_name: output_name.to_string(),
+            schema,
+        }
     }
 }
 
 impl RecordCursor for CoalesceCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
         match self.source.next_batch(max_rows)? {
@@ -39,7 +47,9 @@ impl RecordCursor for CoalesceCursor {
                 let ncols = b.columns.len();
                 for r in 0..b.row_count() {
                     let mut row: Vec<Value> = (0..ncols).map(|c| b.get_value(r, c)).collect();
-                    let coalesced = self.col_indices.iter()
+                    let coalesced = self
+                        .col_indices
+                        .iter()
                         .map(|&i| b.get_value(r, i))
                         .find(|v| *v != Value::Null)
                         .unwrap_or(Value::Null);

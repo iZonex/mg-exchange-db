@@ -7,10 +7,9 @@
 
 use std::path::Path;
 
+use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::column::FixedColumnReader;
-use exchange_core::replication::config::{
-    ReplicationConfig, ReplicationRole, ReplicationSyncMode,
-};
+use exchange_core::replication::config::{ReplicationConfig, ReplicationRole, ReplicationSyncMode};
 use exchange_core::replication::failover::FailoverManager;
 use exchange_core::replication::protocol::{self, ReplicationMessage};
 use exchange_core::replication::s3_shipper::S3WalReceiver;
@@ -21,7 +20,6 @@ use exchange_core::txn::TxnFile;
 use exchange_core::wal::merge::WalMergeJob;
 use exchange_core::wal::row_codec::OwnedColumnValue;
 use exchange_core::wal_writer::{WalTableWriter, WalTableWriterConfig};
-use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use tempfile::tempdir;
 
 /// Helper: create the "trades" table with schema (timestamp, price, volume)
@@ -120,18 +118,11 @@ fn ship_segments_locally(primary_root: &Path, replica_root: &Path, table: &str) 
     let mut segments: Vec<_> = std::fs::read_dir(&primary_wal_dir)
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .ends_with(".wal")
-        })
+        .filter(|e| e.file_name().to_string_lossy().ends_with(".wal"))
         .collect();
     segments.sort_by_key(|e| e.file_name());
 
-    let mut receiver = WalReceiver::new(
-        replica_root.to_path_buf(),
-        "127.0.0.1:0".into(),
-    );
+    let mut receiver = WalReceiver::new(replica_root.to_path_buf(), "127.0.0.1:0".into());
 
     for entry in &segments {
         let data = std::fs::read(entry.path()).unwrap();
@@ -181,7 +172,7 @@ fn ship_segments_locally(primary_root: &Path, replica_root: &Path, table: &str) 
 /// Uses the WAL event binary format: header is 16 bytes,
 /// each event: 1 byte type + 8 bytes txn_id + 8 bytes timestamp + 4 bytes payload_len + payload + 4 bytes checksum.
 fn extract_txn_range(segment_data: &[u8]) -> (u64, u64) {
-    use exchange_core::wal::event::{WalEvent, EVENT_HEADER_SIZE, EVENT_OVERHEAD};
+    use exchange_core::wal::event::{EVENT_HEADER_SIZE, EVENT_OVERHEAD, WalEvent};
 
     let header_size = 16; // SEGMENT_HEADER_SIZE
     let mut offset = header_size;
@@ -190,8 +181,7 @@ fn extract_txn_range(segment_data: &[u8]) -> (u64, u64) {
 
     while offset + EVENT_HEADER_SIZE <= segment_data.len() {
         let payload_len =
-            u32::from_le_bytes(segment_data[offset + 17..offset + 21].try_into().unwrap())
-                as usize;
+            u32::from_le_bytes(segment_data[offset + 17..offset + 21].try_into().unwrap()) as usize;
         let event_total = EVENT_OVERHEAD + payload_len;
         if offset + event_total > segment_data.len() {
             break;
@@ -278,11 +268,17 @@ fn primary_writes_replica_reads() {
 
     // Verify 100 rows on replica.
     let row_count = count_replica_rows(replica_dir.path(), "trades", "price", ColumnType::F64);
-    assert_eq!(row_count, 100, "replica should have 100 rows after first ship");
+    assert_eq!(
+        row_count, 100,
+        "replica should have 100 rows after first ship"
+    );
 
     // Verify data values on replica.
     let part_dir = replica_dir.path().join("trades").join("2024-03-15");
-    assert!(part_dir.exists(), "partition 2024-03-15 should exist on replica");
+    assert!(
+        part_dir.exists(),
+        "partition 2024-03-15 should exist on replica"
+    );
     let price_reader = FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
     assert_eq!(price_reader.read_f64(0), 100.0);
     assert_eq!(price_reader.read_f64(99), 199.0);
@@ -301,7 +297,10 @@ fn primary_writes_replica_reads() {
 
     // Verify 150 total rows on replica.
     let row_count = count_replica_rows(replica_dir.path(), "trades", "price", ColumnType::F64);
-    assert_eq!(row_count, 150, "replica should have 150 rows after second ship");
+    assert_eq!(
+        row_count, 150,
+        "replica should have 150 rows after second ship"
+    );
 }
 
 // ===========================================================================
@@ -320,16 +319,10 @@ fn replica_rejects_writes() {
         ..Default::default()
     };
 
-    let mgr = exchange_core::replication::ReplicationManager::new(
-        dir.path().to_path_buf(),
-        config,
-    );
+    let mgr = exchange_core::replication::ReplicationManager::new(dir.path().to_path_buf(), config);
 
     // A replica should be in read-only mode.
-    assert!(
-        mgr.is_read_only(),
-        "replica should be read-only"
-    );
+    assert!(mgr.is_read_only(), "replica should be read-only");
 
     // A primary should NOT be read-only.
     let primary_config = ReplicationConfig {
@@ -387,20 +380,13 @@ fn failover_promotion() {
         max_lag_bytes: 256 * 1024 * 1024,
         ..Default::default()
     };
-    let mut failover_mgr =
-        FailoverManager::new(replica_config, std::time::Duration::from_secs(5));
+    let mut failover_mgr = FailoverManager::new(replica_config, std::time::Duration::from_secs(5));
 
-    assert_eq!(
-        *failover_mgr.current_role(),
-        ReplicationRole::Replica
-    );
+    assert_eq!(*failover_mgr.current_role(), ReplicationRole::Replica);
 
     failover_mgr.promote_to_primary().unwrap();
 
-    assert_eq!(
-        *failover_mgr.current_role(),
-        ReplicationRole::Primary
-    );
+    assert_eq!(*failover_mgr.current_role(), ReplicationRole::Primary);
 
     // 7. Write new data on the promoted replica (now acting as primary).
     //    Use merge_on_commit since this is the promoted primary now.
@@ -455,10 +441,7 @@ fn txn_range_is_correct_in_shipped_segments() {
                         (0, 0),
                         "txn_range should not be (0,0) for a segment with events"
                     );
-                    assert!(
-                        txn_range.0 <= txn_range.1,
-                        "min_txn should be <= max_txn"
-                    );
+                    assert!(txn_range.0 <= txn_range.1, "min_txn should be <= max_txn");
                     assert!(txn_range.0 >= 1, "txn_ids start at 1");
                 }
             }
@@ -484,10 +467,7 @@ fn receiver_auto_merge_applies_wal() {
     write_rows_no_merge(primary_dir.path(), 20, base_ts);
 
     // Create a receiver and manually feed it WAL data.
-    let mut receiver = WalReceiver::new(
-        replica_dir.path().to_path_buf(),
-        "127.0.0.1:0".into(),
-    );
+    let mut receiver = WalReceiver::new(replica_dir.path().to_path_buf(), "127.0.0.1:0".into());
 
     // Read WAL segments from primary and apply on replica via receiver.
     let primary_wal_dir = primary_dir.path().join("trades").join("wal");
@@ -542,7 +522,10 @@ fn s3_shipping_roundtrip() {
             shipped_count += 1;
         }
     }
-    assert!(shipped_count > 0, "should have shipped at least one segment");
+    assert!(
+        shipped_count > 0,
+        "should have shipped at least one segment"
+    );
 
     // Verify segments are listed.
     let keys = store.list("repl/trades/").unwrap();
@@ -555,11 +538,7 @@ fn s3_shipping_roundtrip() {
     let replica_table_wal = replica_dir.path().join("trades").join("wal");
     std::fs::create_dir_all(&replica_table_wal).unwrap();
 
-    let receiver = S3WalReceiver::new(
-        Box::new(store),
-        "repl",
-        replica_dir.path().to_path_buf(),
-    );
+    let receiver = S3WalReceiver::new(Box::new(store), "repl", replica_dir.path().to_path_buf());
 
     for key in &keys {
         let filename = key.rsplit('/').next().unwrap();
@@ -581,7 +560,10 @@ fn s3_shipping_roundtrip() {
     assert_eq!(stats.rows_merged, 25);
 
     let row_count = count_replica_rows(replica_dir.path(), "trades", "price", ColumnType::F64);
-    assert_eq!(row_count, 25, "replica should have 25 rows after S3 roundtrip");
+    assert_eq!(
+        row_count, 25,
+        "replica should have 25 rows after S3 roundtrip"
+    );
 
     // Spot-check values.
     let part_dir = replica_dir.path().join("trades").join("2024-03-15");
@@ -621,10 +603,7 @@ fn protocol_roundtrip_preserves_txn_range() {
 /// Helper: ship schema + WAL from primary to replica using in-process protocol
 /// encode/decode.  First sends a SchemaSync, then ships WAL segments.
 fn ship_schema_and_segments(primary_root: &Path, replica_root: &Path, table: &str) {
-    let mut receiver = WalReceiver::new(
-        replica_root.to_path_buf(),
-        "127.0.0.1:0".into(),
-    );
+    let mut receiver = WalReceiver::new(replica_root.to_path_buf(), "127.0.0.1:0".into());
 
     // 1. Ship schema via SchemaSync message.
     let meta_path = primary_root.join(table).join("_meta");
@@ -723,16 +702,21 @@ fn schema_sync_creates_table_on_replica() {
     ship_schema_and_segments(primary_dir.path(), replica_dir.path(), "trades");
 
     // Now the replica should have _meta.
-    assert!(replica_meta.exists(), "replica should have _meta after SchemaSync");
+    assert!(
+        replica_meta.exists(),
+        "replica should have _meta after SchemaSync"
+    );
 
     // Verify the _meta content matches the primary.
-    let primary_meta = exchange_core::table::TableMeta::load(
-        &primary_dir.path().join("trades").join("_meta"),
-    )
-    .unwrap();
+    let primary_meta =
+        exchange_core::table::TableMeta::load(&primary_dir.path().join("trades").join("_meta"))
+            .unwrap();
     let replica_meta_loaded = exchange_core::table::TableMeta::load(&replica_meta).unwrap();
     assert_eq!(primary_meta.name, replica_meta_loaded.name);
-    assert_eq!(primary_meta.columns.len(), replica_meta_loaded.columns.len());
+    assert_eq!(
+        primary_meta.columns.len(),
+        replica_meta_loaded.columns.len()
+    );
     assert_eq!(primary_meta.version, replica_meta_loaded.version);
 
     // Merge on replica should succeed now.
@@ -767,15 +751,14 @@ fn schema_sync_after_alter_table() {
     // ALTER TABLE on primary: add a column.
     let primary_meta_path = primary_dir.path().join("trades").join("_meta");
     let mut primary_meta = exchange_core::table::TableMeta::load(&primary_meta_path).unwrap();
-    primary_meta.add_column("source", ColumnType::Symbol).unwrap();
+    primary_meta
+        .add_column("source", ColumnType::Symbol)
+        .unwrap();
     primary_meta.save(&primary_meta_path).unwrap();
 
     // Ship the updated schema.
     let updated_json = std::fs::read_to_string(&primary_meta_path).unwrap();
-    let receiver = WalReceiver::new(
-        replica_dir.path().to_path_buf(),
-        "127.0.0.1:0".into(),
-    );
+    let receiver = WalReceiver::new(replica_dir.path().to_path_buf(), "127.0.0.1:0".into());
     receiver
         .apply_schema_sync("trades", &updated_json, primary_meta.version)
         .unwrap();
@@ -814,8 +797,15 @@ fn schema_sync_does_not_regress_version() {
 
     // Verify the version was NOT regressed.
     let meta_after = exchange_core::table::TableMeta::load(&meta_path).unwrap();
-    assert_eq!(meta_after.version, new_version, "version should not regress");
-    assert_eq!(meta_after.columns.len(), 4, "columns should not be overwritten");
+    assert_eq!(
+        meta_after.version, new_version,
+        "version should not regress"
+    );
+    assert_eq!(
+        meta_after.columns.len(),
+        4,
+        "columns should not be overwritten"
+    );
 }
 
 /// Test: Full flow -- CREATE TABLE on primary, INSERT, data appears on replica
@@ -844,8 +834,7 @@ fn full_flow_create_insert_replicate() {
     // Spot-check values.
     let part_dir = replica_dir.path().join("trades").join("2024-03-15");
     assert!(part_dir.exists());
-    let price_reader =
-        FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
+    let price_reader = FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
     assert_eq!(price_reader.read_f64(0), 100.0);
     assert_eq!(price_reader.read_f64(49), 149.0);
 }
@@ -879,14 +868,12 @@ fn schema_sync_two_replicas() {
     assert_eq!(count2, 20);
 
     // Verify both replicas have identical _meta.
-    let meta1 = exchange_core::table::TableMeta::load(
-        &replica1_dir.path().join("trades").join("_meta"),
-    )
-    .unwrap();
-    let meta2 = exchange_core::table::TableMeta::load(
-        &replica2_dir.path().join("trades").join("_meta"),
-    )
-    .unwrap();
+    let meta1 =
+        exchange_core::table::TableMeta::load(&replica1_dir.path().join("trades").join("_meta"))
+            .unwrap();
+    let meta2 =
+        exchange_core::table::TableMeta::load(&replica2_dir.path().join("trades").join("_meta"))
+            .unwrap();
     assert_eq!(meta1.version, meta2.version);
     assert_eq!(meta1.columns.len(), meta2.columns.len());
 }
@@ -944,7 +931,9 @@ fn schema_sync_multiple_versions() {
     // Ship updated schema.
     let json_v2 = std::fs::read_to_string(&meta_path).unwrap();
     let receiver = WalReceiver::new(replica_dir.path().to_path_buf(), "127.0.0.1:0".into());
-    receiver.apply_schema_sync("trades", &json_v2, meta.version).unwrap();
+    receiver
+        .apply_schema_sync("trades", &json_v2, meta.version)
+        .unwrap();
 
     let replica_meta = exchange_core::table::TableMeta::load(&replica_meta_path).unwrap();
     assert_eq!(replica_meta.columns.len(), 4);
@@ -955,7 +944,9 @@ fn schema_sync_multiple_versions() {
     meta.save(&meta_path).unwrap();
 
     let json_v3 = std::fs::read_to_string(&meta_path).unwrap();
-    receiver.apply_schema_sync("trades", &json_v3, meta.version).unwrap();
+    receiver
+        .apply_schema_sync("trades", &json_v3, meta.version)
+        .unwrap();
 
     let replica_meta = exchange_core::table::TableMeta::load(&replica_meta_path).unwrap();
     assert_eq!(replica_meta.columns.len(), 5);

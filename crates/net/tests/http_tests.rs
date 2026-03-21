@@ -12,9 +12,9 @@
 
 use std::sync::Arc;
 
+use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use axum::Router;
 use tower::ServiceExt;
 
 use exchange_net::http::handlers::AppState;
@@ -46,10 +46,7 @@ async fn get(router: &Router, path: &str) -> (StatusCode, bytes::Bytes) {
     (status, body)
 }
 
-async fn get_json(
-    router: &Router,
-    path: &str,
-) -> (StatusCode, serde_json::Value) {
+async fn get_json(router: &Router, path: &str) -> (StatusCode, serde_json::Value) {
     let (status, body) = get(router, path).await;
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
     (status, json)
@@ -78,11 +75,7 @@ async fn post_json(
     (status, json)
 }
 
-async fn post_text(
-    router: &Router,
-    path: &str,
-    body: &str,
-) -> (StatusCode, bytes::Bytes) {
+async fn post_text(router: &Router, path: &str, body: &str) -> (StatusCode, bytes::Bytes) {
     let resp = router
         .clone()
         .oneshot(
@@ -147,9 +140,7 @@ mod health_endpoint {
         // Even with auth configured, health should be accessible
         let dir = tempfile::tempdir().unwrap();
         let state = AppState::new(dir.path())
-            .with_auth(exchange_net::auth::AuthConfig::new(vec![
-                "secret".into(),
-            ]));
+            .with_auth(exchange_net::auth::AuthConfig::new(vec!["secret".into()]));
         let router = app(Arc::new(state));
         let (status, _) = get_json(&router, "/api/v1/health").await;
         assert_eq!(status, StatusCode::OK);
@@ -167,12 +158,8 @@ mod query_endpoint {
     async fn empty_query_returns_400() {
         let (_dir, state) = test_state();
         let router = app(state);
-        let (status, json) = post_json(
-            &router,
-            "/api/v1/query",
-            serde_json::json!({"query": ""}),
-        )
-        .await;
+        let (status, json) =
+            post_json(&router, "/api/v1/query", serde_json::json!({"query": ""})).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert!(json.get("error").is_some());
     }
@@ -210,7 +197,12 @@ mod query_endpoint {
         let (_dir, state) = test_state();
         let router = app(state);
         // Create table via ILP write
-        post_text(&router, "/api/v1/write", "test_q,host=h1 price=100.5 1000\n").await;
+        post_text(
+            &router,
+            "/api/v1/write",
+            "test_q,host=h1 price=100.5 1000\n",
+        )
+        .await;
         let (status, json) = post_json(
             &router,
             "/api/v1/query",
@@ -329,8 +321,7 @@ mod write_endpoint {
         let (_dir, state) = test_state();
         let router = app(state);
         let (status, body) =
-            post_text(&router, "/api/v1/write", "auto_tbl,host=h1 val=42i 1000\n")
-                .await;
+            post_text(&router, "/api/v1/write", "auto_tbl,host=h1 val=42i 1000\n").await;
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(status, StatusCode::OK);
         assert_eq!(json["status"], "ok");
@@ -356,8 +347,7 @@ mod write_endpoint {
         post_text(&router, "/api/v1/write", "existing,tag=a val=1i 1000\n").await;
         // Second write to same table
         let (status, body) =
-            post_text(&router, "/api/v1/write", "existing,tag=b val=2i 2000\n")
-                .await;
+            post_text(&router, "/api/v1/write", "existing,tag=b val=2i 2000\n").await;
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(status, StatusCode::OK);
         assert_eq!(json["lines_accepted"], 1);
@@ -385,8 +375,7 @@ mod write_endpoint {
     async fn write_invalid_ilp_returns_400() {
         let (_dir, state) = test_state();
         let router = app(state);
-        let (status, body) =
-            post_text(&router, "/api/v1/write", "this is not ILP\n").await;
+        let (status, body) = post_text(&router, "/api/v1/write", "this is not ILP\n").await;
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert!(json["error"].as_str().unwrap().contains("ILP"));
@@ -409,8 +398,7 @@ mod write_endpoint {
         let mut state = AppState::new(dir.path());
         state.read_only = true;
         let router = app(Arc::new(state));
-        let (status, _) =
-            post_text(&router, "/api/v1/write", "tbl val=1i 1000\n").await;
+        let (status, _) = post_text(&router, "/api/v1/write", "tbl val=1i 1000\n").await;
         assert_eq!(status, StatusCode::FORBIDDEN);
     }
 
@@ -418,9 +406,7 @@ mod write_endpoint {
     async fn write_comments_only_returns_400() {
         let (_dir, state) = test_state();
         let router = app(state);
-        let (status, _) =
-            post_text(&router, "/api/v1/write", "# only comments\n# nothing\n")
-                .await;
+        let (status, _) = post_text(&router, "/api/v1/write", "# only comments\n# nothing\n").await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 }
@@ -457,8 +443,7 @@ mod tables_endpoint {
     async fn table_info_not_found() {
         let (_dir, state) = test_state();
         let router = app(state);
-        let (status, json) =
-            get_json(&router, "/api/v1/tables/nonexistent").await;
+        let (status, json) = get_json(&router, "/api/v1/tables/nonexistent").await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert!(json.get("error").is_some());
     }
@@ -490,11 +475,7 @@ mod export_endpoint {
         // Create table with data
         post_text(&router, "/api/v1/write", "exp,tag=a val=42i 1000\n").await;
 
-        let (status, body) = get(
-            &router,
-            "/api/v1/export?query=SELECT%20*%20FROM%20exp",
-        )
-        .await;
+        let (status, body) = get(&router, "/api/v1/export?query=SELECT%20*%20FROM%20exp").await;
         assert_eq!(status, StatusCode::OK);
         let csv = std::str::from_utf8(&body).unwrap();
         assert!(csv.contains(","));
@@ -534,12 +515,7 @@ mod import_endpoint {
         let (_dir, state) = test_state();
         let router = app(state);
         let csv = "name,value\nalice,100\nbob,200\n";
-        let (status, body) = post_text(
-            &router,
-            "/api/v1/import?table=imported",
-            csv,
-        )
-        .await;
+        let (status, body) = post_text(&router, "/api/v1/import?table=imported", csv).await;
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(status, StatusCode::OK);
         assert_eq!(json["rows_imported"], 2);
@@ -549,12 +525,7 @@ mod import_endpoint {
     async fn csv_import_empty_body_returns_400() {
         let (_dir, state) = test_state();
         let router = app(state);
-        let (status, _) = post_text(
-            &router,
-            "/api/v1/import?table=t",
-            "",
-        )
-        .await;
+        let (status, _) = post_text(&router, "/api/v1/import?table=t", "").await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
@@ -562,12 +533,7 @@ mod import_endpoint {
     async fn csv_import_empty_table_param_returns_400() {
         let (_dir, state) = test_state();
         let router = app(state);
-        let (status, _) = post_text(
-            &router,
-            "/api/v1/import?table=",
-            "a,b\n1,2\n",
-        )
-        .await;
+        let (status, _) = post_text(&router, "/api/v1/import?table=", "a,b\n1,2\n").await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
@@ -576,8 +542,7 @@ mod import_endpoint {
         let (_dir, state) = test_state();
         let router = app(state);
         let csv = "name,count,ratio\nalpha,10,1.5\nbeta,20,2.5\n";
-        let (status, body) =
-            post_text(&router, "/api/v1/import?table=typed_import", csv).await;
+        let (status, body) = post_text(&router, "/api/v1/import?table=typed_import", csv).await;
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(status, StatusCode::OK);
         assert_eq!(json["rows_imported"], 2);
@@ -730,11 +695,7 @@ mod admin_endpoints {
         ];
         for ep in &endpoints {
             let (status, json) = get_json(&router, ep).await;
-            assert_eq!(
-                status,
-                StatusCode::OK,
-                "GET {ep} returned {status}"
-            );
+            assert_eq!(status, StatusCode::OK, "GET {ep} returned {status}");
             assert!(
                 json.is_object() || json.is_array(),
                 "GET {ep} did not return JSON"
@@ -846,10 +807,7 @@ mod cors {
                     .method("OPTIONS")
                     .uri("/api/v1/query")
                     .header("origin", "http://localhost:3000")
-                    .header(
-                        "access-control-request-method",
-                        "POST",
-                    )
+                    .header("access-control-request-method", "POST")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -963,10 +921,7 @@ mod metrics {
         let m = Metrics::new();
         m.add_ilp_lines(10);
         m.add_ilp_lines(5);
-        assert_eq!(
-            m.ilp_lines_received_total.load(Ordering::Relaxed),
-            15
-        );
+        assert_eq!(m.ilp_lines_received_total.load(Ordering::Relaxed), 15);
     }
 
     #[test]
@@ -1040,9 +995,7 @@ mod metrics {
 
 mod auth_integration {
     use super::*;
-    use exchange_net::auth::{
-        AuthConfig, AuthMethod, AuthResult, try_authenticate,
-    };
+    use exchange_net::auth::{AuthConfig, AuthMethod, AuthResult, try_authenticate};
 
     #[test]
     fn auth_none_always_authenticated() {
@@ -1093,10 +1046,7 @@ mod auth_integration {
     #[test]
     fn auth_multi_fallback() {
         let config = AuthConfig::new(vec!["token".into()]);
-        let method = AuthMethod::Multi(vec![
-            AuthMethod::Token(config),
-            AuthMethod::None,
-        ]);
+        let method = AuthMethod::Multi(vec![AuthMethod::Token(config), AuthMethod::None]);
         let headers = axum::http::HeaderMap::new();
         let result = try_authenticate(&method, &headers);
         assert!(matches!(result, AuthResult::Authenticated { .. }));
@@ -1104,10 +1054,7 @@ mod auth_integration {
 
     #[test]
     fn auth_config_multiple_tokens() {
-        let config = AuthConfig::new(vec![
-            "token-a".into(),
-            "token-b".into(),
-        ]);
+        let config = AuthConfig::new(vec!["token-a".into(), "token-b".into()]);
         assert!(config.is_valid_token("token-a"));
         assert!(config.is_valid_token("token-b"));
         assert!(!config.is_valid_token("token-c"));
@@ -1124,7 +1071,10 @@ mod response_types {
     #[test]
     fn query_response_serialization() {
         let resp = QueryResponse {
-            columns: vec![ColumnInfo { name: "id".into(), r#type: "I64".into() }],
+            columns: vec![ColumnInfo {
+                name: "id".into(),
+                r#type: "I64".into(),
+            }],
             rows: vec![vec![serde_json::json!(42)]],
             timing_ms: 1.5,
         };
@@ -1172,8 +1122,14 @@ mod response_types {
         let resp = TableInfoResponse {
             name: "trades".into(),
             columns: vec![
-                ColumnInfo { name: "price".into(), r#type: "F64".into() },
-                ColumnInfo { name: "volume".into(), r#type: "I64".into() },
+                ColumnInfo {
+                    name: "price".into(),
+                    r#type: "F64".into(),
+                },
+                ColumnInfo {
+                    name: "volume".into(),
+                    r#type: "I64".into(),
+                },
             ],
             partition_by: "Day".into(),
             row_count: 1_000_000,
@@ -1222,7 +1178,10 @@ mod response_types {
 
     #[test]
     fn column_info_name_and_type() {
-        let c = ColumnInfo { name: "ts".into(), r#type: "Timestamp".into() };
+        let c = ColumnInfo {
+            name: "ts".into(),
+            r#type: "Timestamp".into(),
+        };
         assert_eq!(c.name, "ts");
         assert_eq!(c.r#type, "Timestamp");
     }
@@ -1371,7 +1330,10 @@ async fn health_returns_checks() {
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
     // Should have "checks" field with actual health check results.
-    assert!(json.get("checks").is_some(), "health response should include checks");
+    assert!(
+        json.get("checks").is_some(),
+        "health response should include checks"
+    );
     let checks = json["checks"].as_array().unwrap();
     assert!(!checks.is_empty(), "should have at least one health check");
 
@@ -1384,10 +1346,16 @@ async fn health_returns_checks() {
 
     // Verify check names include expected checks.
     let check_names: Vec<&str> = checks.iter().map(|c| c["name"].as_str().unwrap()).collect();
-    assert!(check_names.contains(&"disk_space"), "should check disk_space");
+    assert!(
+        check_names.contains(&"disk_space"),
+        "should check disk_space"
+    );
     assert!(check_names.contains(&"data_dir"), "should check data_dir");
     assert!(check_names.contains(&"wal_lag"), "should check wal_lag");
-    assert!(check_names.contains(&"memory_usage"), "should check memory_usage");
+    assert!(
+        check_names.contains(&"memory_usage"),
+        "should check memory_usage"
+    );
 
     // Status should reflect actual checks (should be "ok" for a fresh temp dir).
     let status = json["status"].as_str().unwrap();
@@ -1410,12 +1378,12 @@ fn app_state_has_scaffolding_fields() {
     assert!(state.encryption_config.is_none());
 
     // Set them and verify they're accessible.
-    state.usage_meter = Some(Arc::new(
-        exchange_core::metering::UsageMeter::new(dir.path().to_path_buf()),
-    ));
-    state.tenant_manager = Some(Arc::new(
-        exchange_core::tenant::TenantManager::new(dir.path().to_path_buf()),
-    ));
+    state.usage_meter = Some(Arc::new(exchange_core::metering::UsageMeter::new(
+        dir.path().to_path_buf(),
+    )));
+    state.tenant_manager = Some(Arc::new(exchange_core::tenant::TenantManager::new(
+        dir.path().to_path_buf(),
+    )));
     state.encryption_config = Some(Arc::new(
         exchange_core::encryption::EncryptionConfig::disabled(),
     ));
@@ -1430,7 +1398,9 @@ fn app_state_has_scaffolding_fields() {
 async fn metering_records_writes() {
     let dir = tempfile::tempdir().unwrap();
     let mut state = AppState::new(dir.path());
-    let meter = Arc::new(exchange_core::metering::UsageMeter::new(dir.path().to_path_buf()));
+    let meter = Arc::new(exchange_core::metering::UsageMeter::new(
+        dir.path().to_path_buf(),
+    ));
     state.usage_meter = Some(meter.clone());
     let state = Arc::new(state);
     let app = exchange_net::http::router(state);
@@ -1453,7 +1423,10 @@ async fn metering_records_writes() {
 
     // Check metering recorded the write for the default tenant.
     let usage = meter.get_usage("default");
-    assert_eq!(usage.rows_written, 1, "metering should record 1 row written");
+    assert_eq!(
+        usage.rows_written, 1,
+        "metering should record 1 row written"
+    );
 }
 
 /// Test that metering records writes with tenant header.
@@ -1461,7 +1434,9 @@ async fn metering_records_writes() {
 async fn metering_records_writes_with_tenant() {
     let dir = tempfile::tempdir().unwrap();
     let mut state = AppState::new(dir.path());
-    let meter = Arc::new(exchange_core::metering::UsageMeter::new(dir.path().to_path_buf()));
+    let meter = Arc::new(exchange_core::metering::UsageMeter::new(
+        dir.path().to_path_buf(),
+    ));
     state.usage_meter = Some(meter.clone());
     let state = Arc::new(state);
     let app = exchange_net::http::router(state);
@@ -1483,7 +1458,10 @@ async fn metering_records_writes_with_tenant() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let usage = meter.get_usage("tenant_42");
-    assert_eq!(usage.rows_written, 1, "metering should record write for tenant_42");
+    assert_eq!(
+        usage.rows_written, 1,
+        "metering should record write for tenant_42"
+    );
 
     // Default tenant should have no writes.
     let default_usage = meter.get_usage("default");
@@ -1565,7 +1543,10 @@ async fn plan_cache_hit_on_repeat_query() {
         .unwrap();
 
     let stats = cache.stats();
-    assert!(stats.hits >= 1, "second identical query should be a cache hit");
+    assert!(
+        stats.hits >= 1,
+        "second identical query should be a cache hit"
+    );
 }
 
 /// Test slow query metrics increment.
@@ -1656,6 +1637,12 @@ async fn active_queries_metric_balanced() {
         .unwrap();
 
     // After query completes, active_queries should be back to 0.
-    let active = state.metrics.active_queries.load(std::sync::atomic::Ordering::Relaxed);
-    assert_eq!(active, 0, "active_queries should return to 0 after query completes");
+    let active = state
+        .metrics
+        .active_queries
+        .load(std::sync::atomic::Ordering::Relaxed);
+    assert_eq!(
+        active, 0,
+        "active_queries should return to 0 after query completes"
+    );
 }

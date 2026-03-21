@@ -28,11 +28,7 @@ pub struct LatestByCursor {
 }
 
 impl LatestByCursor {
-    pub fn new(
-        source: Box<dyn RecordCursor>,
-        partition_cols: Vec<usize>,
-        ts_col: usize,
-    ) -> Self {
+    pub fn new(source: Box<dyn RecordCursor>, partition_cols: Vec<usize>, ts_col: usize) -> Self {
         let schema = source.schema().to_vec();
         Self {
             source: Some(source),
@@ -57,9 +53,7 @@ impl LatestByCursor {
                 Some(batch) => {
                     let ncols = batch.columns.len();
                     for r in 0..batch.row_count() {
-                        let row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> = (0..ncols).map(|c| batch.get_value(r, c)).collect();
 
                         let ts = match &row[self.ts_col] {
                             Value::Timestamp(n) | Value::I64(n) => *n,
@@ -161,11 +155,31 @@ mod tests {
             ("price".to_string(), ColumnType::F64),
         ];
         let rows = vec![
-            vec![Value::Str("BTC".into()), Value::Timestamp(100), Value::F64(50000.0)],
-            vec![Value::Str("ETH".into()), Value::Timestamp(100), Value::F64(3000.0)],
-            vec![Value::Str("BTC".into()), Value::Timestamp(200), Value::F64(51000.0)],
-            vec![Value::Str("ETH".into()), Value::Timestamp(200), Value::F64(3100.0)],
-            vec![Value::Str("BTC".into()), Value::Timestamp(300), Value::F64(52000.0)],
+            vec![
+                Value::Str("BTC".into()),
+                Value::Timestamp(100),
+                Value::F64(50000.0),
+            ],
+            vec![
+                Value::Str("ETH".into()),
+                Value::Timestamp(100),
+                Value::F64(3000.0),
+            ],
+            vec![
+                Value::Str("BTC".into()),
+                Value::Timestamp(200),
+                Value::F64(51000.0),
+            ],
+            vec![
+                Value::Str("ETH".into()),
+                Value::Timestamp(200),
+                Value::F64(3100.0),
+            ],
+            vec![
+                Value::Str("BTC".into()),
+                Value::Timestamp(300),
+                Value::F64(52000.0),
+            ],
         ];
         let source = MemoryCursor::from_rows(schema, &rows);
         // partition by symbol (col 0), order by ts (col 1)

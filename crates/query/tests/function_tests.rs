@@ -41,10 +41,7 @@ fn eval_err(name: &str, args: &[Value]) -> String {
 
 fn assert_f64_close(val: &Value, expected: f64, tol: f64) {
     match val {
-        Value::F64(v) => assert!(
-            (*v - expected).abs() < tol,
-            "expected ~{expected}, got {v}"
-        ),
+        Value::F64(v) => assert!((*v - expected).abs() < tol, "expected ~{expected}, got {v}"),
         other => panic!("expected F64(~{expected}), got {other:?}"),
     }
 }
@@ -203,10 +200,7 @@ mod string_functions {
     }
     #[test]
     fn concat_three() {
-        assert_eq!(
-            eval("concat", &[s("a"), s("b"), s("c")]),
-            s("abc")
-        );
+        assert_eq!(eval("concat", &[s("a"), s("b"), s("c")]), s("abc"));
     }
     #[test]
     fn concat_null_and_string() {
@@ -238,10 +232,7 @@ mod string_functions {
     }
     #[test]
     fn replace_multiple() {
-        assert_eq!(
-            eval("replace", &[s("aaa"), s("a"), s("b")]),
-            s("bbb")
-        );
+        assert_eq!(eval("replace", &[s("aaa"), s("a"), s("b")]), s("bbb"));
     }
     #[test]
     fn replace_null() {
@@ -617,7 +608,10 @@ mod string_functions {
     #[test]
     fn regexp_replace_basic() {
         assert_eq!(
-            eval("regexp_replace", &[s("hello 123 world 456"), s(r"\d+"), s("NUM")]),
+            eval(
+                "regexp_replace",
+                &[s("hello 123 world 456"), s(r"\d+"), s("NUM")]
+            ),
             s("hello NUM world NUM")
         );
     }
@@ -1645,7 +1639,10 @@ mod date_functions {
     }
     #[test]
     fn date_diff_null() {
-        assert_eq!(eval("date_diff", &[s("days"), null(), ts(JAN_1_2024)]), null());
+        assert_eq!(
+            eval("date_diff", &[s("days"), null(), ts(JAN_1_2024)]),
+            null()
+        );
     }
 
     // --- timestamp_add ---
@@ -2306,7 +2303,10 @@ mod aggregate_functions {
         let db = TestDb::with_trades(10);
         let first = db.query_scalar("SELECT first(price) FROM trades");
         let last = db.query_scalar("SELECT last(price) FROM trades");
-        assert_ne!(first, last, "first and last price should differ for 10 rows");
+        assert_ne!(
+            first, last,
+            "first and last price should differ for 10 rows"
+        );
     }
 
     #[test]
@@ -2391,10 +2391,13 @@ mod aggregate_functions {
         let db = TestDb::with_trades(30);
         let (_, rows) = db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol");
         assert_eq!(rows.len(), 3);
-        let total: i64 = rows.iter().filter_map(|r| match &r[1] {
-            Value::I64(n) => Some(*n),
-            _ => None,
-        }).sum();
+        let total: i64 = rows
+            .iter()
+            .filter_map(|r| match &r[1] {
+                Value::I64(n) => Some(*n),
+                _ => None,
+            })
+            .sum();
         assert_eq!(total, 30);
     }
 
@@ -2422,9 +2425,8 @@ mod aggregate_functions {
     #[test]
     fn group_by_min_max() {
         let db = TestDb::with_trades(30);
-        let (_, rows) = db.query(
-            "SELECT symbol, min(price), max(price) FROM trades GROUP BY symbol",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, min(price), max(price) FROM trades GROUP BY symbol");
         assert_eq!(rows.len(), 3);
         for row in &rows {
             // min <= max
@@ -2545,7 +2547,9 @@ mod cast_functions {
     fn typeof_int() {
         let result = eval("typeof", &[i(42)]);
         match result {
-            Value::Str(r) => assert!(r.to_lowercase().contains("int") || r.to_lowercase().contains("i64")),
+            Value::Str(r) => {
+                assert!(r.to_lowercase().contains("int") || r.to_lowercase().contains("i64"))
+            }
             _ => panic!("expected Str"),
         }
     }
@@ -2553,7 +2557,11 @@ mod cast_functions {
     fn typeof_float() {
         let result = eval("typeof", &[f(3.14)]);
         match result {
-            Value::Str(r) => assert!(r.to_lowercase().contains("float") || r.to_lowercase().contains("f64") || r.to_lowercase().contains("double")),
+            Value::Str(r) => assert!(
+                r.to_lowercase().contains("float")
+                    || r.to_lowercase().contains("f64")
+                    || r.to_lowercase().contains("double")
+            ),
             _ => panic!("expected Str"),
         }
     }
@@ -2561,7 +2569,11 @@ mod cast_functions {
     fn typeof_string() {
         let result = eval("typeof", &[s("hello")]);
         match result {
-            Value::Str(r) => assert!(r.to_lowercase().contains("str") || r.to_lowercase().contains("varchar") || r.to_lowercase().contains("string")),
+            Value::Str(r) => assert!(
+                r.to_lowercase().contains("str")
+                    || r.to_lowercase().contains("varchar")
+                    || r.to_lowercase().contains("string")
+            ),
             _ => panic!("expected Str"),
         }
     }
@@ -2739,7 +2751,12 @@ mod utility_functions {
         let result = eval("rnd_uuid4", &[]);
         match result {
             Value::Str(uuid) => {
-                assert_eq!(uuid.len(), 36, "UUID should be 36 chars, got {}", uuid.len());
+                assert_eq!(
+                    uuid.len(),
+                    36,
+                    "UUID should be 36 chars, got {}",
+                    uuid.len()
+                );
                 assert_eq!(uuid.chars().filter(|c| *c == '-').count(), 4);
             }
             _ => panic!("expected Str"),
@@ -2853,7 +2870,10 @@ mod utility_functions {
     // --- json_extract ---
     #[test]
     fn json_extract_basic() {
-        let result = eval("json_extract", &[s(r#"{"name":"John","age":30}"#), s("name")]);
+        let result = eval(
+            "json_extract",
+            &[s(r#"{"name":"John","age":30}"#), s("name")],
+        );
         match result {
             Value::Str(v) => assert!(v.contains("John")),
             _ => panic!("expected Str containing John"),

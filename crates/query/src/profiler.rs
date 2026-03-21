@@ -138,7 +138,10 @@ impl QueryProfiler {
                 out.push_str(&format!("    Rows out: {}\n", step.rows_out));
             }
             if step.bytes_scanned > 0 {
-                out.push_str(&format!("    Bytes scanned: {}\n", format_bytes(step.bytes_scanned)));
+                out.push_str(&format!(
+                    "    Bytes scanned: {}\n",
+                    format_bytes(step.bytes_scanned)
+                ));
             }
             out.push_str(&format!("    Time: {}\n", format_duration(step.duration)));
             if !step.details.is_empty() {
@@ -147,7 +150,10 @@ impl QueryProfiler {
         }
 
         let total = self.total_elapsed();
-        out.push_str(&format!("  Total execution time: {}\n", format_duration(total)));
+        out.push_str(&format!(
+            "  Total execution time: {}\n",
+            format_duration(total)
+        ));
         out
     }
 }

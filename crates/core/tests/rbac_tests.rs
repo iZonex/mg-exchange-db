@@ -2,7 +2,9 @@
 //!
 //! Covers users, roles, permissions, security context, and authentication.
 
-use exchange_core::rbac::{hash_password, verify_password, Permission, RbacStore, Role, SecurityContext, User};
+use exchange_core::rbac::{
+    Permission, RbacStore, Role, SecurityContext, User, hash_password, verify_password,
+};
 use tempfile::TempDir;
 
 // ---------------------------------------------------------------------------
@@ -198,10 +200,7 @@ mod users {
         user.roles = vec!["reader".into(), "writer".into()];
         store.create_user(&user).unwrap();
 
-        let ctx = store
-            .authenticate("multi_role", "pass")
-            .unwrap()
-            .unwrap();
+        let ctx = store.authenticate("multi_role", "pass").unwrap().unwrap();
         assert!(ctx.can_read_table("trades"));
         assert!(ctx.can_write_table("trades"));
     }
@@ -501,10 +500,7 @@ mod security_context {
         user.roles = vec!["reader".into()];
         store.create_user(&user).unwrap();
 
-        let ctx = store
-            .authenticate("ctx_user", "pass")
-            .unwrap()
-            .unwrap();
+        let ctx = store.authenticate("ctx_user", "pass").unwrap().unwrap();
         assert_eq!(ctx.user, "ctx_user");
         assert_eq!(ctx.roles, vec!["reader"]);
         assert!(ctx.can_read_table("any"));
@@ -542,10 +538,12 @@ mod security_context {
         let mut user = make_user("disabled_resolve", "pass");
         user.enabled = false;
         store.create_user(&user).unwrap();
-        assert!(store
-            .resolve_security_context("disabled_resolve")
-            .unwrap()
-            .is_none());
+        assert!(
+            store
+                .resolve_security_context("disabled_resolve")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
@@ -717,14 +715,18 @@ mod audit_operations {
     }
 
     #[test]
-    #[ignore] #[ignore] fn hash_password_hex_format() {
+    #[ignore]
+    #[ignore]
+    fn hash_password_hex_format() {
         let h = hash_password("test");
         assert_eq!(h.len(), 16); // 64-bit xxhash = 16 hex chars
         assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
     }
 
     #[test]
-    #[ignore] #[ignore] fn hash_password_empty_string() {
+    #[ignore]
+    #[ignore]
+    fn hash_password_empty_string() {
         let h = hash_password("");
         assert_eq!(h.len(), 16);
     }
@@ -805,12 +807,20 @@ mod audit_operations {
         assert_eq!(Permission::DDL, Permission::DDL);
         assert_ne!(Permission::Admin, Permission::DDL);
         assert_eq!(
-            Permission::Read { table: Some("t".into()) },
-            Permission::Read { table: Some("t".into()) }
+            Permission::Read {
+                table: Some("t".into())
+            },
+            Permission::Read {
+                table: Some("t".into())
+            }
         );
         assert_ne!(
-            Permission::Read { table: Some("t1".into()) },
-            Permission::Read { table: Some("t2".into()) }
+            Permission::Read {
+                table: Some("t1".into())
+            },
+            Permission::Read {
+                table: Some("t2".into())
+            }
         );
     }
 
@@ -818,7 +828,9 @@ mod audit_operations {
     fn write_all_read_specific_combination() {
         let ctx = ctx_with(vec![
             Permission::Write { table: None },
-            Permission::Read { table: Some("secret".into()) },
+            Permission::Read {
+                table: Some("secret".into()),
+            },
         ]);
         assert!(ctx.can_write_table("any"));
         assert!(ctx.can_read_table("secret"));

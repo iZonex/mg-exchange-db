@@ -45,9 +45,9 @@ impl Decimal128 {
             format!("{integer_part}{frac_part}")
         };
 
-        let mantissa: i128 = combined.parse::<i128>().map_err(|e| {
-            ExchangeDbError::Parse(format!("invalid Decimal128 string '{s}': {e}"))
-        })?;
+        let mantissa: i128 = combined
+            .parse::<i128>()
+            .map_err(|e| ExchangeDbError::Parse(format!("invalid Decimal128 string '{s}': {e}")))?;
 
         Ok(Self { mantissa, scale })
     }

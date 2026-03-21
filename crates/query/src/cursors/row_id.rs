@@ -18,12 +18,18 @@ impl RowIdCursor {
     pub fn new(source: Box<dyn RecordCursor>, col_name: &str) -> Self {
         let mut schema = vec![(col_name.to_string(), ColumnType::I64)];
         schema.extend(source.schema().to_vec());
-        Self { source, schema, next_id: 1 }
+        Self {
+            source,
+            schema,
+            next_id: 1,
+        }
     }
 }
 
 impl RecordCursor for RowIdCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
         match self.source.next_batch(max_rows)? {

@@ -75,13 +75,13 @@ impl WalReceiver {
     pub async fn start(&mut self) -> Result<()> {
         // Bind to a local port (port 0 = OS-assigned, or we could use
         // a configured port). For now we listen on 0.0.0.0:0.
-        let listener = TcpListener::bind("0.0.0.0:0").await.map_err(|e| {
-            ExchangeDbError::Wal(format!("failed to bind receiver: {e}"))
-        })?;
+        let listener = TcpListener::bind("0.0.0.0:0")
+            .await
+            .map_err(|e| ExchangeDbError::Wal(format!("failed to bind receiver: {e}")))?;
 
-        let local_addr = listener.local_addr().map_err(|e| {
-            ExchangeDbError::Wal(format!("failed to get local addr: {e}"))
-        })?;
+        let local_addr = listener
+            .local_addr()
+            .map_err(|e| ExchangeDbError::Wal(format!("failed to get local addr: {e}")))?;
 
         tracing::info!(
             addr = %local_addr,
@@ -90,9 +90,10 @@ impl WalReceiver {
         );
 
         loop {
-            let (mut stream, peer) = listener.accept().await.map_err(|e| {
-                ExchangeDbError::Wal(format!("accept failed: {e}"))
-            })?;
+            let (mut stream, peer) = listener
+                .accept()
+                .await
+                .map_err(|e| ExchangeDbError::Wal(format!("accept failed: {e}")))?;
 
             tracing::debug!(peer = %peer, "accepted replication connection");
 
@@ -135,15 +136,12 @@ impl WalReceiver {
     pub fn apply_segment(&mut self, table: &str, segment_data: &[u8]) -> Result<u64> {
         let table_wal_dir = self.db_root.join(table).join("wal");
         std::fs::create_dir_all(&table_wal_dir).map_err(|e| {
-            ExchangeDbError::Wal(format!(
-                "failed to create WAL dir for table {table}: {e}"
-            ))
+            ExchangeDbError::Wal(format!("failed to create WAL dir for table {table}: {e}"))
         })?;
 
         // Determine the next segment file name by scanning existing files.
         let next_id = self.next_segment_id(&table_wal_dir)?;
-        let segment_path =
-            table_wal_dir.join(format!("wal-{next_id:06}.wal"));
+        let segment_path = table_wal_dir.join(format!("wal-{next_id:06}.wal"));
 
         // The raw segment data contains a header with the primary's segment_id.
         // We need to rewrite the segment_id in the header (bytes 6..10) to match
@@ -275,17 +273,10 @@ impl WalReceiver {
     /// Apply a `SchemaSync` message: write (or update) the table's `_meta`
     /// file on the replica side.  Only overwrites when the incoming version
     /// is strictly newer than what is already on disk.
-    pub fn apply_schema_sync(
-        &self,
-        table: &str,
-        meta_json: &str,
-        version: u64,
-    ) -> Result<()> {
+    pub fn apply_schema_sync(&self, table: &str, meta_json: &str, version: u64) -> Result<()> {
         let table_dir = self.db_root.join(table);
         std::fs::create_dir_all(&table_dir).map_err(|e| {
-            ExchangeDbError::Wal(format!(
-                "failed to create table dir for {table}: {e}"
-            ))
+            ExchangeDbError::Wal(format!("failed to create table dir for {table}: {e}"))
         })?;
 
         let meta_path = table_dir.join("_meta");
@@ -301,9 +292,7 @@ impl WalReceiver {
 
         if should_update {
             std::fs::write(&meta_path, meta_json).map_err(|e| {
-                ExchangeDbError::Wal(format!(
-                    "failed to write _meta for table {table}: {e}"
-                ))
+                ExchangeDbError::Wal(format!("failed to write _meta for table {table}: {e}"))
             })?;
 
             // Ensure the _txn file exists so merges can proceed.
@@ -331,9 +320,10 @@ impl WalReceiver {
 
                 if let Some(rest) = name.strip_prefix("wal-")
                     && let Some(id_str) = rest.strip_suffix(".wal")
-                        && let Ok(id) = id_str.parse::<u32>() {
-                            max_id = Some(max_id.map_or(id, |m: u32| m.max(id)));
-                        }
+                    && let Ok(id) = id_str.parse::<u32>()
+                {
+                    max_id = Some(max_id.map_or(id, |m: u32| m.max(id)));
+                }
             }
         }
 
@@ -382,10 +372,7 @@ mod tests {
     #[test]
     fn apply_segment_creates_wal_dir() {
         let dir = tempdir().unwrap();
-        let mut receiver = WalReceiver::new(
-            dir.path().to_path_buf(),
-            "127.0.0.1:9100".into(),
-        );
+        let mut receiver = WalReceiver::new(dir.path().to_path_buf(), "127.0.0.1:9100".into());
 
         let fake_data = b"XWAL\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
         let bytes = receiver.apply_segment("test_table", fake_data).unwrap();
@@ -405,10 +392,7 @@ mod tests {
     #[test]
     fn apply_segment_increments_id() {
         let dir = tempdir().unwrap();
-        let mut receiver = WalReceiver::new(
-            dir.path().to_path_buf(),
-            "127.0.0.1:9100".into(),
-        );
+        let mut receiver = WalReceiver::new(dir.path().to_path_buf(), "127.0.0.1:9100".into());
 
         let data1 = b"segment-1-data";
         let data2 = b"segment-2-data";
@@ -424,10 +408,7 @@ mod tests {
     #[test]
     fn current_position_reflects_state() {
         let dir = tempdir().unwrap();
-        let receiver = WalReceiver::new(
-            dir.path().to_path_buf(),
-            "127.0.0.1:9100".into(),
-        );
+        let receiver = WalReceiver::new(dir.path().to_path_buf(), "127.0.0.1:9100".into());
 
         let pos = receiver.current_position();
         assert_eq!(pos.last_applied_txn, 0);
@@ -437,10 +418,7 @@ mod tests {
     #[test]
     fn handle_wal_segment_message() {
         let dir = tempdir().unwrap();
-        let mut receiver = WalReceiver::new(
-            dir.path().to_path_buf(),
-            "127.0.0.1:9100".into(),
-        );
+        let mut receiver = WalReceiver::new(dir.path().to_path_buf(), "127.0.0.1:9100".into());
 
         let msg = ReplicationMessage::WalSegment {
             table: "trades".into(),

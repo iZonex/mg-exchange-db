@@ -5,8 +5,8 @@ use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast;
 use tokio::sync::RwLock;
+use tokio::sync::broadcast;
 
 use crate::http::handlers::AppState;
 
@@ -103,26 +103,27 @@ impl SubscriptionManager {
         // Extract symbol from rows if present.
         for (key, sender) in channels.iter() {
             if key.table == table
-                && let Some(ref symbol) = key.symbol {
-                    // Filter rows that match this symbol.
-                    let matching: Vec<serde_json::Value> = rows
-                        .iter()
-                        .filter(|row| {
-                            row.get("symbol")
-                                .and_then(|v| v.as_str())
-                                .is_some_and(|s| s == symbol)
-                        })
-                        .cloned()
-                        .collect();
+                && let Some(ref symbol) = key.symbol
+            {
+                // Filter rows that match this symbol.
+                let matching: Vec<serde_json::Value> = rows
+                    .iter()
+                    .filter(|row| {
+                        row.get("symbol")
+                            .and_then(|v| v.as_str())
+                            .is_some_and(|s| s == symbol)
+                    })
+                    .cloned()
+                    .collect();
 
-                    if !matching.is_empty() {
-                        let filtered_event = WriteEvent {
-                            table: table.to_string(),
-                            rows: matching,
-                        };
-                        let _ = sender.send(filtered_event);
-                    }
+                if !matching.is_empty() {
+                    let filtered_event = WriteEvent {
+                        table: table.to_string(),
+                        rows: matching,
+                    };
+                    let _ = sender.send(filtered_event);
                 }
+            }
         }
     }
 
@@ -140,7 +141,8 @@ impl Default for SubscriptionManager {
 
 impl std::fmt::Debug for SubscriptionManager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SubscriptionManager").finish_non_exhaustive()
+        f.debug_struct("SubscriptionManager")
+            .finish_non_exhaustive()
     }
 }
 
@@ -223,9 +225,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                                 table: subscribe,
                                 symbol,
                             };
-                            let _ = fwd_tx
-                                .send(serde_json::to_string(&ack).unwrap())
-                                .await;
+                            let _ = fwd_tx.send(serde_json::to_string(&ack).unwrap()).await;
                             continue;
                         }
 
@@ -249,10 +249,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                                         }
                                     }
                                     Err(broadcast::error::RecvError::Lagged(n)) => {
-                                        tracing::warn!(
-                                            skipped = n,
-                                            "WebSocket subscriber lagged"
-                                        );
+                                        tracing::warn!(skipped = n, "WebSocket subscriber lagged");
                                     }
                                     Err(broadcast::error::RecvError::Closed) => break,
                                 }
@@ -267,9 +264,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                             table: subscribe,
                             symbol,
                         };
-                        let _ = fwd_tx
-                            .send(serde_json::to_string(&ack).unwrap())
-                            .await;
+                        let _ = fwd_tx.send(serde_json::to_string(&ack).unwrap()).await;
                     }
                     Ok(ClientMessage::Unsubscribe { unsubscribe }) => {
                         // Unsubscribe from all symbol variants for this table.
@@ -291,17 +286,13 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                             table: unsubscribe,
                             symbol: None,
                         };
-                        let _ = fwd_tx
-                            .send(serde_json::to_string(&ack).unwrap())
-                            .await;
+                        let _ = fwd_tx.send(serde_json::to_string(&ack).unwrap()).await;
                     }
                     Err(e) => {
                         let err = ErrorMessage {
                             error: format!("invalid message: {e}"),
                         };
-                        let _ = fwd_tx
-                            .send(serde_json::to_string(&err).unwrap())
-                            .await;
+                        let _ = fwd_tx.send(serde_json::to_string(&err).unwrap()).await;
                     }
                 }
             }

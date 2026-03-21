@@ -1,10 +1,10 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use axum::Json;
 use axum::extract::{Path, Query as AxumQuery, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use futures::stream;
 use serde::Deserialize;
 
@@ -14,15 +14,15 @@ use exchange_core::encryption::EncryptionConfig;
 use exchange_core::engine::Engine;
 use exchange_core::health::{HealthChecker, OverallStatus};
 use exchange_core::metering::UsageMeter;
+use exchange_core::rbac::RbacStore;
+use exchange_core::resource::ResourceManager;
 use exchange_core::table::{ColumnValue, TableBuilder, WriteMode};
 use exchange_core::tenant::TenantManager;
 use exchange_core::wal_writer::{WalTableWriter, WalTableWriterConfig};
-use exchange_core::rbac::RbacStore;
-use exchange_core::resource::ResourceManager;
 use exchange_query::context::ExecutionContext;
+use exchange_query::cursor_executor::execute_cursor;
 use exchange_query::plan::{QueryPlan, QueryResult, Value};
 use exchange_query::{execute_with_context, plan_query};
-use exchange_query::cursor_executor::execute_cursor;
 
 use crate::auth::{AuthConfig, AuthMethod, AuthResult, try_authenticate};
 use crate::ilp;
@@ -98,17 +98,12 @@ impl AppState {
         if let Err(e) = std::fs::create_dir_all(&db_root) {
             tracing::error!(path = %db_root.display(), error = %e, "failed to create db_root directory");
         }
-        let engine = Arc::new(
-            Engine::open(&db_root).unwrap_or_else(|e| {
-                tracing::error!(error = %e, "failed to open Engine; creating minimal instance");
-                // Fallback: try once more after ensuring the directory exists.
-                Engine::open(&db_root).expect("Engine::open failed on second attempt")
-            }),
-        );
-        let session_manager = Arc::new(SessionManager::new(
-            10_000,
-            Duration::from_secs(3600),
-        ));
+        let engine = Arc::new(Engine::open(&db_root).unwrap_or_else(|e| {
+            tracing::error!(error = %e, "failed to open Engine; creating minimal instance");
+            // Fallback: try once more after ensuring the directory exists.
+            Engine::open(&db_root).expect("Engine::open failed on second attempt")
+        }));
+        let session_manager = Arc::new(SessionManager::new(10_000, Duration::from_secs(3600)));
         Self {
             db_root,
             engine,
@@ -131,7 +126,7 @@ impl AppState {
             tenant_manager: None,
             encryption_config: None,
             query_registry: Arc::new(exchange_query::QueryRegistry::new()),
-            max_query_size: 1_048_576,      // 1 MB
+            max_query_size: 1_048_576,       // 1 MB
             max_write_body_size: 67_108_864, // 64 MB
         }
     }
@@ -198,7 +193,11 @@ fn substitute_params(sql: &str, params: &[serde_json::Value]) -> String {
         let replacement = match &params[i] {
             serde_json::Value::Null => "NULL".to_string(),
             serde_json::Value::Bool(b) => {
-                if *b { "TRUE".to_string() } else { "FALSE".to_string() }
+                if *b {
+                    "TRUE".to_string()
+                } else {
+                    "FALSE".to_string()
+                }
             }
             serde_json::Value::Number(n) => n.to_string(),
             serde_json::Value::String(s) => {
@@ -331,9 +330,10 @@ fn resolve_session(
 ) -> (String, Option<crate::session::Session>) {
     if let Some(hv) = headers.get(SESSION_HEADER)
         && let Ok(id) = hv.to_str()
-            && let Some(session) = state.session_manager.get_session(id) {
-                return (id.to_string(), Some(session));
-            }
+        && let Some(session) = state.session_manager.get_session(id)
+    {
+        return (id.to_string(), Some(session));
+    }
     // Create a new session.
     match state.session_manager.create_session() {
         Ok(id) => {
@@ -388,13 +388,15 @@ fn build_execution_context(
     // Determine whether to use cursor engine for this query.
     // Enable for SELECT / Join / SetOperation plans when the server-wide flag is on.
     let use_cursors = state.use_cursor_engine
-        && plan.is_some_and(|p| matches!(
-            p,
-            QueryPlan::Select { .. }
-            | QueryPlan::Join { .. }
-            | QueryPlan::MultiJoin { .. }
-            | QueryPlan::AsofJoin { .. }
-        ));
+        && plan.is_some_and(|p| {
+            matches!(
+                p,
+                QueryPlan::Select { .. }
+                    | QueryPlan::Join { .. }
+                    | QueryPlan::MultiJoin { .. }
+                    | QueryPlan::AsofJoin { .. }
+            )
+        });
 
     // Resolve session to pick up session variables.
     let (_session_id, session) = resolve_session(state, headers);
@@ -404,8 +406,8 @@ fn build_execution_context(
     // (timezone and search_path will be used when the executor supports them)
 
     // When replication is enabled, force WAL mode for SQL writes too.
-    let effective_use_wal = state.write_mode == WriteMode::Wal
-        || state.replication_manager.is_some();
+    let effective_use_wal =
+        state.write_mode == WriteMode::Wal || state.replication_manager.is_some();
 
     // Register the query for cancellation support.
     let (query_id, cancel_token) = state.query_registry.register();
@@ -457,7 +459,9 @@ pub async fn query(
     let query_sql = if req.params.is_empty() {
         req.query.trim().to_string()
     } else {
-        substitute_params(&req.query, &req.params).trim().to_string()
+        substitute_params(&req.query, &req.params)
+            .trim()
+            .to_string()
     };
 
     if query_sql.is_empty() {
@@ -491,8 +495,13 @@ pub async fn query(
                 db_error_to_response(e)
             })?;
             // Store in cache for next time.
-            if matches!(&p, QueryPlan::Select { .. } | QueryPlan::Join { .. }
-                | QueryPlan::MultiJoin { .. } | QueryPlan::AsofJoin { .. }) {
+            if matches!(
+                &p,
+                QueryPlan::Select { .. }
+                    | QueryPlan::Join { .. }
+                    | QueryPlan::MultiJoin { .. }
+                    | QueryPlan::AsofJoin { .. }
+            ) {
                 cache.put(&query_sql, p.clone());
             }
             (p, false)
@@ -535,11 +544,11 @@ pub async fn query(
     // that the async runtime is not meaningfully blocked.
     let exec_start = Instant::now();
     let result = execute_with_context(&ctx, &plan).map_err(|e| {
-            state.query_registry.deregister(main_query_id);
-            state.metrics.dec_active_queries();
-            state.metrics.inc_queries_failed();
-            db_error_to_response(e)
-        })?;
+        state.query_registry.deregister(main_query_id);
+        state.metrics.dec_active_queries();
+        state.metrics.inc_queries_failed();
+        db_error_to_response(e)
+    })?;
     let t_exec = exec_start.elapsed();
     let timing_ms = start.elapsed().as_secs_f64() * 1000.0;
     state.query_registry.deregister(main_query_id);
@@ -575,21 +584,25 @@ pub async fn query(
     // Invalidate plan cache after DDL operations.
     if let Some(ref cache) = state.plan_cache {
         let upper = query_sql.trim().to_ascii_uppercase();
-        if (upper.starts_with("CREATE") || upper.starts_with("DROP") || upper.starts_with("ALTER") || upper.starts_with("TRUNCATE"))
-            && let Ok(ref p) = plan_query(&query_sql) {
-                match p {
-                    exchange_query::QueryPlan::CreateTable { name, .. }
-                    | exchange_query::QueryPlan::DropTable { table: name, .. }
-                    | exchange_query::QueryPlan::AddColumn { table: name, .. }
-                    | exchange_query::QueryPlan::DropColumn { table: name, .. }
-                    | exchange_query::QueryPlan::RenameColumn { table: name, .. }
-                    | exchange_query::QueryPlan::SetColumnType { table: name, .. }
-                    | exchange_query::QueryPlan::TruncateTable { table: name, .. } => {
-                        cache.invalidate_table(name);
-                    }
-                    _ => {}
+        if (upper.starts_with("CREATE")
+            || upper.starts_with("DROP")
+            || upper.starts_with("ALTER")
+            || upper.starts_with("TRUNCATE"))
+            && let Ok(ref p) = plan_query(&query_sql)
+        {
+            match p {
+                exchange_query::QueryPlan::CreateTable { name, .. }
+                | exchange_query::QueryPlan::DropTable { table: name, .. }
+                | exchange_query::QueryPlan::AddColumn { table: name, .. }
+                | exchange_query::QueryPlan::DropColumn { table: name, .. }
+                | exchange_query::QueryPlan::RenameColumn { table: name, .. }
+                | exchange_query::QueryPlan::SetColumnType { table: name, .. }
+                | exchange_query::QueryPlan::TruncateTable { table: name, .. } => {
+                    cache.invalidate_table(name);
                 }
+                _ => {}
             }
+        }
     }
 
     // Log slow queries and increment slow metric.
@@ -630,7 +643,8 @@ fn format_query_result(
                 .enumerate()
                 .map(|(i, name)| {
                     // Infer column type from the first non-null value in this column.
-                    let type_name = rows.iter()
+                    let type_name = rows
+                        .iter()
                         .find_map(|row| {
                             row.get(i).and_then(|v| match v {
                                 Value::I64(_) => Some("BIGINT"),
@@ -714,10 +728,7 @@ pub async fn write(
     }
 
     let lines = ilp::parse_ilp_batch(&body).map_err(|e| {
-        ErrorResponse::new(
-            StatusCode::BAD_REQUEST,
-            format!("ILP parse error: {e}"),
-        )
+        ErrorResponse::new(StatusCode::BAD_REQUEST, format!("ILP parse error: {e}"))
     })?;
 
     if lines.is_empty() {
@@ -754,9 +765,8 @@ pub async fn write(
 
         for (table_name, table_lines) in &by_table {
             // Validate measurement name to prevent path traversal.
-            exchange_common::validation::validate_measurement_name(table_name).map_err(|e| {
-                ErrorResponse::new(StatusCode::BAD_REQUEST, e.to_string())
-            })?;
+            exchange_common::validation::validate_measurement_name(table_name)
+                .map_err(|e| ErrorResponse::new(StatusCode::BAD_REQUEST, e.to_string()))?;
 
             let table_dir = db_root.join(table_name);
             let meta_path = table_dir.join("_meta");
@@ -924,9 +934,8 @@ fn write_ilp_lines_wal(
     use exchange_core::wal::row_codec::OwnedColumnValue as OV;
 
     let config = WalTableWriterConfig::default();
-    let mut writer = WalTableWriter::open(db_root, table_name, config).map_err(|e| {
-        ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-    })?;
+    let mut writer = WalTableWriter::open(db_root, table_name, config)
+        .map_err(|e| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Wire the replication manager into the WAL writer so that on commit,
     // the sealed WAL segment is shipped to all configured replicas.
@@ -958,18 +967,17 @@ fn write_ilp_lines_wal(
             })
             .collect();
 
-        writer.write_row(ts, owned_values).map_err(|e| {
-            ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-        })?;
+        writer
+            .write_row(ts, owned_values)
+            .map_err(|e| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
 
-    writer.commit().map_err(|e| {
-        ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-    })?;
+    writer
+        .commit()
+        .map_err(|e| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(())
 }
-
 
 /// Write ILP lines to a table using per-partition locking.
 ///
@@ -987,9 +995,8 @@ fn write_ilp_lines_partitioned(
     use std::collections::HashMap;
 
     let table_dir = db_root.join(table_name);
-    let meta = exchange_core::table::TableMeta::load(&table_dir.join("_meta")).map_err(|e| {
-        ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-    })?;
+    let meta = exchange_core::table::TableMeta::load(&table_dir.join("_meta"))
+        .map_err(|e| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let partition_by: PartitionBy = meta.partition_by.into();
 
     // Group lines by target partition.
@@ -1005,9 +1012,9 @@ fn write_ilp_lines_partitioned(
 
     for (part_name, part_lines) in &by_partition {
         // Acquire per-partition lock — other partitions remain unlocked.
-        let mut handle = engine.get_writer_for_partition(table_name, part_name).map_err(|e| {
-            ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-        })?;
+        let mut handle = engine
+            .get_writer_for_partition(table_name, part_name)
+            .map_err(|e| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
         for line in part_lines {
             let ts = line.timestamp.unwrap_or_else(Timestamp::now);
@@ -1032,9 +1039,10 @@ fn write_ilp_lines_partitioned(
             })?;
         }
 
-        handle.writer().flush().map_err(|e| {
-            ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-        })?;
+        handle
+            .writer()
+            .flush()
+            .map_err(|e| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
 
     Ok(())
@@ -1052,26 +1060,30 @@ pub async fn cancel_query(
 ) -> impl IntoResponse {
     if state.query_registry.cancel(query_id) {
         tracing::info!(query_id = query_id, "query cancellation requested");
-        (StatusCode::OK, Json(serde_json::json!({
-            "status": "cancelled",
-            "query_id": query_id,
-        })))
+        (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "status": "cancelled",
+                "query_id": query_id,
+            })),
+        )
     } else {
         tracing::debug!(query_id = query_id, "query cancel: ID not found");
-        (StatusCode::NOT_FOUND, Json(serde_json::json!({
-            "status": "not_found",
-            "query_id": query_id,
-            "message": "query not found (already completed or invalid ID)",
-        })))
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "status": "not_found",
+                "query_id": query_id,
+                "message": "query not found (already completed or invalid ID)",
+            })),
+        )
     }
 }
 
 /// `GET /api/v1/queries/active`
 ///
 /// List currently active query IDs.
-pub async fn active_queries(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn active_queries(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let ids = state.query_registry.active_query_ids();
     Json(serde_json::json!({
         "active_queries": ids,
@@ -1082,9 +1094,7 @@ pub async fn active_queries(
 /// `GET /api/v1/tables`
 ///
 /// Lists all tables in the database.
-pub async fn list_tables(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn list_tables(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let engine = state.engine.clone();
 
     let tables = tokio::task::spawn_blocking(move || -> Vec<String> {
@@ -1109,47 +1119,49 @@ pub async fn table_info(
     let engine = state.engine.clone();
     let table_name = name.clone();
 
-    let info = tokio::task::spawn_blocking(move || -> std::result::Result<TableInfoResponse, ExchangeDbError> {
-        let meta = engine.get_meta(&table_name)?;
-        let table_dir = engine.db_root().join(&table_name);
+    let info = tokio::task::spawn_blocking(
+        move || -> std::result::Result<TableInfoResponse, ExchangeDbError> {
+            let meta = engine.get_meta(&table_name)?;
+            let table_dir = engine.db_root().join(&table_name);
 
-        let columns: Vec<ColumnInfo> = meta
-            .columns
-            .iter()
-            .map(|col| {
-                let type_name = format!("{:?}", col.col_type);
-                ColumnInfo {
-                    name: col.name.clone(),
-                    r#type: type_name,
-                }
-            })
-            .collect();
+            let columns: Vec<ColumnInfo> = meta
+                .columns
+                .iter()
+                .map(|col| {
+                    let type_name = format!("{:?}", col.col_type);
+                    ColumnInfo {
+                        name: col.name.clone(),
+                        r#type: type_name,
+                    }
+                })
+                .collect();
 
-        let partition_by = format!("{:?}", meta.partition_by);
+            let partition_by = format!("{:?}", meta.partition_by);
 
-        // Count rows by scanning partition directories.
-        let mut row_count: u64 = 0;
-        if let Ok(entries) = std::fs::read_dir(&table_dir) {
-            for entry in entries.flatten() {
-                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                    // Count rows from the timestamp column file size.
-                    let ts_col_name = &meta.columns[meta.timestamp_column].name;
-                    let ts_file = entry.path().join(format!("{ts_col_name}.d"));
-                    if let Ok(file_meta) = std::fs::metadata(&ts_file) {
-                        // Timestamp is 8 bytes per row.
-                        row_count += file_meta.len() / 8;
+            // Count rows by scanning partition directories.
+            let mut row_count: u64 = 0;
+            if let Ok(entries) = std::fs::read_dir(&table_dir) {
+                for entry in entries.flatten() {
+                    if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                        // Count rows from the timestamp column file size.
+                        let ts_col_name = &meta.columns[meta.timestamp_column].name;
+                        let ts_file = entry.path().join(format!("{ts_col_name}.d"));
+                        if let Ok(file_meta) = std::fs::metadata(&ts_file) {
+                            // Timestamp is 8 bytes per row.
+                            row_count += file_meta.len() / 8;
+                        }
                     }
                 }
             }
-        }
 
-        Ok(TableInfoResponse {
-            name: meta.name,
-            columns,
-            partition_by,
-            row_count,
-        })
-    })
+            Ok(TableInfoResponse {
+                name: meta.name,
+                columns,
+                partition_by,
+                row_count,
+            })
+        },
+    )
     .await
     .map_err(|e| {
         ErrorResponse::new(
@@ -1195,13 +1207,25 @@ pub async fn query_stream(
 
     // For SELECT-family queries, try cursor-based streaming for true
     // backpressure and low memory usage on large result sets.
-    let is_select = matches!(&plan, QueryPlan::Select { .. } | QueryPlan::Join { .. } | QueryPlan::MultiJoin { .. } | QueryPlan::AsofJoin { .. });
+    let is_select = matches!(
+        &plan,
+        QueryPlan::Select { .. }
+            | QueryPlan::Join { .. }
+            | QueryPlan::MultiJoin { .. }
+            | QueryPlan::AsofJoin { .. }
+    );
     if is_select {
         use futures::StreamExt;
         let plan_c = plan.clone();
         let dbr = db_root.clone();
-        let cr = tokio::task::spawn_blocking(move || execute_cursor(&dbr, &plan_c)).await
-            .map_err(|e| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, format!("task join error: {e}")))?;
+        let cr = tokio::task::spawn_blocking(move || execute_cursor(&dbr, &plan_c))
+            .await
+            .map_err(|e| {
+                ErrorResponse::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("task join error: {e}"),
+                )
+            })?;
         if let Ok(cursor) = cr {
             state.metrics.inc_queries();
             let schema: Vec<String> = cursor.schema().iter().map(|(n, _)| n.clone()).collect();
@@ -1211,27 +1235,54 @@ pub async fn query_stream(
             let bs: usize = 1000;
             let cs = stream::unfold((Some(cursor), 0u64), move |(co, rc)| async move {
                 let cu = co?;
-                let r = tokio::task::spawn_blocking(move || { let mut c = cu; let b = c.next_batch(bs); (c, b) }).await;
+                let r = tokio::task::spawn_blocking(move || {
+                    let mut c = cu;
+                    let b = c.next_batch(bs);
+                    (c, b)
+                })
+                .await;
                 match r {
                     Ok((c, Ok(Some(batch)))) => {
                         let nr = batch.row_count() as u64;
                         let mut buf = Vec::new();
                         for ri in 0..batch.row_count() {
-                            let jr: Vec<serde_json::Value> = (0..batch.columns.len()).map(|ci| value_to_json(&batch.get_value(ri, ci))).collect();
-                            let mut l = serde_json::to_string(&serde_json::json!({"row": jr})).unwrap();
+                            let jr: Vec<serde_json::Value> = (0..batch.columns.len())
+                                .map(|ci| value_to_json(&batch.get_value(ri, ci)))
+                                .collect();
+                            let mut l =
+                                serde_json::to_string(&serde_json::json!({"row": jr})).unwrap();
                             l.push('\n');
                             buf.extend_from_slice(l.as_bytes());
                         }
-                        Some((Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(buf)), (Some(c), rc + nr)))
+                        Some((
+                            Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(buf)),
+                            (Some(c), rc + nr),
+                        ))
                     }
-                    Ok((_, Ok(None))) => { let mut f = serde_json::to_string(&serde_json::json!({"complete": true, "row_count": rc})).unwrap(); f.push('\n'); Some((Ok(bytes::Bytes::from(f)), (None, rc))) }
-                    Ok((_, Err(e))) => Some((Ok(bytes::Bytes::from(format!("{{\"error\":\"{}\"}}\n", e))), (None, rc))),
-                    Err(e) => Some((Ok(bytes::Bytes::from(format!("{{\"error\":\"{}\"}}\n", e))), (None, rc))),
+                    Ok((_, Ok(None))) => {
+                        let mut f = serde_json::to_string(
+                            &serde_json::json!({"complete": true, "row_count": rc}),
+                        )
+                        .unwrap();
+                        f.push('\n');
+                        Some((Ok(bytes::Bytes::from(f)), (None, rc)))
+                    }
+                    Ok((_, Err(e))) => Some((
+                        Ok(bytes::Bytes::from(format!("{{\"error\":\"{}\"}}\n", e))),
+                        (None, rc),
+                    )),
+                    Err(e) => Some((
+                        Ok(bytes::Bytes::from(format!("{{\"error\":\"{}\"}}\n", e))),
+                        (None, rc),
+                    )),
                 }
             });
             let hs = stream::once(async move { Ok::<bytes::Bytes, std::io::Error>(hb) });
             let body = axum::body::Body::from_stream(hs.chain(cs));
-            return Ok(axum::response::Response::builder().header("content-type", "application/x-ndjson").body(body).unwrap());
+            return Ok(axum::response::Response::builder()
+                .header("content-type", "application/x-ndjson")
+                .body(body)
+                .unwrap());
         }
         // If cursor build failed, fall through to eager execution.
     }
@@ -1240,7 +1291,12 @@ pub async fn query_stream(
     let ctx = build_execution_context(&state, &headers, Some(&plan))?;
     let result = tokio::task::spawn_blocking(move || execute_with_context(&ctx, &plan))
         .await
-        .map_err(|e| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, format!("task join error: {e}")))?
+        .map_err(|e| {
+            ErrorResponse::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("task join error: {e}"),
+            )
+        })?
         .map_err(db_error_to_response)?;
 
     state.metrics.inc_queries();
@@ -1252,24 +1308,29 @@ pub async fn query_stream(
             let row_count = rows.len();
 
             // Build all NDJSON lines eagerly, then stream them.
-            let mut lines: Vec<Result<bytes::Bytes, std::io::Error>> = Vec::with_capacity(row_count + 2);
+            let mut lines: Vec<Result<bytes::Bytes, std::io::Error>> =
+                Vec::with_capacity(row_count + 2);
 
             // First line: column metadata.
-            let mut header_line = serde_json::to_string(&serde_json::json!({ "columns": columns })).unwrap();
+            let mut header_line =
+                serde_json::to_string(&serde_json::json!({ "columns": columns })).unwrap();
             header_line.push('\n');
             lines.push(Ok(bytes::Bytes::from(header_line)));
 
             // Data lines.
             for row in &rows {
-                let json_row: Vec<serde_json::Value> =
-                    row.iter().map(value_to_json).collect();
-                let mut line = serde_json::to_string(&serde_json::json!({ "row": json_row })).unwrap();
+                let json_row: Vec<serde_json::Value> = row.iter().map(value_to_json).collect();
+                let mut line =
+                    serde_json::to_string(&serde_json::json!({ "row": json_row })).unwrap();
                 line.push('\n');
                 lines.push(Ok(bytes::Bytes::from(line)));
             }
 
             // Final line: completion marker.
-            let mut footer_line = serde_json::to_string(&serde_json::json!({ "complete": true, "row_count": row_count })).unwrap();
+            let mut footer_line = serde_json::to_string(
+                &serde_json::json!({ "complete": true, "row_count": row_count }),
+            )
+            .unwrap();
             footer_line.push('\n');
             lines.push(Ok(bytes::Bytes::from(footer_line)));
 
@@ -1283,15 +1344,20 @@ pub async fn query_stream(
         QueryResult::Ok { affected_rows } => {
             let mut lines: Vec<Result<bytes::Bytes, std::io::Error>> = Vec::with_capacity(3);
 
-            let mut header_line = serde_json::to_string(&serde_json::json!({ "columns": ["affected_rows"] })).unwrap();
+            let mut header_line =
+                serde_json::to_string(&serde_json::json!({ "columns": ["affected_rows"] }))
+                    .unwrap();
             header_line.push('\n');
             lines.push(Ok(bytes::Bytes::from(header_line)));
 
-            let mut row_line = serde_json::to_string(&serde_json::json!({ "row": [affected_rows] })).unwrap();
+            let mut row_line =
+                serde_json::to_string(&serde_json::json!({ "row": [affected_rows] })).unwrap();
             row_line.push('\n');
             lines.push(Ok(bytes::Bytes::from(row_line)));
 
-            let mut footer_line = serde_json::to_string(&serde_json::json!({ "complete": true, "row_count": 1 })).unwrap();
+            let mut footer_line =
+                serde_json::to_string(&serde_json::json!({ "complete": true, "row_count": 1 }))
+                    .unwrap();
             footer_line.push('\n');
             lines.push(Ok(bytes::Bytes::from(footer_line)));
 
@@ -1330,8 +1396,7 @@ mod tests {
 
         // Data rows.
         for row in &rows {
-            let json_row: Vec<serde_json::Value> =
-                row.iter().map(value_to_json).collect();
+            let json_row: Vec<serde_json::Value> = row.iter().map(value_to_json).collect();
             let row_obj = serde_json::json!({ "row": json_row });
             lines.push(serde_json::to_string(&row_obj).unwrap());
         }
@@ -1547,12 +1612,12 @@ mod tests {
     #[test]
     fn substitute_params_basic() {
         let sql = "SELECT * FROM trades WHERE symbol = $1 AND price > $2";
-        let params = vec![
-            serde_json::json!("BTC/USD"),
-            serde_json::json!(50000),
-        ];
+        let params = vec![serde_json::json!("BTC/USD"), serde_json::json!(50000)];
         let result = substitute_params(sql, &params);
-        assert_eq!(result, "SELECT * FROM trades WHERE symbol = 'BTC/USD' AND price > 50000");
+        assert_eq!(
+            result,
+            "SELECT * FROM trades WHERE symbol = 'BTC/USD' AND price > 50000"
+        );
     }
 
     #[test]
@@ -1571,7 +1636,10 @@ mod tests {
             serde_json::json!(false),
         ];
         let result = substitute_params(sql, &params);
-        assert_eq!(result, "SELECT * FROM t WHERE a = NULL AND b = TRUE AND c = FALSE");
+        assert_eq!(
+            result,
+            "SELECT * FROM t WHERE a = NULL AND b = TRUE AND c = FALSE"
+        );
     }
 
     #[test]

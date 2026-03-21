@@ -83,9 +83,7 @@ pub fn validate_measurement_name(name: &str) -> Result<()> {
 /// - Absolute paths (starting with `/` or a Windows drive letter)
 pub fn validate_path_component(path: &str) -> Result<()> {
     if path.is_empty() {
-        return Err(ExchangeDbError::Query(
-            "path must not be empty".to_string(),
-        ));
+        return Err(ExchangeDbError::Query("path must not be empty".to_string()));
     }
 
     if path.contains('\0') {
@@ -169,11 +167,7 @@ fn validate_identifier_chars(name: &str, kind: &str) -> Result<()> {
 
 /// Truncate a string for safe display in error messages.
 fn truncate_for_display(s: &str) -> &str {
-    if s.len() > 40 {
-        &s[..40]
-    } else {
-        s
-    }
+    if s.len() > 40 { &s[..40] } else { s }
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────

@@ -136,7 +136,10 @@ fn full_lifecycle() {
     // 8. Verify some rows were deleted.
     let post_delete = scalar(db_root, "SELECT count(*) FROM trades");
     match &post_delete {
-        Value::I64(n) => assert!(*n < 100, "expected fewer than 100 rows after delete, got {n}"),
+        Value::I64(n) => assert!(
+            *n < 100,
+            "expected fewer than 100 rows after delete, got {n}"
+        ),
         Value::F64(n) => assert!((*n as i64) < 100, "expected fewer than 100 rows"),
         _ => panic!("unexpected count type: {post_delete:?}"),
     }
@@ -171,7 +174,10 @@ fn full_lifecycle() {
     // 14. Verify table is gone.
     let err = exec_err(db_root, "SELECT * FROM trades");
     assert!(
-        matches!(err, ExchangeDbError::TableNotFound(_) | ExchangeDbError::TableNotFoundAt { .. }),
+        matches!(
+            err,
+            ExchangeDbError::TableNotFound(_) | ExchangeDbError::TableNotFoundAt { .. }
+        ),
         "expected TableNotFound, got {err:?}"
     );
 
@@ -229,10 +235,7 @@ fn lifecycle_create_insert_select_drop() {
     let dir = tempdir().unwrap();
     let db_root = dir.path();
 
-    exec_ok(
-        db_root,
-        "CREATE TABLE t1 (timestamp TIMESTAMP, val DOUBLE)",
-    );
+    exec_ok(db_root, "CREATE TABLE t1 (timestamp TIMESTAMP, val DOUBLE)");
     exec_ok(
         db_root,
         &format!("INSERT INTO t1 VALUES ({}, 42.0)", TS_BASE),
@@ -316,7 +319,10 @@ fn grafana_information_schema_tables() {
     );
 
     let (cols, _rows) = query(db_root, "SELECT * FROM information_schema.tables");
-    assert!(!cols.is_empty(), "information_schema.tables should have columns");
+    assert!(
+        !cols.is_empty(),
+        "information_schema.tables should have columns"
+    );
 }
 
 #[test]
@@ -411,8 +417,7 @@ fn wal_durability_write_crash_recover() {
 
     // Verify data is now in column files.
     assert!(part_dir.exists(), "partition should exist after recovery");
-    let reader =
-        FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
+    let reader = FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
     assert!(
         reader.row_count() >= 1,
         "expected at least 1 row after recovery, got {}",
@@ -451,8 +456,7 @@ fn wal_durability_committed_data_persists() {
 
     // Data should be in column files.
     let part_dir = db_root.join("committed").join("2024-03-15");
-    let reader =
-        FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
+    let reader = FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
     assert_eq!(reader.row_count(), 1);
     assert_eq!(reader.read_f64(0), 99999.0);
 }
@@ -502,7 +506,8 @@ fn wal_recovery_is_idempotent() {
 // ===========================================================================
 
 #[test]
-#[ignore] fn concurrent_readers_and_writer() {
+#[ignore]
+fn concurrent_readers_and_writer() {
     let dir = tempdir().unwrap();
     let db_root = dir.path().to_path_buf();
 
@@ -568,9 +573,9 @@ fn wal_recovery_is_idempotent() {
                         if !rows.is_empty() {
                             // Count should always be >= initial 50.
                             match &rows[0][0] {
-                                Value::I64(n) if *n >= 50 => {} // ok
+                                Value::I64(n) if *n >= 50 => {}   // ok
                                 Value::F64(n) if *n >= 50.0 => {} // ok
-                                _ => {} // early read is acceptable
+                                _ => {}                           // early read is acceptable
                             }
                         }
                     }
@@ -609,14 +614,8 @@ fn concurrent_multiple_tables() {
     let dir = tempdir().unwrap();
     let db_root = dir.path().to_path_buf();
 
-    exec_ok(
-        &db_root,
-        "CREATE TABLE t_a (timestamp TIMESTAMP, x DOUBLE)",
-    );
-    exec_ok(
-        &db_root,
-        "CREATE TABLE t_b (timestamp TIMESTAMP, y DOUBLE)",
-    );
+    exec_ok(&db_root, "CREATE TABLE t_a (timestamp TIMESTAMP, x DOUBLE)");
+    exec_ok(&db_root, "CREATE TABLE t_b (timestamp TIMESTAMP, y DOUBLE)");
 
     let barrier = Arc::new(Barrier::new(2));
 
@@ -908,7 +907,8 @@ fn ilp_parse_multi_line_batch() {
 
 #[test]
 fn ilp_parse_with_tags_and_fields() {
-    let line = "trades,symbol=BTC/USD,exchange=binance price=65000.0,volume=1.5i 1710513000000000000";
+    let line =
+        "trades,symbol=BTC/USD,exchange=binance price=65000.0,volume=1.5i 1710513000000000000";
     let parsed = parse_ilp_line(line).unwrap();
     assert_eq!(parsed.tags.len(), 2);
     assert_eq!(parsed.tags.get("symbol").unwrap(), "BTC/USD");
@@ -932,14 +932,8 @@ fn snapshot_restore_preserves_all_tables() {
     let dir = tempdir().unwrap();
     let db_root = dir.path();
 
-    exec_ok(
-        db_root,
-        "CREATE TABLE t1 (timestamp TIMESTAMP, a DOUBLE)",
-    );
-    exec_ok(
-        db_root,
-        "CREATE TABLE t2 (timestamp TIMESTAMP, b VARCHAR)",
-    );
+    exec_ok(db_root, "CREATE TABLE t1 (timestamp TIMESTAMP, a DOUBLE)");
+    exec_ok(db_root, "CREATE TABLE t2 (timestamp TIMESTAMP, b VARCHAR)");
     exec_ok(
         db_root,
         &format!("INSERT INTO t1 VALUES ({}, 1.0)", TS_BASE),
@@ -1017,7 +1011,10 @@ fn where_clause_filtering() {
 
     let (_, rows) = query(db_root, "SELECT count(*) FROM filt WHERE category = 'A'");
     let count = &rows[0][0];
-    assert!(count.eq_coerce(&Value::I64(15)), "expected 15 A rows, got {count:?}");
+    assert!(
+        count.eq_coerce(&Value::I64(15)),
+        "expected 15 A rows, got {count:?}"
+    );
 }
 
 #[test]

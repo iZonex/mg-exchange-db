@@ -4,12 +4,10 @@
 //! the standard TSBS query types (last-point, max-cpu-12h, double-groupby,
 //! high-cpu, groupby-orderby-limit).
 
-use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::table::{ColumnValue, TableBuilder, TableMeta, TableWriter};
-use exchange_query::{execute, plan_query, QueryResult};
+use exchange_query::{QueryResult, execute, plan_query};
 use std::path::Path;
 use tempfile::TempDir;
 

@@ -24,14 +24,10 @@ pub enum ReplicationMessage {
     /// Primary -> Replica: request the replica's current replication position.
     StatusRequest,
     /// Replica -> Primary: current replication position.
-    StatusResponse {
-        position: ReplicaPosition,
-    },
+    StatusResponse { position: ReplicaPosition },
     /// Primary -> Replica: the replica is too far behind and must re-sync
     /// from a full snapshot for the given table.
-    FullSyncRequired {
-        table: String,
-    },
+    FullSyncRequired { table: String },
     /// Primary -> Replica: synchronize the table schema (_meta) before
     /// shipping WAL segments.  Sent whenever a table is first seen by a
     /// replica or when the schema version changes (e.g. ALTER TABLE).
@@ -53,9 +49,8 @@ pub enum ReplicationMessage {
 /// [N bytes: JSON-serialized ReplicationMessage]
 /// ```
 pub fn encode(msg: &ReplicationMessage) -> Result<Vec<u8>> {
-    let payload = serde_json::to_vec(msg).map_err(|e| {
-        ExchangeDbError::Wal(format!("replication encode error: {e}"))
-    })?;
+    let payload = serde_json::to_vec(msg)
+        .map_err(|e| ExchangeDbError::Wal(format!("replication encode error: {e}")))?;
 
     let len = payload.len() as u32;
     let mut buf = Vec::with_capacity(4 + payload.len());
@@ -85,10 +80,8 @@ pub fn decode(bytes: &[u8]) -> Result<(ReplicationMessage, usize)> {
         )));
     }
 
-    let msg: ReplicationMessage =
-        serde_json::from_slice(&bytes[4..total]).map_err(|e| {
-            ExchangeDbError::Wal(format!("replication decode error: {e}"))
-        })?;
+    let msg: ReplicationMessage = serde_json::from_slice(&bytes[4..total])
+        .map_err(|e| ExchangeDbError::Wal(format!("replication decode error: {e}")))?;
 
     Ok((msg, total))
 }

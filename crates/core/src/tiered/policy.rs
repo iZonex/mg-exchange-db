@@ -1,8 +1,8 @@
 use crate::compression::{compress_column_file, decompress_column_file};
-use crate::parquet::writer::{ParquetColumn, ParquetType, ParquetWriter};
 use crate::parquet::reader::ParquetReader;
+use crate::parquet::writer::{ParquetColumn, ParquetType, ParquetWriter};
 use crate::tiered::parquet::{parquet_to_partition, partition_to_parquet};
-use crate::tiered::partition_meta::{load_tier_info, save_tier_info, PartitionTierInfo};
+use crate::tiered::partition_meta::{PartitionTierInfo, load_tier_info, save_tier_info};
 use exchange_common::error::{ExchangeDbError, Result};
 use exchange_common::types::{ColumnType, PartitionBy};
 use std::path::{Path, PathBuf};
@@ -105,11 +105,11 @@ impl TieringManager {
         let mut actions = Vec::new();
 
         for (partition_name, current_tier) in &tiers {
-            let partition_secs =
-                match parse_partition_timestamp(partition_name, self.partition_by) {
-                    Some(s) => s,
-                    None => continue,
-                };
+            let partition_secs = match parse_partition_timestamp(partition_name, self.partition_by)
+            {
+                Some(s) => s,
+                None => continue,
+            };
 
             let desired_tier = if partition_secs >= hot_cutoff {
                 StorageTier::Hot
@@ -281,8 +281,7 @@ impl TieringManager {
 
         // Also include cold partitions that may not have directories on disk
         for info in &tier_infos {
-            if info.tier == StorageTier::Cold
-                && !result.iter().any(|r| r.0 == info.partition_name)
+            if info.tier == StorageTier::Cold && !result.iter().any(|r| r.0 == info.partition_name)
             {
                 result.push((info.partition_name.clone(), StorageTier::Cold));
             }
@@ -291,22 +290,24 @@ impl TieringManager {
         // Scan _cold/ directory for XPQT files not already known
         let cold_dir = self.table_dir.join("_cold");
         if cold_dir.exists()
-            && let Ok(entries) = std::fs::read_dir(&cold_dir) {
-                for entry in entries.flatten() {
-                    let name = entry.file_name().to_string_lossy().to_string();
-                    let pname = if name.ends_with(".parquet") {
-                        Some(name.trim_end_matches(".parquet").to_string())
-                    } else if name.ends_with(".xpqt") {
-                        Some(name.trim_end_matches(".xpqt").to_string())
-                    } else {
-                        None
-                    };
-                    if let Some(partition_name) = pname
-                        && !result.iter().any(|r| r.0 == partition_name) {
-                            result.push((partition_name, StorageTier::Cold));
-                        }
+            && let Ok(entries) = std::fs::read_dir(&cold_dir)
+        {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                let pname = if name.ends_with(".parquet") {
+                    Some(name.trim_end_matches(".parquet").to_string())
+                } else if name.ends_with(".xpqt") {
+                    Some(name.trim_end_matches(".xpqt").to_string())
+                } else {
+                    None
+                };
+                if let Some(partition_name) = pname
+                    && !result.iter().any(|r| r.0 == partition_name)
+                {
+                    result.push((partition_name, StorageTier::Cold));
                 }
             }
+        }
 
         result.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(result)
@@ -409,14 +410,18 @@ impl TieringManager {
         let parquet_path = cold_base.join(format!("{partition_name}.parquet"));
 
         // Build schema from table metadata.
-        let schema: Vec<ParquetColumn> = meta.columns.iter().map(|c| {
-            let ct: ColumnType = c.col_type.into();
-            ParquetColumn {
-                name: c.name.clone(),
-                parquet_type: ParquetType::from_column_type(ct),
-                col_type: ct,
-            }
-        }).collect();
+        let schema: Vec<ParquetColumn> = meta
+            .columns
+            .iter()
+            .map(|c| {
+                let ct: ColumnType = c.col_type.into();
+                ParquetColumn {
+                    name: c.name.clone(),
+                    parquet_type: ParquetType::from_column_type(ct),
+                    col_type: ct,
+                }
+            })
+            .collect();
 
         let writer = ParquetWriter::new(&parquet_path, schema);
         let pstats = writer.write_partition(partition_path, meta)?;
@@ -640,34 +645,38 @@ pub fn list_all_partitions(table_dir: &Path) -> Result<Vec<(PathBuf, StorageTier
     // 2. Scan _cold/ directory for XPQT and PAR1XCHG (.parquet) files.
     let cold_dir = table_dir.join("_cold");
     if cold_dir.exists()
-        && let Ok(entries) = std::fs::read_dir(&cold_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                let partition_name = if name.ends_with(".parquet") {
-                    Some(name.trim_end_matches(".parquet").to_string())
-                } else if name.ends_with(".xpqt") {
-                    Some(name.trim_end_matches(".xpqt").to_string())
-                } else {
-                    None
-                };
-                if let Some(pname) = partition_name
-                    && !seen_names.contains(&pname) {
-                        result.push((entry.path(), StorageTier::Cold));
-                        seen_names.insert(pname);
-                    }
+        && let Ok(entries) = std::fs::read_dir(&cold_dir)
+    {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let partition_name = if name.ends_with(".parquet") {
+                Some(name.trim_end_matches(".parquet").to_string())
+            } else if name.ends_with(".xpqt") {
+                Some(name.trim_end_matches(".xpqt").to_string())
+            } else {
+                None
+            };
+            if let Some(pname) = partition_name
+                && !seen_names.contains(&pname)
+            {
+                result.push((entry.path(), StorageTier::Cold));
+                seen_names.insert(pname);
             }
         }
+    }
 
     // 3. Include cold partitions from tier metadata that we haven't found yet.
     for info in &tier_infos {
-        if info.tier == StorageTier::Cold && !seen_names.contains(&info.partition_name)
-            && let Some(ref ppath) = info.parquet_path {
-                let p = PathBuf::from(ppath);
-                if p.exists() {
-                    result.push((p, StorageTier::Cold));
-                    seen_names.insert(info.partition_name.clone());
-                }
+        if info.tier == StorageTier::Cold
+            && !seen_names.contains(&info.partition_name)
+            && let Some(ref ppath) = info.parquet_path
+        {
+            let p = PathBuf::from(ppath);
+            if p.exists() {
+                result.push((p, StorageTier::Cold));
+                seen_names.insert(info.partition_name.clone());
             }
+        }
     }
 
     result.sort_by(|a, b| a.0.cmp(&b.0));
@@ -774,7 +783,7 @@ mod tests {
         create_partition_with_data(root, "2019-01-01", 10);
 
         let policy = TieringPolicy {
-            hot_retention: Duration::from_secs(7 * 86400),   // 7 days
+            hot_retention: Duration::from_secs(7 * 86400), // 7 days
             warm_retention: Duration::from_secs(30 * 86400), // 30 days
             cold_storage_path: None,
             auto_tier: true,
@@ -784,15 +793,25 @@ mod tests {
         let actions = mgr.evaluate().unwrap();
 
         // Both old partitions should have actions (Hot -> Warm or Hot -> Cold)
-        assert!(actions.len() >= 2, "expected at least 2 actions, got {}", actions.len());
+        assert!(
+            actions.len() >= 2,
+            "expected at least 2 actions, got {}",
+            actions.len()
+        );
 
         // The 2019 partition should go to Cold
-        let action_2019 = actions.iter().find(|a| a.partition == "2019-01-01").unwrap();
+        let action_2019 = actions
+            .iter()
+            .find(|a| a.partition == "2019-01-01")
+            .unwrap();
         assert_eq!(action_2019.from, StorageTier::Hot);
         assert_eq!(action_2019.to, StorageTier::Cold);
 
         // The 2020 partition should go to Cold too (both are > 30 days old)
-        let action_2020 = actions.iter().find(|a| a.partition == "2020-01-01").unwrap();
+        let action_2020 = actions
+            .iter()
+            .find(|a| a.partition == "2020-01-01")
+            .unwrap();
         assert_eq!(action_2020.from, StorageTier::Hot);
         assert_eq!(action_2020.to, StorageTier::Cold);
 
@@ -812,7 +831,9 @@ mod tests {
         let partition_path = create_partition_with_data(root, "2024-01-15", 100);
 
         // Record original sizes
-        let original_ts_size = fs::metadata(partition_path.join("timestamp.d")).unwrap().len();
+        let original_ts_size = fs::metadata(partition_path.join("timestamp.d"))
+            .unwrap()
+            .len();
         assert!(original_ts_size > 0);
 
         let policy = TieringPolicy {
@@ -943,9 +964,18 @@ mod tests {
         let restored_price = fs::read(partition_path.join("price.d")).unwrap();
         let restored_volume = fs::read(partition_path.join("volume.d")).unwrap();
 
-        assert_eq!(original_ts, restored_ts, "timestamp data mismatch after round-trip");
-        assert_eq!(original_price, restored_price, "price data mismatch after round-trip");
-        assert_eq!(original_volume, restored_volume, "volume data mismatch after round-trip");
+        assert_eq!(
+            original_ts, restored_ts,
+            "timestamp data mismatch after round-trip"
+        );
+        assert_eq!(
+            original_price, restored_price,
+            "price data mismatch after round-trip"
+        );
+        assert_eq!(
+            original_volume, restored_volume,
+            "volume data mismatch after round-trip"
+        );
     }
 
     #[test]

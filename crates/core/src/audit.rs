@@ -88,9 +88,10 @@ impl AuditLog {
         let line = serde_json::to_string(&entry)
             .map_err(|e| ExchangeDbError::Query(format!("audit serialize error: {e}")))?;
 
-        let mut guard = self.writer.lock().map_err(|e| {
-            ExchangeDbError::Query(format!("audit log lock poisoned: {e}"))
-        })?;
+        let mut guard = self
+            .writer
+            .lock()
+            .map_err(|e| ExchangeDbError::Query(format!("audit log lock poisoned: {e}")))?;
 
         // Rotate if necessary.
         let needs_rotate = match &*guard {
@@ -100,10 +101,7 @@ impl AuditLog {
 
         if needs_rotate {
             let path = self.log_dir.join(format!("audit-{date_str}.log"));
-            let file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&path)?;
+            let file = OpenOptions::new().create(true).append(true).open(&path)?;
             *guard = Some((date_str, BufWriter::new(file)));
         }
 

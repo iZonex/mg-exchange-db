@@ -313,9 +313,7 @@ fn write_fixed_value(
     val: &OwnedColumnValue,
 ) -> Result<()> {
     match (ct, val) {
-        (ColumnType::Boolean, OwnedColumnValue::Boolean(v)) => {
-            w.append(&[if *v { 1 } else { 0 }])
-        }
+        (ColumnType::Boolean, OwnedColumnValue::Boolean(v)) => w.append(&[if *v { 1 } else { 0 }]),
         (ColumnType::I8, OwnedColumnValue::I8(v)) => w.append(&[*v as u8]),
         (ColumnType::I16, OwnedColumnValue::I16(v)) => w.append(&v.to_le_bytes()),
         (ColumnType::I32, OwnedColumnValue::I32(v)) => w.append_i32(*v),
@@ -337,8 +335,8 @@ fn write_fixed_value(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::table::{ColumnDef, ColumnTypeSerializable};
     use crate::column::FixedColumnReader;
+    use crate::table::{ColumnDef, ColumnTypeSerializable};
     use tempfile::tempdir;
 
     #[test]
@@ -480,9 +478,10 @@ mod tests {
         }
 
         // Merge new O3 row with timestamp 200 (out of order relative to 300).
-        let new_rows = vec![
-            vec![OwnedColumnValue::Timestamp(200), OwnedColumnValue::I64(20)],
-        ];
+        let new_rows = vec![vec![
+            OwnedColumnValue::Timestamp(200),
+            OwnedColumnValue::I64(20),
+        ]];
 
         let total = merge_sorted_into_partition(&part_path, new_rows, &col_defs, 0).unwrap();
         assert_eq!(total, 3);
@@ -525,11 +524,9 @@ mod tests {
         {
             let mut ts_w =
                 FixedColumnWriter::open(&part_path.join("ts.d"), ColumnType::Timestamp).unwrap();
-            let mut name_w = VarColumnWriter::open(
-                &part_path.join("name.d"),
-                &part_path.join("name.i"),
-            )
-            .unwrap();
+            let mut name_w =
+                VarColumnWriter::open(&part_path.join("name.d"), &part_path.join("name.i"))
+                    .unwrap();
 
             ts_w.append_i64(100).unwrap();
             name_w.append_str("alpha").unwrap();
@@ -557,11 +554,8 @@ mod tests {
         assert_eq!(ts_reader.read_i64(1), 200);
         assert_eq!(ts_reader.read_i64(2), 300);
 
-        let name_reader = VarColumnReader::open(
-            &part_path.join("name.d"),
-            &part_path.join("name.i"),
-        )
-        .unwrap();
+        let name_reader =
+            VarColumnReader::open(&part_path.join("name.d"), &part_path.join("name.i")).unwrap();
         assert_eq!(name_reader.read_str(0), "alpha");
         assert_eq!(name_reader.read_str(1), "beta");
         assert_eq!(name_reader.read_str(2), "gamma");

@@ -74,9 +74,8 @@ impl FixedColumnWriter {
         // SAFETY: i64 has no padding and le bytes representation is well-defined
         // on little-endian systems. On big-endian we'd need conversion, but
         // ExchangeDB targets x86_64/aarch64 (both LE).
-        let bytes = unsafe {
-            std::slice::from_raw_parts(values.as_ptr() as *const u8, values.len() * 8)
-        };
+        let bytes =
+            unsafe { std::slice::from_raw_parts(values.as_ptr() as *const u8, values.len() * 8) };
         self.data.append_bulk(bytes)?;
         self.row_count += values.len() as u64;
         Ok(())
@@ -86,9 +85,8 @@ impl FixedColumnWriter {
     #[inline]
     pub fn append_bulk_f64(&mut self, values: &[f64]) -> Result<()> {
         debug_assert_eq!(self.element_size, 8);
-        let bytes = unsafe {
-            std::slice::from_raw_parts(values.as_ptr() as *const u8, values.len() * 8)
-        };
+        let bytes =
+            unsafe { std::slice::from_raw_parts(values.as_ptr() as *const u8, values.len() * 8) };
         self.data.append_bulk(bytes)?;
         self.row_count += values.len() as u64;
         Ok(())
@@ -98,9 +96,8 @@ impl FixedColumnWriter {
     #[inline]
     pub fn append_bulk_i32(&mut self, values: &[i32]) -> Result<()> {
         debug_assert_eq!(self.element_size, 4);
-        let bytes = unsafe {
-            std::slice::from_raw_parts(values.as_ptr() as *const u8, values.len() * 4)
-        };
+        let bytes =
+            unsafe { std::slice::from_raw_parts(values.as_ptr() as *const u8, values.len() * 4) };
         self.data.append_bulk(bytes)?;
         self.row_count += values.len() as u64;
         Ok(())
@@ -278,16 +275,11 @@ impl VarColumnReader {
     /// Read the raw bytes for a row (without length prefix).
     pub fn read(&self, row: u64) -> &[u8] {
         let idx_offset = row * 8;
-        let data_offset =
-            u64::from_le_bytes(self.index.read_at(idx_offset, 8).try_into().unwrap());
+        let data_offset = u64::from_le_bytes(self.index.read_at(idx_offset, 8).try_into().unwrap());
 
         // Read length prefix
-        let len = u32::from_le_bytes(
-            self.data
-                .read_at(data_offset, 4)
-                .try_into()
-                .unwrap(),
-        ) as usize;
+        let len =
+            u32::from_le_bytes(self.data.read_at(data_offset, 4).try_into().unwrap()) as usize;
 
         self.data.read_at(data_offset + 4, len)
     }

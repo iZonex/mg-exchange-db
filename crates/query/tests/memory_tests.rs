@@ -144,12 +144,7 @@ fn sort_small_no_spill() {
     }];
     let col_names = vec!["id".to_string(), "name".to_string()];
 
-    let mut sorter = ExternalSort::new(
-        temp.path().to_path_buf(),
-        1024 * 1024,
-        order_by,
-        col_names,
-    );
+    let mut sorter = ExternalSort::new(temp.path().to_path_buf(), 1024 * 1024, order_by, col_names);
 
     let mut rows = vec![
         vec![Value::I64(3), Value::Str("c".into())],
@@ -189,7 +184,10 @@ fn sort_spills_to_disk() {
         .collect();
     sorter.add_rows(&mut rows).unwrap();
 
-    assert!(sorter.run_count() > 1, "should have spilled to multiple runs");
+    assert!(
+        sorter.run_count() > 1,
+        "should have spilled to multiple runs"
+    );
 
     let result = sorter.finish().unwrap().collect_rows().unwrap();
     assert_eq!(result.len(), 1000);
@@ -208,17 +206,9 @@ fn sort_10k_rows_small_budget() {
     }];
     let col_names = vec!["id".to_string()];
 
-    let mut sorter = ExternalSort::new(
-        temp.path().to_path_buf(),
-        512,
-        order_by,
-        col_names,
-    );
+    let mut sorter = ExternalSort::new(temp.path().to_path_buf(), 512, order_by, col_names);
 
-    let mut rows: Vec<Vec<Value>> = (0..10_000)
-        .rev()
-        .map(|i| vec![Value::I64(i)])
-        .collect();
+    let mut rows: Vec<Vec<Value>> = (0..10_000).rev().map(|i| vec![Value::I64(i)]).collect();
     sorter.add_rows(&mut rows).unwrap();
 
     let result = sorter.finish().unwrap().collect_rows().unwrap();
@@ -238,12 +228,7 @@ fn sort_descending_with_spill() {
     }];
     let col_names = vec!["id".to_string()];
 
-    let mut sorter = ExternalSort::new(
-        temp.path().to_path_buf(),
-        200,
-        order_by,
-        col_names,
-    );
+    let mut sorter = ExternalSort::new(temp.path().to_path_buf(), 200, order_by, col_names);
 
     let mut rows: Vec<Vec<Value>> = (0..500).map(|i| vec![Value::I64(i)]).collect();
     sorter.add_rows(&mut rows).unwrap();
@@ -270,20 +255,10 @@ fn sort_multi_column_with_spill() {
     ];
     let col_names = vec!["group".to_string(), "value".to_string()];
 
-    let mut sorter = ExternalSort::new(
-        temp.path().to_path_buf(),
-        300,
-        order_by,
-        col_names,
-    );
+    let mut sorter = ExternalSort::new(temp.path().to_path_buf(), 300, order_by, col_names);
 
     let mut rows: Vec<Vec<Value>> = (0..200)
-        .map(|i| {
-            vec![
-                Value::Str(format!("g{}", i % 5)),
-                Value::I64(i),
-            ]
-        })
+        .map(|i| vec![Value::Str(format!("g{}", i % 5)), Value::I64(i)])
         .collect();
 
     // Reference sort.
@@ -308,12 +283,7 @@ fn sort_multi_column_with_spill() {
 #[test]
 fn sort_empty() {
     let temp = tempfile::tempdir().unwrap();
-    let mut sorter = ExternalSort::new(
-        temp.path().to_path_buf(),
-        1024,
-        vec![],
-        vec![],
-    );
+    let mut sorter = ExternalSort::new(temp.path().to_path_buf(), 1024, vec![], vec![]);
     let mut rows: Vec<Vec<Value>> = vec![];
     sorter.add_rows(&mut rows).unwrap();
     let result = sorter.finish().unwrap().collect_rows().unwrap();
@@ -330,12 +300,7 @@ fn sort_single_row() {
     }];
     let col_names = vec!["id".to_string()];
 
-    let mut sorter = ExternalSort::new(
-        temp.path().to_path_buf(),
-        1024,
-        order_by,
-        col_names,
-    );
+    let mut sorter = ExternalSort::new(temp.path().to_path_buf(), 1024, order_by, col_names);
 
     let mut rows = vec![vec![Value::I64(42)]];
     sorter.add_rows(&mut rows).unwrap();
@@ -354,12 +319,7 @@ fn sort_with_nulls() {
     }];
     let col_names = vec!["id".to_string()];
 
-    let mut sorter = ExternalSort::new(
-        temp.path().to_path_buf(),
-        200,
-        order_by,
-        col_names,
-    );
+    let mut sorter = ExternalSort::new(temp.path().to_path_buf(), 200, order_by, col_names);
 
     let mut rows = vec![
         vec![Value::I64(3)],
@@ -512,9 +472,8 @@ fn offset_skips_rows() {
 #[test]
 fn multiple_aggregates() {
     let db = TestDb::with_trades(100);
-    let (cols, rows) = db.query(
-        "SELECT count(*), sum(price), avg(price), min(price), max(price) FROM trades",
-    );
+    let (cols, rows) =
+        db.query("SELECT count(*), sum(price), avg(price), min(price), max(price) FROM trades");
     assert_eq!(cols.len(), 5);
     assert_eq!(rows.len(), 1);
 }
@@ -523,9 +482,8 @@ fn multiple_aggregates() {
 #[test]
 fn where_order_limit_combo() {
     let db = TestDb::with_trades(100);
-    let (_, rows) = db.query(
-        "SELECT price FROM trades WHERE symbol = 'BTC/USD' ORDER BY price DESC LIMIT 5",
-    );
+    let (_, rows) =
+        db.query("SELECT price FROM trades WHERE symbol = 'BTC/USD' ORDER BY price DESC LIMIT 5");
     assert!(rows.len() <= 5);
     // Verify descending.
     for i in 0..rows.len().saturating_sub(1) {
@@ -539,9 +497,8 @@ fn where_order_limit_combo() {
 #[test]
 fn group_by_having() {
     let db = TestDb::with_trades(100);
-    let (_, rows) = db.query(
-        "SELECT symbol, count(*) FROM trades GROUP BY symbol HAVING count(*) > 0",
-    );
+    let (_, rows) =
+        db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol HAVING count(*) > 0");
     assert!(!rows.is_empty());
     // All groups should have count > 0.
     for row in &rows {

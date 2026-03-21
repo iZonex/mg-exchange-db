@@ -1,13 +1,15 @@
 //! Comprehensive ILP parser tests — 500+ tests covering parsing, escaping,
 //! versions, multi-line batches, edge cases, and authentication.
 
-use exchange_net::ilp::parser::{parse_ilp_batch, parse_ilp_line, IlpLine, IlpParseError, IlpValue, IlpVersion};
-use exchange_net::ilp::auth::{IlpAuthConfig, IlpAuthenticator};
+use base64::Engine as _;
 use exchange_common::types::Timestamp;
-use std::collections::BTreeMap;
+use exchange_net::ilp::auth::{IlpAuthConfig, IlpAuthenticator};
+use exchange_net::ilp::parser::{
+    IlpLine, IlpParseError, IlpValue, IlpVersion, parse_ilp_batch, parse_ilp_line,
+};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
-use base64::Engine as _;
+use std::collections::BTreeMap;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -161,19 +163,28 @@ fn field_string_empty() {
 #[test]
 fn field_string_with_spaces() {
     let p = parse_ilp_line(r#"m v="hello world""#).unwrap();
-    assert_eq!(p.fields.get("v"), Some(&IlpValue::String("hello world".into())));
+    assert_eq!(
+        p.fields.get("v"),
+        Some(&IlpValue::String("hello world".into()))
+    );
 }
 
 #[test]
 fn field_string_with_escaped_quotes() {
     let p = parse_ilp_line(r#"m v="say \"hi\"""#).unwrap();
-    assert_eq!(p.fields.get("v"), Some(&IlpValue::String("say \"hi\"".into())));
+    assert_eq!(
+        p.fields.get("v"),
+        Some(&IlpValue::String("say \"hi\"".into()))
+    );
 }
 
 #[test]
 fn field_string_with_escaped_backslash() {
     let p = parse_ilp_line(r#"m v="path\\to\\file""#).unwrap();
-    assert_eq!(p.fields.get("v"), Some(&IlpValue::String("path\\to\\file".into())));
+    assert_eq!(
+        p.fields.get("v"),
+        Some(&IlpValue::String("path\\to\\file".into()))
+    );
 }
 
 #[test]
@@ -240,7 +251,10 @@ fn field_boolean_false_title_case() {
 #[test]
 fn field_timestamp_v2() {
     let p = parse_ilp_line("m ts=1609459200000000000t").unwrap();
-    assert_eq!(p.fields.get("ts"), Some(&IlpValue::Timestamp(1609459200000000000)));
+    assert_eq!(
+        p.fields.get("ts"),
+        Some(&IlpValue::Timestamp(1609459200000000000))
+    );
 }
 
 #[test]
@@ -258,7 +272,10 @@ fn field_timestamp_v2_negative() {
 #[test]
 fn field_symbol_v2() {
     let p = parse_ilp_line("m sym=BTCUSD$").unwrap();
-    assert_eq!(p.fields.get("sym"), Some(&IlpValue::Symbol("BTCUSD".into())));
+    assert_eq!(
+        p.fields.get("sym"),
+        Some(&IlpValue::Symbol("BTCUSD".into()))
+    );
 }
 
 #[test]
@@ -270,13 +287,19 @@ fn field_symbol_v2_single_char() {
 #[test]
 fn field_long256_v2() {
     let p = parse_ilp_line("m hash=0xdeadbeefn").unwrap();
-    assert_eq!(p.fields.get("hash"), Some(&IlpValue::Long256("deadbeef".into())));
+    assert_eq!(
+        p.fields.get("hash"),
+        Some(&IlpValue::Long256("deadbeef".into()))
+    );
 }
 
 #[test]
 fn field_long256_v2_all_digits() {
     let p = parse_ilp_line("m h=0x0123456789abcdefn").unwrap();
-    assert_eq!(p.fields.get("h"), Some(&IlpValue::Long256("0123456789abcdef".into())));
+    assert_eq!(
+        p.fields.get("h"),
+        Some(&IlpValue::Long256("0123456789abcdef".into()))
+    );
 }
 
 #[test]
@@ -434,7 +457,10 @@ fn escape_equals_in_tag_value() {
 #[test]
 fn escape_quotes_in_string_field() {
     let p = parse_ilp_line(r#"m v="say \"hello\"""#).unwrap();
-    assert_eq!(p.fields.get("v"), Some(&IlpValue::String(r#"say "hello""#.into())));
+    assert_eq!(
+        p.fields.get("v"),
+        Some(&IlpValue::String(r#"say "hello""#.into()))
+    );
 }
 
 #[test]
@@ -454,17 +480,26 @@ fn edge_empty_input() {
 
 #[test]
 fn edge_whitespace_only() {
-    assert_eq!(parse_ilp_line("   ").unwrap_err(), IlpParseError::EmptyInput);
+    assert_eq!(
+        parse_ilp_line("   ").unwrap_err(),
+        IlpParseError::EmptyInput
+    );
 }
 
 #[test]
 fn edge_comment_hash() {
-    assert_eq!(parse_ilp_line("# comment").unwrap_err(), IlpParseError::EmptyInput);
+    assert_eq!(
+        parse_ilp_line("# comment").unwrap_err(),
+        IlpParseError::EmptyInput
+    );
 }
 
 #[test]
 fn edge_comment_hash_with_space() {
-    assert_eq!(parse_ilp_line("  # comment ").unwrap_err(), IlpParseError::EmptyInput);
+    assert_eq!(
+        parse_ilp_line("  # comment ").unwrap_err(),
+        IlpParseError::EmptyInput
+    );
 }
 
 #[test]
@@ -568,7 +603,10 @@ fn unicode_tag_value() {
 #[test]
 fn unicode_string_field() {
     let p = parse_ilp_line(r#"m v="Привет мир""#).unwrap();
-    assert_eq!(p.fields.get("v"), Some(&IlpValue::String("Привет мир".into())));
+    assert_eq!(
+        p.fields.get("v"),
+        Some(&IlpValue::String("Привет мир".into()))
+    );
 }
 
 #[test]
@@ -679,7 +717,10 @@ fn batch_mixed_timestamps() {
 
 #[test]
 fn version_v1_simple() {
-    assert_eq!(IlpVersion::detect("cpu,host=h1 usage=0.5 1000"), IlpVersion::V1);
+    assert_eq!(
+        IlpVersion::detect("cpu,host=h1 usage=0.5 1000"),
+        IlpVersion::V1
+    );
 }
 
 #[test]
@@ -962,7 +1003,10 @@ fn string_with_equals() {
 #[test]
 fn string_with_space() {
     let p = parse_ilp_line(r#"m v="hello world""#).unwrap();
-    assert_eq!(p.fields.get("v"), Some(&IlpValue::String("hello world".into())));
+    assert_eq!(
+        p.fields.get("v"),
+        Some(&IlpValue::String("hello world".into()))
+    );
 }
 
 #[test]
@@ -1099,7 +1143,10 @@ fn auth_ten_keys_all_valid() {
     for (kid, _) in &keys {
         let secret_b64 = config.auth_keys.get(kid).unwrap();
         let sig = sign(secret_b64, &challenge);
-        assert!(auth.verify_response(kid, &challenge, &sig), "key {kid} should verify");
+        assert!(
+            auth.verify_response(kid, &challenge, &sig),
+            "key {kid} should verify"
+        );
     }
 }
 
@@ -1228,10 +1275,14 @@ fn realworld_system_metrics() {
 
 #[test]
 fn realworld_logs() {
-    let p =
-        parse_ilp_line(r#"logs,source=nginx,level=error message="Connection refused",code=502i 1000"#)
-            .unwrap();
-    assert_eq!(p.fields.get("message"), Some(&IlpValue::String("Connection refused".into())));
+    let p = parse_ilp_line(
+        r#"logs,source=nginx,level=error message="Connection refused",code=502i 1000"#,
+    )
+    .unwrap();
+    assert_eq!(
+        p.fields.get("message"),
+        Some(&IlpValue::String("Connection refused".into()))
+    );
     assert_eq!(p.fields.get("code"), Some(&IlpValue::Integer(502)));
 }
 
@@ -1268,13 +1319,19 @@ fn v2_timestamp_large_value() {
 #[test]
 fn v2_symbol_with_slash() {
     let p = parse_ilp_line("m sym=BTC/USD$").unwrap();
-    assert_eq!(p.fields.get("sym"), Some(&IlpValue::Symbol("BTC/USD".into())));
+    assert_eq!(
+        p.fields.get("sym"),
+        Some(&IlpValue::Symbol("BTC/USD".into()))
+    );
 }
 
 #[test]
 fn v2_symbol_with_underscore() {
     let p = parse_ilp_line("m sym=BTC_USD$").unwrap();
-    assert_eq!(p.fields.get("sym"), Some(&IlpValue::Symbol("BTC_USD".into())));
+    assert_eq!(
+        p.fields.get("sym"),
+        Some(&IlpValue::Symbol("BTC_USD".into()))
+    );
 }
 
 #[test]
@@ -1377,12 +1434,7 @@ fn stability_parse_many_string_lines() {
 fn stability_batch_many_diverse() {
     let mut input = String::new();
     for i in 0..100 {
-        input.push_str(&format!(
-            "m{},t=v f1={i}i,f2={}.5 {}\n",
-            i % 5,
-            i,
-            1000 + i
-        ));
+        input.push_str(&format!("m{},t=v f1={i}i,f2={}.5 {}\n", i % 5, i, 1000 + i));
     }
     let lines = parse_ilp_batch(&input).unwrap();
     assert_eq!(lines.len(), 100);
@@ -1442,13 +1494,19 @@ fn tags_with_underscores() {
 fn string_field_with_newline_literal() {
     // Note: actual newlines end the line, so we test literal \n in string
     let p = parse_ilp_line(r#"m v="line1\nline2""#).unwrap();
-    assert_eq!(p.fields.get("v"), Some(&IlpValue::String(r"line1\nline2".into())));
+    assert_eq!(
+        p.fields.get("v"),
+        Some(&IlpValue::String(r"line1\nline2".into()))
+    );
 }
 
 #[test]
 fn string_field_with_tab_literal() {
     let p = parse_ilp_line(r#"m v="col1\tcol2""#).unwrap();
-    assert_eq!(p.fields.get("v"), Some(&IlpValue::String(r"col1\tcol2".into())));
+    assert_eq!(
+        p.fields.get("v"),
+        Some(&IlpValue::String(r"col1\tcol2".into()))
+    );
 }
 
 // Batch with all field types
@@ -1777,7 +1835,9 @@ macro_rules! float_range_test {
             let line = format!("m v={}", $val);
             let p = parse_ilp_line(&line).unwrap();
             match p.fields.get("v") {
-                Some(IlpValue::Float(f)) => assert!((*f - $val).abs() < ($val).abs() * 0.001 + 0.0001),
+                Some(IlpValue::Float(f)) => {
+                    assert!((*f - $val).abs() < ($val).abs() * 0.001 + 0.0001)
+                }
                 _ => panic!("expected float"),
             }
         }
@@ -2003,7 +2063,10 @@ macro_rules! exhaustive_test {
         #[test]
         fn $name() {
             let tags: String = (0..$nt).map(|i| format!(",t{i}=v{i}")).collect();
-            let fields: String = (0..$nf).map(|i| format!("f{i}={i}i")).collect::<Vec<_>>().join(",");
+            let fields: String = (0..$nf)
+                .map(|i| format!("f{i}={i}i"))
+                .collect::<Vec<_>>()
+                .join(",");
             let ts_part = if $ts { " 1000" } else { "" };
             let line = format!("m{tags} {fields}{ts_part}");
             let p = parse_ilp_line(&line).unwrap();
@@ -2423,7 +2486,10 @@ fn parse_many_tags_with_string_field() {
     let line = format!("m{tags} msg=\"hello world\"");
     let p = parse_ilp_line(&line).unwrap();
     assert_eq!(p.tags.len(), 10);
-    assert_eq!(p.fields.get("msg"), Some(&IlpValue::String("hello world".into())));
+    assert_eq!(
+        p.fields.get("msg"),
+        Some(&IlpValue::String("hello world".into()))
+    );
 }
 
 #[test]

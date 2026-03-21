@@ -17,9 +17,7 @@ pub fn parse_ipv4(s: &str) -> Result<u32> {
     let mut ip: u32 = 0;
     for (i, part) in parts.iter().enumerate() {
         let octet: u8 = part.parse::<u8>().map_err(|_| {
-            ExchangeDbError::Parse(format!(
-                "invalid IPv4 octet: '{part}' in address '{s}'"
-            ))
+            ExchangeDbError::Parse(format!("invalid IPv4 octet: '{part}' in address '{s}'"))
         })?;
         ip |= (octet as u32) << (24 - i * 8);
     }
@@ -101,9 +99,7 @@ pub fn parse_ipv6(s: &str) -> Result<[u8; 16]> {
             )));
         }
         let val = u16::from_str_radix(group, 16).map_err(|_| {
-            ExchangeDbError::Parse(format!(
-                "invalid IPv6 group: '{group}' in address '{s}'"
-            ))
+            ExchangeDbError::Parse(format!("invalid IPv6 group: '{group}' in address '{s}'"))
         })?;
         result[i * 2] = (val >> 8) as u8;
         result[i * 2 + 1] = (val & 0xFF) as u8;
@@ -163,7 +159,11 @@ pub fn format_ipv6(ip: &[u8; 16]) -> String {
             format!("{}::{}", left.join(":"), right.join(":"))
         }
     } else {
-        groups.iter().map(|g| format!("{g:x}")).collect::<Vec<_>>().join(":")
+        groups
+            .iter()
+            .map(|g| format!("{g:x}"))
+            .collect::<Vec<_>>()
+            .join(":")
     }
 }
 

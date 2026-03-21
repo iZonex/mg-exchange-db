@@ -5,7 +5,6 @@
 //! (`.1`, `.2`, ...) up to `max_files`. The oldest file is deleted when the
 //! limit is reached.
 
-
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -53,7 +52,10 @@ impl RotatingLog {
 
     /// Write a message to the log, rotating if needed.
     pub fn write(&self, msg: &str) -> Result<()> {
-        let mut writer = self.current.lock().map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
+        let mut writer = self
+            .current
+            .lock()
+            .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
 
         writer
             .write_all(msg.as_bytes())
@@ -62,9 +64,7 @@ impl RotatingLog {
 
         // Check if rotation is needed.
         let current_path = self.current_path();
-        let size = fs::metadata(&current_path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let size = fs::metadata(&current_path).map(|m| m.len()).unwrap_or(0);
 
         if size >= self.max_size {
             // Drop the old writer before renaming files.
@@ -90,11 +90,7 @@ impl RotatingLog {
             let to = self.rotated_path(i + 1);
             if from.exists() {
                 fs::rename(&from, &to).with_context(|| {
-                    format!(
-                        "failed to rename {} -> {}",
-                        from.display(),
-                        to.display()
-                    )
+                    format!("failed to rename {} -> {}", from.display(), to.display())
                 })?;
             }
         }

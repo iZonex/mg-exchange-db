@@ -92,8 +92,12 @@ impl ScalarFunction for IdentityFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         Ok(args.first().cloned().unwrap_or(Value::Null))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// Sum-like passthrough: returns the numeric value (identity for scalars).
@@ -105,8 +109,12 @@ impl ScalarFunction for SumTypeFn {
         }
         Ok(args[0].clone())
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// Avg-like passthrough (returns float).
@@ -118,8 +126,12 @@ impl ScalarFunction for AvgTypeFn {
         }
         Ok(Value::F64(val_to_f64(&args[0])))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// Count-like: returns 1 for non-null, 0 for null.
@@ -129,10 +141,18 @@ impl ScalarFunction for CountTypeFn {
         if args.is_empty() {
             return Ok(Value::I64(0));
         }
-        Ok(Value::I64(if matches!(args[0], Value::Null) { 0 } else { 1 }))
+        Ok(Value::I64(if matches!(args[0], Value::Null) {
+            0
+        } else {
+            1
+        }))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// Stddev/variance-like: returns 0.0 for single value.
@@ -144,8 +164,12 @@ impl ScalarFunction for StddevTypeFn {
         }
         Ok(Value::F64(0.0))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -156,30 +180,54 @@ impl ScalarFunction for StddevTypeFn {
 struct EqFn;
 impl ScalarFunction for EqFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        Ok(Value::I64(if values_equal(&args[0], &args[1]) { 1 } else { 0 }))
+        Ok(Value::I64(if values_equal(&args[0], &args[1]) {
+            1
+        } else {
+            0
+        }))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Not equal: ne(a, b) -> bool
 struct NeFn;
 impl ScalarFunction for NeFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        Ok(Value::I64(if values_equal(&args[0], &args[1]) { 0 } else { 1 }))
+        Ok(Value::I64(if values_equal(&args[0], &args[1]) {
+            0
+        } else {
+            1
+        }))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Less-than: lt(a, b) -> bool
 struct LtFn;
 impl ScalarFunction for LtFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        Ok(Value::I64(if values_lt(&args[0], &args[1]) { 1 } else { 0 }))
+        Ok(Value::I64(if values_lt(&args[0], &args[1]) {
+            1
+        } else {
+            0
+        }))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Less-than-or-equal: le(a, b) -> bool
@@ -190,18 +238,30 @@ impl ScalarFunction for LeFn {
         let lt = values_lt(&args[0], &args[1]);
         Ok(Value::I64(if eq || lt { 1 } else { 0 }))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Greater-than: gt(a, b) -> bool
 struct GtFn;
 impl ScalarFunction for GtFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        Ok(Value::I64(if values_lt(&args[1], &args[0]) { 1 } else { 0 }))
+        Ok(Value::I64(if values_lt(&args[1], &args[0]) {
+            1
+        } else {
+            0
+        }))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Greater-than-or-equal: ge(a, b) -> bool
@@ -212,8 +272,12 @@ impl ScalarFunction for GeFn {
         let gt = values_lt(&args[1], &args[0]);
         Ok(Value::I64(if eq || gt { 1 } else { 0 }))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Negate: neg(a) -> -a
@@ -227,39 +291,69 @@ impl ScalarFunction for NegFn {
             _ => Ok(Value::I64(-val_to_i64(&args[0]))),
         }
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// Logical NOT: not(a) -> !a
 struct NotBoolFn;
 impl ScalarFunction for NotBoolFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        if matches!(args[0], Value::Null) { return Ok(Value::Null); }
+        if matches!(args[0], Value::Null) {
+            return Ok(Value::Null);
+        }
         Ok(Value::I64(if val_to_bool(&args[0]) { 0 } else { 1 }))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// Logical AND: and(a, b) -> a && b
 struct AndBoolFn;
 impl ScalarFunction for AndBoolFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        Ok(Value::I64(if val_to_bool(&args[0]) && val_to_bool(&args[1]) { 1 } else { 0 }))
+        Ok(Value::I64(
+            if val_to_bool(&args[0]) && val_to_bool(&args[1]) {
+                1
+            } else {
+                0
+            },
+        ))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Logical OR: or(a, b) -> a || b
 struct OrBoolFn;
 impl ScalarFunction for OrBoolFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        Ok(Value::I64(if val_to_bool(&args[0]) || val_to_bool(&args[1]) { 1 } else { 0 }))
+        Ok(Value::I64(
+            if val_to_bool(&args[0]) || val_to_bool(&args[1]) {
+                1
+            } else {
+                0
+            },
+        ))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Add: add(a, b) -> a + b
@@ -273,8 +367,12 @@ impl ScalarFunction for AddFn {
             _ => Ok(Value::F64(val_to_f64(&args[0]) + val_to_f64(&args[1]))),
         }
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Subtract: sub(a, b) -> a - b
@@ -288,8 +386,12 @@ impl ScalarFunction for SubFn {
             _ => Ok(Value::F64(val_to_f64(&args[0]) - val_to_f64(&args[1]))),
         }
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Multiply: mul(a, b) -> a * b
@@ -303,8 +405,12 @@ impl ScalarFunction for MulFn {
             _ => Ok(Value::F64(val_to_f64(&args[0]) * val_to_f64(&args[1]))),
         }
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Divide: div_op(a, b) -> a / b
@@ -313,23 +419,33 @@ impl ScalarFunction for DivOpFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         match (&args[0], &args[1]) {
             (Value::I64(a), Value::I64(b)) => {
-                if *b == 0 { return Ok(Value::Null); }
+                if *b == 0 {
+                    return Ok(Value::Null);
+                }
                 Ok(Value::I64(a / b))
             }
             (Value::F64(a), Value::F64(b)) => {
-                if *b == 0.0 { return Ok(Value::Null); }
+                if *b == 0.0 {
+                    return Ok(Value::Null);
+                }
                 Ok(Value::F64(a / b))
             }
             (Value::Null, _) | (_, Value::Null) => Ok(Value::Null),
             _ => {
                 let b = val_to_f64(&args[1]);
-                if b == 0.0 { return Ok(Value::Null); }
+                if b == 0.0 {
+                    return Ok(Value::Null);
+                }
                 Ok(Value::F64(val_to_f64(&args[0]) / b))
             }
         }
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Modulo: mod_op(a, b) -> a % b
@@ -338,19 +454,27 @@ impl ScalarFunction for ModOpFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         match (&args[0], &args[1]) {
             (Value::I64(a), Value::I64(b)) => {
-                if *b == 0 { return Ok(Value::Null); }
+                if *b == 0 {
+                    return Ok(Value::Null);
+                }
                 Ok(Value::I64(a % b))
             }
             (Value::Null, _) | (_, Value::Null) => Ok(Value::Null),
             _ => {
                 let b = val_to_f64(&args[1]);
-                if b == 0.0 { return Ok(Value::Null); }
+                if b == 0.0 {
+                    return Ok(Value::Null);
+                }
                 Ok(Value::F64(val_to_f64(&args[0]) % b))
             }
         }
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -363,8 +487,12 @@ impl ScalarFunction for ConstStrFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::Str(self.0.into()))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 /// Returns a constant integer value.
@@ -373,38 +501,63 @@ impl ScalarFunction for ConstI64Fn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::I64(self.0))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 /// Returns NULL.
-struct NullFn { min: usize, max: usize }
+struct NullFn {
+    min: usize,
+    max: usize,
+}
 impl ScalarFunction for NullFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::Null)
     }
-    fn min_args(&self) -> usize { self.min }
-    fn max_args(&self) -> usize { self.max }
+    fn min_args(&self) -> usize {
+        self.min
+    }
+    fn max_args(&self) -> usize {
+        self.max
+    }
 }
 
 /// Returns true (1) for privilege checks -- single-user mode.
-struct TrueFn { min: usize, max: usize }
+struct TrueFn {
+    min: usize,
+    max: usize,
+}
 impl ScalarFunction for TrueFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::I64(1))
     }
-    fn min_args(&self) -> usize { self.min }
-    fn max_args(&self) -> usize { self.max }
+    fn min_args(&self) -> usize {
+        self.min
+    }
+    fn max_args(&self) -> usize {
+        self.max
+    }
 }
 
 /// Returns false (0).
-struct FalseFn { min: usize, max: usize }
+struct FalseFn {
+    min: usize,
+    max: usize,
+}
 impl ScalarFunction for FalseFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::I64(0))
     }
-    fn min_args(&self) -> usize { self.min }
-    fn max_args(&self) -> usize { self.max }
+    fn min_args(&self) -> usize {
+        self.min
+    }
+    fn max_args(&self) -> usize {
+        self.max
+    }
 }
 
 /// Sequence: nextval -- returns incrementing values.
@@ -415,8 +568,12 @@ impl ScalarFunction for NextvalFn {
         static SEQ: AtomicI64 = AtomicI64::new(1);
         Ok(Value::I64(SEQ.fetch_add(1, Ordering::Relaxed)))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// Sequence: currval -- returns last sequence value.
@@ -427,19 +584,31 @@ impl ScalarFunction for CurrvalFn {
         static SEQ: AtomicI64 = AtomicI64::new(0);
         Ok(Value::I64(SEQ.load(Ordering::Relaxed)))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// Sequence: setval.
 struct SetvalFn;
 impl ScalarFunction for SetvalFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
-        let v = if args.len() >= 2 { val_to_i64(&args[1]) } else { 0 };
+        let v = if args.len() >= 2 {
+            val_to_i64(&args[1])
+        } else {
+            0
+        };
         Ok(Value::I64(v))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 3 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        3
+    }
 }
 
 /// Sequence: lastval.
@@ -448,8 +617,12 @@ impl ScalarFunction for LastvalFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::I64(0))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 /// pg_encoding_to_char: maps encoding OID to name.
@@ -465,8 +638,12 @@ impl ScalarFunction for PgEncodingToCharFn {
         };
         Ok(Value::Str(name.into()))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// pg_char_to_encoding: maps encoding name to OID.
@@ -482,8 +659,12 @@ impl ScalarFunction for PgCharToEncodingFn {
         };
         Ok(Value::I64(oid))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// get_bit: returns the nth bit of an integer.
@@ -492,11 +673,17 @@ impl ScalarFunction for GetBitFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         let v = val_to_i64(&args[0]);
         let n = val_to_i64(&args[1]);
-        if !(0..64).contains(&n) { return Ok(Value::I64(0)); }
+        if !(0..64).contains(&n) {
+            return Ok(Value::I64(0));
+        }
         Ok(Value::I64((v >> n) & 1))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// set_bit: sets the nth bit of an integer.
@@ -505,8 +692,14 @@ impl ScalarFunction for SetBitFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         let v = val_to_i64(&args[0]);
         let n = val_to_i64(&args[1]);
-        let bit = if args.len() > 2 { val_to_i64(&args[2]) } else { 1 };
-        if !(0..64).contains(&n) { return Ok(Value::I64(v)); }
+        let bit = if args.len() > 2 {
+            val_to_i64(&args[2])
+        } else {
+            1
+        };
+        if !(0..64).contains(&n) {
+            return Ok(Value::I64(v));
+        }
         let result = if bit != 0 {
             v | (1 << n)
         } else {
@@ -514,8 +707,12 @@ impl ScalarFunction for SetBitFn {
         };
         Ok(Value::I64(result))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 3 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        3
+    }
 }
 
 /// get_byte: returns the nth byte.
@@ -524,11 +721,17 @@ impl ScalarFunction for GetByteFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         let v = val_to_i64(&args[0]);
         let n = val_to_i64(&args[1]);
-        if !(0..8).contains(&n) { return Ok(Value::I64(0)); }
+        if !(0..8).contains(&n) {
+            return Ok(Value::I64(0));
+        }
         Ok(Value::I64((v >> (n * 8)) & 0xFF))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// set_byte: sets the nth byte.
@@ -537,14 +740,24 @@ impl ScalarFunction for SetByteFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         let v = val_to_i64(&args[0]);
         let n = val_to_i64(&args[1]);
-        let byte_val = if args.len() > 2 { val_to_i64(&args[2]) & 0xFF } else { 0 };
-        if !(0..8).contains(&n) { return Ok(Value::I64(v)); }
+        let byte_val = if args.len() > 2 {
+            val_to_i64(&args[2]) & 0xFF
+        } else {
+            0
+        };
+        if !(0..8).contains(&n) {
+            return Ok(Value::I64(v));
+        }
         let mask = !(0xFFi64 << (n * 8));
         let result = (v & mask) | (byte_val << (n * 8));
         Ok(Value::I64(result))
     }
-    fn min_args(&self) -> usize { 2 }
-    fn max_args(&self) -> usize { 3 }
+    fn min_args(&self) -> usize {
+        2
+    }
+    fn max_args(&self) -> usize {
+        3
+    }
 }
 
 /// Range constructor: returns a string representation like "[low,high)".
@@ -552,11 +765,19 @@ struct RangeFn;
 impl ScalarFunction for RangeFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         let low = val_to_str(&args[0]);
-        let high = if args.len() > 1 { val_to_str(&args[1]) } else { String::new() };
+        let high = if args.len() > 1 {
+            val_to_str(&args[1])
+        } else {
+            String::new()
+        };
         Ok(Value::Str(format!("[{low},{high})")))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// convert / convert_from / convert_to: passthrough (UTF-8 only).
@@ -565,8 +786,12 @@ impl ScalarFunction for ConvertFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         Ok(args[0].clone())
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 3 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        3
+    }
 }
 
 /// json_typeof: returns the JSON type of a value.
@@ -592,8 +817,12 @@ impl ScalarFunction for JsonTypeofFn {
         };
         Ok(Value::Str(ty.into()))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// json_strip_nulls: removes null fields from JSON string.
@@ -603,15 +832,20 @@ impl ScalarFunction for JsonStripNullsFn {
         let s = val_to_str(&args[0]);
         // Simple approach: strip null values from JSON.
         // Proper JSON handling would need serde; for now pass through.
-        let _stripped = s.replace(":null,", ":__STRIP__,")
+        let _stripped = s
+            .replace(":null,", ":__STRIP__,")
             .replace(":null}", ":__STRIP__}")
             .replace(":null", "")
             .replace(":__STRIP__,", ":null,")
             .replace(":__STRIP__}", ":null}");
         Ok(Value::Str(s))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// json_build_object: builds {"k1": v1, "k2": v2, ...}
@@ -621,7 +855,9 @@ impl ScalarFunction for JsonBuildObjectFn {
         let mut result = String::from("{");
         let mut i = 0;
         while i + 1 < args.len() {
-            if i > 0 { result.push(','); }
+            if i > 0 {
+                result.push(',');
+            }
             let key = val_to_str(&args[i]);
             let val = val_to_str(&args[i + 1]);
             result.push_str(&format!("\"{}\":\"{}\"", key, val));
@@ -630,8 +866,12 @@ impl ScalarFunction for JsonBuildObjectFn {
         result.push('}');
         Ok(Value::Str(result))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { usize::MAX }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        usize::MAX
+    }
 }
 
 /// json_build_array: builds [v1, v2, ...]
@@ -640,15 +880,21 @@ impl ScalarFunction for JsonBuildArrayFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         let mut result = String::from("[");
         for (i, arg) in args.iter().enumerate() {
-            if i > 0 { result.push(','); }
+            if i > 0 {
+                result.push(',');
+            }
             let val = val_to_str(arg);
             result.push_str(&format!("\"{}\"", val));
         }
         result.push(']');
         Ok(Value::Str(result))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { usize::MAX }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        usize::MAX
+    }
 }
 
 /// json_object: builds {"k": "v", ...} from key/value arrays.
@@ -659,7 +905,9 @@ impl ScalarFunction for JsonObjectFn {
         let mut result = String::from("{");
         let mut i = 0;
         while i + 1 < args.len() {
-            if i > 0 { result.push(','); }
+            if i > 0 {
+                result.push(',');
+            }
             let key = val_to_str(&args[i]);
             let val = val_to_str(&args[i + 1]);
             result.push_str(&format!("\"{}\":\"{}\"", key, val));
@@ -668,8 +916,12 @@ impl ScalarFunction for JsonObjectFn {
         result.push('}');
         Ok(Value::Str(result))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { usize::MAX }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        usize::MAX
+    }
 }
 
 /// json_agg: wraps value in a JSON array.
@@ -681,8 +933,12 @@ impl ScalarFunction for JsonAggFn {
         }
         Ok(Value::Str(format!("[\"{}\"", val_to_str(&args[0])) + "]"))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 1 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        1
+    }
 }
 
 /// format_number: format a number with a given number of decimal places.
@@ -690,11 +946,19 @@ struct FormatNumberFn;
 impl ScalarFunction for FormatNumberFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         let num = val_to_f64(&args[0]);
-        let decimals = if args.len() > 1 { val_to_i64(&args[1]).max(0) as usize } else { 2 };
+        let decimals = if args.len() > 1 {
+            val_to_i64(&args[1]).max(0) as usize
+        } else {
+            2
+        };
         Ok(Value::Str(format!("{:.prec$}", num, prec = decimals)))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// to_char_int: format integer as string.
@@ -703,8 +967,12 @@ impl ScalarFunction for ToCharIntFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         Ok(Value::Str(val_to_str(&args[0])))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// to_char_double: format double as string.
@@ -714,8 +982,12 @@ impl ScalarFunction for ToCharDoubleFn {
         let f = val_to_f64(&args[0]);
         Ok(Value::Str(format!("{f}")))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// to_char_interval: format interval as string.
@@ -724,8 +996,12 @@ impl ScalarFunction for ToCharIntervalFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         Ok(Value::Str(val_to_str(&args[0])))
     }
-    fn min_args(&self) -> usize { 1 }
-    fn max_args(&self) -> usize { 2 }
+    fn min_args(&self) -> usize {
+        1
+    }
+    fn max_args(&self) -> usize {
+        2
+    }
 }
 
 /// Now timestamp for pg_postmaster_start_time, pg_conf_load_time.
@@ -738,8 +1014,12 @@ impl ScalarFunction for PgStartTimeFn {
             .as_nanos() as i64;
         Ok(Value::Timestamp(ns))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 /// pg_trigger_depth: always returns 0.
@@ -748,8 +1028,12 @@ impl ScalarFunction for PgTriggerDepthFn {
     fn evaluate(&self, _args: &[Value]) -> Result<Value, String> {
         Ok(Value::I64(0))
     }
-    fn min_args(&self) -> usize { 0 }
-    fn max_args(&self) -> usize { 0 }
+    fn min_args(&self) -> usize {
+        0
+    }
+    fn max_args(&self) -> usize {
+        0
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -764,7 +1048,14 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
 
     // sum variants
     let sum_types: &[&str] = &[
-        "byte", "short", "int", "long", "float", "double", "date", "timestamp",
+        "byte",
+        "short",
+        "int",
+        "long",
+        "float",
+        "double",
+        "date",
+        "timestamp",
     ];
     for ty in sum_types {
         registry.register_public(&format!("sum_{ty}"), Box::new(SumTypeFn));
@@ -788,8 +1079,16 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
 
     // min variants
     let min_max_types: &[&str] = &[
-        "byte", "short", "int", "long", "float", "double",
-        "date", "timestamp", "str", "symbol",
+        "byte",
+        "short",
+        "int",
+        "long",
+        "float",
+        "double",
+        "date",
+        "timestamp",
+        "str",
+        "symbol",
     ];
     for ty in min_max_types {
         registry.register_public(&format!("min_{ty}"), Box::new(IdentityFn));
@@ -802,23 +1101,53 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
 
     // count variants
     let count_types: &[&str] = &[
-        "byte", "short", "int", "long", "float", "double",
-        "str", "symbol", "date", "timestamp", "boolean",
-        "uuid", "ipv4", "geohash", "varchar",
+        "byte",
+        "short",
+        "int",
+        "long",
+        "float",
+        "double",
+        "str",
+        "symbol",
+        "date",
+        "timestamp",
+        "boolean",
+        "uuid",
+        "ipv4",
+        "geohash",
+        "varchar",
     ];
     for ty in count_types {
         registry.register_public(&format!("count_{ty}"), Box::new(CountTypeFn));
     }
 
     // count_distinct variants
-    for ty in &["int", "long", "str", "symbol", "double", "float", "timestamp", "date"] {
+    for ty in &[
+        "int",
+        "long",
+        "str",
+        "symbol",
+        "double",
+        "float",
+        "timestamp",
+        "date",
+    ] {
         registry.register_public(&format!("count_distinct_{ty}"), Box::new(CountTypeFn));
     }
 
     // first variants
     let first_last_types: &[&str] = &[
-        "byte", "short", "int", "long", "float", "double",
-        "str", "symbol", "date", "timestamp", "boolean",
+        "byte",
+        "short",
+        "int",
+        "long",
+        "float",
+        "double",
+        "str",
+        "symbol",
+        "date",
+        "timestamp",
+        "boolean",
     ];
     for ty in first_last_types {
         registry.register_public(&format!("first_{ty}"), Box::new(IdentityFn));
@@ -830,7 +1159,15 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
     }
 
     // first_not_null / last_not_null variants
-    for ty in &["int", "long", "double", "float", "str", "symbol", "timestamp"] {
+    for ty in &[
+        "int",
+        "long",
+        "double",
+        "float",
+        "str",
+        "symbol",
+        "timestamp",
+    ] {
         registry.register_public(&format!("first_not_null_{ty}"), Box::new(IdentityFn));
         registry.register_public(&format!("last_not_null_{ty}"), Box::new(IdentityFn));
     }
@@ -852,9 +1189,16 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
 
     // eq variants
     let op_types: &[&str] = &[
-        "int_int", "long_long", "double_double", "float_float",
-        "str_str", "timestamp_timestamp", "date_date",
-        "boolean_boolean", "short_short", "byte_byte",
+        "int_int",
+        "long_long",
+        "double_double",
+        "float_float",
+        "str_str",
+        "timestamp_timestamp",
+        "date_date",
+        "boolean_boolean",
+        "short_short",
+        "byte_byte",
         "symbol_symbol",
     ];
     for ty in op_types {
@@ -868,9 +1212,15 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
 
     // lt variants
     let cmp_types: &[&str] = &[
-        "int_int", "long_long", "double_double", "float_float",
-        "str_str", "timestamp_timestamp", "date_date",
-        "short_short", "byte_byte",
+        "int_int",
+        "long_long",
+        "double_double",
+        "float_float",
+        "str_str",
+        "timestamp_timestamp",
+        "date_date",
+        "short_short",
+        "byte_byte",
     ];
     for ty in cmp_types {
         registry.register_public(&format!("lt_{ty}"), Box::new(LtFn));
@@ -908,11 +1258,22 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
 
     // add variants
     let arith_types: &[&str] = &[
-        "int_int", "long_long", "double_double", "float_float",
-        "short_short", "byte_byte",
-        "int_long", "long_int", "int_double", "double_int",
-        "long_double", "double_long", "float_double", "double_float",
-        "timestamp_long", "long_timestamp",
+        "int_int",
+        "long_long",
+        "double_double",
+        "float_float",
+        "short_short",
+        "byte_byte",
+        "int_long",
+        "long_int",
+        "int_double",
+        "double_int",
+        "long_double",
+        "double_long",
+        "float_double",
+        "double_float",
+        "timestamp_long",
+        "long_timestamp",
     ];
     for ty in arith_types {
         registry.register_public(&format!("add_{ty}"), Box::new(AddFn));
@@ -925,10 +1286,18 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
 
     // mul variants
     let mul_types: &[&str] = &[
-        "int_int", "long_long", "double_double", "float_float",
-        "short_short", "byte_byte",
-        "int_long", "long_int", "int_double", "double_int",
-        "long_double", "double_long",
+        "int_int",
+        "long_long",
+        "double_double",
+        "float_float",
+        "short_short",
+        "byte_byte",
+        "int_long",
+        "long_int",
+        "int_double",
+        "double_int",
+        "long_double",
+        "double_long",
     ];
     for ty in mul_types {
         registry.register_public(&format!("mul_{ty}"), Box::new(MulFn));
@@ -971,7 +1340,10 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
     registry.register_public("pg_listening_channels", Box::new(ConstStrFn("")));
     registry.register_public("pg_notification_queue_usage", Box::new(ConstI64Fn(0)));
     registry.register_public("pg_is_in_recovery", Box::new(FalseFn { min: 0, max: 0 }));
-    registry.register_public("pg_is_wal_replay_paused", Box::new(FalseFn { min: 0, max: 0 }));
+    registry.register_public(
+        "pg_is_wal_replay_paused",
+        Box::new(FalseFn { min: 0, max: 0 }),
+    );
     registry.register_public("pg_last_wal_receive_lsn", Box::new(ConstStrFn("0/0")));
     registry.register_public("pg_last_wal_replay_lsn", Box::new(ConstStrFn("0/0")));
     registry.register_public("pg_last_xact_replay_timestamp", Box::new(PgStartTimeFn));
@@ -989,9 +1361,15 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
     registry.register_public("pg_try_advisory_lock", Box::new(TrueFn { min: 1, max: 2 }));
     registry.register_public("pg_advisory_unlock", Box::new(TrueFn { min: 1, max: 2 }));
     registry.register_public("pg_advisory_lock", Box::new(TrueFn { min: 1, max: 2 }));
-    registry.register_public("pg_try_advisory_xact_lock", Box::new(TrueFn { min: 1, max: 2 }));
+    registry.register_public(
+        "pg_try_advisory_xact_lock",
+        Box::new(TrueFn { min: 1, max: 2 }),
+    );
     registry.register_public("pg_advisory_xact_lock", Box::new(TrueFn { min: 1, max: 2 }));
-    registry.register_public("pg_advisory_unlock_all", Box::new(TrueFn { min: 0, max: 0 }));
+    registry.register_public(
+        "pg_advisory_unlock_all",
+        Box::new(TrueFn { min: 0, max: 0 }),
+    );
 
     // Conversion functions
     registry.register_public("convert", Box::new(ConvertFn));
@@ -1013,17 +1391,38 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
     registry.register_public("daterange", Box::new(RangeFn));
 
     // Has-privilege functions (always true in single-user mode)
-    registry.register_public("has_any_column_privilege", Box::new(TrueFn { min: 2, max: 3 }));
+    registry.register_public(
+        "has_any_column_privilege",
+        Box::new(TrueFn { min: 2, max: 3 }),
+    );
     registry.register_public("has_column_privilege", Box::new(TrueFn { min: 3, max: 4 }));
-    registry.register_public("has_database_privilege", Box::new(TrueFn { min: 2, max: 3 }));
-    registry.register_public("has_function_privilege", Box::new(TrueFn { min: 2, max: 3 }));
+    registry.register_public(
+        "has_database_privilege",
+        Box::new(TrueFn { min: 2, max: 3 }),
+    );
+    registry.register_public(
+        "has_function_privilege",
+        Box::new(TrueFn { min: 2, max: 3 }),
+    );
     registry.register_public("has_schema_privilege", Box::new(TrueFn { min: 2, max: 3 }));
-    registry.register_public("has_sequence_privilege", Box::new(TrueFn { min: 2, max: 3 }));
+    registry.register_public(
+        "has_sequence_privilege",
+        Box::new(TrueFn { min: 2, max: 3 }),
+    );
     registry.register_public("has_server_privilege", Box::new(TrueFn { min: 2, max: 3 }));
     registry.register_public("has_type_privilege", Box::new(TrueFn { min: 2, max: 3 }));
-    registry.register_public("has_tablespace_privilege", Box::new(TrueFn { min: 2, max: 3 }));
-    registry.register_public("has_language_privilege", Box::new(TrueFn { min: 2, max: 3 }));
-    registry.register_public("has_foreign_data_wrapper_privilege", Box::new(TrueFn { min: 2, max: 3 }));
+    registry.register_public(
+        "has_tablespace_privilege",
+        Box::new(TrueFn { min: 2, max: 3 }),
+    );
+    registry.register_public(
+        "has_language_privilege",
+        Box::new(TrueFn { min: 2, max: 3 }),
+    );
+    registry.register_public(
+        "has_foreign_data_wrapper_privilege",
+        Box::new(TrueFn { min: 2, max: 3 }),
+    );
 
     // JSON extras
     registry.register_public("json_typeof", Box::new(JsonTypeofFn));
@@ -1075,10 +1474,22 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
     registry.register_public("pg_get_triggerdef", Box::new(NullFn { min: 1, max: 2 }));
     registry.register_public("pg_get_ruledef", Box::new(NullFn { min: 1, max: 2 }));
     registry.register_public("pg_get_functiondef", Box::new(NullFn { min: 1, max: 1 }));
-    registry.register_public("pg_get_function_arguments", Box::new(NullFn { min: 1, max: 1 }));
-    registry.register_public("pg_get_function_result", Box::new(NullFn { min: 1, max: 1 }));
-    registry.register_public("pg_get_function_identity_arguments", Box::new(NullFn { min: 1, max: 1 }));
-    registry.register_public("pg_get_serial_sequence", Box::new(NullFn { min: 2, max: 2 }));
+    registry.register_public(
+        "pg_get_function_arguments",
+        Box::new(NullFn { min: 1, max: 1 }),
+    );
+    registry.register_public(
+        "pg_get_function_result",
+        Box::new(NullFn { min: 1, max: 1 }),
+    );
+    registry.register_public(
+        "pg_get_function_identity_arguments",
+        Box::new(NullFn { min: 1, max: 1 }),
+    );
+    registry.register_public(
+        "pg_get_serial_sequence",
+        Box::new(NullFn { min: 2, max: 2 }),
+    );
     registry.register_public("pg_get_userbyid", Box::new(ConstStrFn("admin")));
     registry.register_public("pg_stat_get_numscans", Box::new(ConstI64Fn(0)));
     registry.register_public("pg_stat_get_tuples_returned", Box::new(ConstI64Fn(0)));
@@ -1106,7 +1517,10 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
     // Additional pg_ object info
     registry.register_public("pg_describe_object", Box::new(NullFn { min: 3, max: 3 }));
     registry.register_public("pg_identify_object", Box::new(NullFn { min: 3, max: 3 }));
-    registry.register_public("pg_identify_object_as_address", Box::new(NullFn { min: 3, max: 3 }));
+    registry.register_public(
+        "pg_identify_object_as_address",
+        Box::new(NullFn { min: 3, max: 3 }),
+    );
 
     // Aggregate function aliases without type suffix
     registry.register_public("regr_slope", Box::new(StddevTypeFn));
@@ -1172,18 +1586,45 @@ pub fn register_compat_functions(registry: &mut ScalarRegistry) {
     // System catalog accessors
     registry.register_public("pg_table_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
     registry.register_public("pg_type_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
-    registry.register_public("pg_function_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
-    registry.register_public("pg_operator_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
+    registry.register_public(
+        "pg_function_is_visible",
+        Box::new(TrueFn { min: 1, max: 1 }),
+    );
+    registry.register_public(
+        "pg_operator_is_visible",
+        Box::new(TrueFn { min: 1, max: 1 }),
+    );
     registry.register_public("pg_opclass_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
-    registry.register_public("pg_opfamily_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
-    registry.register_public("pg_conversion_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
-    registry.register_public("pg_ts_config_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
+    registry.register_public(
+        "pg_opfamily_is_visible",
+        Box::new(TrueFn { min: 1, max: 1 }),
+    );
+    registry.register_public(
+        "pg_conversion_is_visible",
+        Box::new(TrueFn { min: 1, max: 1 }),
+    );
+    registry.register_public(
+        "pg_ts_config_is_visible",
+        Box::new(TrueFn { min: 1, max: 1 }),
+    );
     registry.register_public("pg_ts_dict_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
-    registry.register_public("pg_ts_parser_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
-    registry.register_public("pg_ts_template_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
-    registry.register_public("pg_collation_is_visible", Box::new(TrueFn { min: 1, max: 1 }));
+    registry.register_public(
+        "pg_ts_parser_is_visible",
+        Box::new(TrueFn { min: 1, max: 1 }),
+    );
+    registry.register_public(
+        "pg_ts_template_is_visible",
+        Box::new(TrueFn { min: 1, max: 1 }),
+    );
+    registry.register_public(
+        "pg_collation_is_visible",
+        Box::new(TrueFn { min: 1, max: 1 }),
+    );
     registry.register_public("pg_my_temp_schema", Box::new(ConstI64Fn(0)));
-    registry.register_public("pg_is_other_temp_schema", Box::new(FalseFn { min: 1, max: 1 }));
+    registry.register_public(
+        "pg_is_other_temp_schema",
+        Box::new(FalseFn { min: 1, max: 1 }),
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1201,19 +1642,34 @@ mod tests {
 
     #[test]
     fn test_eq_int_int() {
-        assert_eq!(eval("eq_int_int", &[Value::I64(5), Value::I64(5)]).unwrap(), Value::I64(1));
-        assert_eq!(eval("eq_int_int", &[Value::I64(5), Value::I64(3)]).unwrap(), Value::I64(0));
+        assert_eq!(
+            eval("eq_int_int", &[Value::I64(5), Value::I64(5)]).unwrap(),
+            Value::I64(1)
+        );
+        assert_eq!(
+            eval("eq_int_int", &[Value::I64(5), Value::I64(3)]).unwrap(),
+            Value::I64(0)
+        );
     }
 
     #[test]
     fn test_lt_double_double() {
-        assert_eq!(eval("lt_double_double", &[Value::F64(1.0), Value::F64(2.0)]).unwrap(), Value::I64(1));
-        assert_eq!(eval("lt_double_double", &[Value::F64(2.0), Value::F64(1.0)]).unwrap(), Value::I64(0));
+        assert_eq!(
+            eval("lt_double_double", &[Value::F64(1.0), Value::F64(2.0)]).unwrap(),
+            Value::I64(1)
+        );
+        assert_eq!(
+            eval("lt_double_double", &[Value::F64(2.0), Value::F64(1.0)]).unwrap(),
+            Value::I64(0)
+        );
     }
 
     #[test]
     fn test_add_long_long() {
-        assert_eq!(eval("add_long_long", &[Value::I64(10), Value::I64(20)]).unwrap(), Value::I64(30));
+        assert_eq!(
+            eval("add_long_long", &[Value::I64(10), Value::I64(20)]).unwrap(),
+            Value::I64(30)
+        );
     }
 
     #[test]
@@ -1241,26 +1697,53 @@ mod tests {
 
     #[test]
     fn test_json_typeof() {
-        assert_eq!(eval("json_typeof", &[Value::Str("42".into())]).unwrap(), Value::Str("number".into()));
-        assert_eq!(eval("json_typeof", &[Value::Str("\"hello\"".into())]).unwrap(), Value::Str("string".into()));
-        assert_eq!(eval("json_typeof", &[Value::Str("[1,2]".into())]).unwrap(), Value::Str("array".into()));
-        assert_eq!(eval("json_typeof", &[Value::Str("{\"a\":1}".into())]).unwrap(), Value::Str("object".into()));
-        assert_eq!(eval("json_typeof", &[Value::Str("true".into())]).unwrap(), Value::Str("boolean".into()));
+        assert_eq!(
+            eval("json_typeof", &[Value::Str("42".into())]).unwrap(),
+            Value::Str("number".into())
+        );
+        assert_eq!(
+            eval("json_typeof", &[Value::Str("\"hello\"".into())]).unwrap(),
+            Value::Str("string".into())
+        );
+        assert_eq!(
+            eval("json_typeof", &[Value::Str("[1,2]".into())]).unwrap(),
+            Value::Str("array".into())
+        );
+        assert_eq!(
+            eval("json_typeof", &[Value::Str("{\"a\":1}".into())]).unwrap(),
+            Value::Str("object".into())
+        );
+        assert_eq!(
+            eval("json_typeof", &[Value::Str("true".into())]).unwrap(),
+            Value::Str("boolean".into())
+        );
     }
 
     #[test]
     fn test_get_bit() {
         // 0b1010 = 10, bit 1 should be 1
-        assert_eq!(eval("get_bit", &[Value::I64(10), Value::I64(1)]).unwrap(), Value::I64(1));
-        assert_eq!(eval("get_bit", &[Value::I64(10), Value::I64(2)]).unwrap(), Value::I64(0));
+        assert_eq!(
+            eval("get_bit", &[Value::I64(10), Value::I64(1)]).unwrap(),
+            Value::I64(1)
+        );
+        assert_eq!(
+            eval("get_bit", &[Value::I64(10), Value::I64(2)]).unwrap(),
+            Value::I64(0)
+        );
     }
 
     #[test]
     fn test_json_build_object() {
-        let result = eval("json_build_object", &[
-            Value::Str("name".into()), Value::Str("Alice".into()),
-            Value::Str("age".into()), Value::I64(30),
-        ]).unwrap();
+        let result = eval(
+            "json_build_object",
+            &[
+                Value::Str("name".into()),
+                Value::Str("Alice".into()),
+                Value::Str("age".into()),
+                Value::I64(30),
+            ],
+        )
+        .unwrap();
         if let Value::Str(s) = result {
             assert!(s.contains("\"name\":\"Alice\""), "got: {s}");
             assert!(s.contains("\"age\":\"30\""), "got: {s}");
@@ -1272,7 +1755,10 @@ mod tests {
     #[test]
     fn test_sum_int_passthrough() {
         assert_eq!(eval("sum_int", &[Value::I64(42)]).unwrap(), Value::I64(42));
-        assert_eq!(eval("sum_double", &[Value::F64(3.14)]).unwrap(), Value::F64(3.14));
+        assert_eq!(
+            eval("sum_double", &[Value::F64(3.14)]).unwrap(),
+            Value::F64(3.14)
+        );
     }
 
     #[test]

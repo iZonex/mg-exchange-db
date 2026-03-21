@@ -49,10 +49,7 @@ impl S3WalShipper {
             .file_name()
             .and_then(|n| n.to_str())
             .ok_or_else(|| {
-                ExchangeDbError::Wal(format!(
-                    "invalid segment path: {}",
-                    segment_path.display()
-                ))
+                ExchangeDbError::Wal(format!("invalid segment path: {}", segment_path.display()))
             })?;
 
         let data = std::fs::read(segment_path).map_err(|e| {
@@ -131,24 +128,25 @@ impl S3WalReceiver {
             // Extract sequence number from filename like "wal-000042.wal".
             let filename = key.rsplit('/').next().unwrap_or(key);
             if let Some(seq) = parse_segment_sequence(filename)
-                && seq > last_applied {
-                    // Download the segment.
-                    let data = self.store.get(key)?;
+                && seq > last_applied
+            {
+                // Download the segment.
+                let data = self.store.get(key)?;
 
-                    // Ensure local directory exists.
-                    let table_dir = self.local_wal_dir.join(table);
-                    if !table_dir.exists() {
-                        std::fs::create_dir_all(&table_dir)?;
-                    }
-
-                    // Write to local file.
-                    let local_path = table_dir.join(filename);
-                    std::fs::write(&local_path, &data)?;
-
-                    if seq > max_seq {
-                        max_seq = seq;
-                    }
+                // Ensure local directory exists.
+                let table_dir = self.local_wal_dir.join(table);
+                if !table_dir.exists() {
+                    std::fs::create_dir_all(&table_dir)?;
                 }
+
+                // Write to local file.
+                let local_path = table_dir.join(filename);
+                std::fs::write(&local_path, &data)?;
+
+                if seq > max_seq {
+                    max_seq = seq;
+                }
+            }
         }
 
         Ok(max_seq)
@@ -207,22 +205,12 @@ mod tests {
         let store = MemoryObjectStore::new();
 
         // Ship some segments via the store directly.
-        store
-            .put("repl/trades/wal-000001.wal", b"seg1")
-            .unwrap();
-        store
-            .put("repl/trades/wal-000002.wal", b"seg2")
-            .unwrap();
-        store
-            .put("repl/trades/wal-000003.wal", b"seg3")
-            .unwrap();
+        store.put("repl/trades/wal-000001.wal", b"seg1").unwrap();
+        store.put("repl/trades/wal-000002.wal", b"seg2").unwrap();
+        store.put("repl/trades/wal-000003.wal", b"seg3").unwrap();
 
         let tmpdir = tempfile::tempdir().unwrap();
-        let receiver = S3WalReceiver::new(
-            Box::new(store),
-            "repl",
-            tmpdir.path().to_path_buf(),
-        );
+        let receiver = S3WalReceiver::new(Box::new(store), "repl", tmpdir.path().to_path_buf());
 
         // Sync from sequence 1 (should download 2 and 3).
         let max_seq = receiver.sync("trades", 1).unwrap();
@@ -244,16 +232,10 @@ mod tests {
     #[test]
     fn receiver_sync_no_new_segments() {
         let store = MemoryObjectStore::new();
-        store
-            .put("repl/trades/wal-000001.wal", b"seg1")
-            .unwrap();
+        store.put("repl/trades/wal-000001.wal", b"seg1").unwrap();
 
         let tmpdir = tempfile::tempdir().unwrap();
-        let receiver = S3WalReceiver::new(
-            Box::new(store),
-            "repl",
-            tmpdir.path().to_path_buf(),
-        );
+        let receiver = S3WalReceiver::new(Box::new(store), "repl", tmpdir.path().to_path_buf());
 
         let max_seq = receiver.sync("trades", 5).unwrap();
         assert_eq!(max_seq, 5, "no new segments, should return last_applied");
@@ -270,11 +252,7 @@ mod tests {
         store.put("wal/orders/wal-000002.wal", b"data-two").unwrap();
 
         let tmpdir = tempfile::tempdir().unwrap();
-        let receiver = S3WalReceiver::new(
-            Box::new(store),
-            "wal",
-            tmpdir.path().to_path_buf(),
-        );
+        let receiver = S3WalReceiver::new(Box::new(store), "wal", tmpdir.path().to_path_buf());
 
         let max = receiver.sync("orders", 0).unwrap();
         assert_eq!(max, 2);

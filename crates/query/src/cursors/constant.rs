@@ -27,12 +27,18 @@ impl ConstantCursor {
             };
             schema.push((name.clone(), ct));
         }
-        Self { source, constants, schema }
+        Self {
+            source,
+            constants,
+            schema,
+        }
     }
 }
 
 impl RecordCursor for ConstantCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
         match self.source.next_batch(max_rows)? {
@@ -63,10 +69,13 @@ mod tests {
         let schema = vec![("v".to_string(), ColumnType::I64)];
         let rows = vec![vec![Value::I64(1)], vec![Value::I64(2)]];
         let source = MemoryCursor::from_rows(schema, &rows);
-        let mut cursor = ConstantCursor::new(Box::new(source), vec![
-            ("source".into(), Value::Str("test".into())),
-            ("version".into(), Value::I64(42)),
-        ]);
+        let mut cursor = ConstantCursor::new(
+            Box::new(source),
+            vec![
+                ("source".into(), Value::Str("test".into())),
+                ("version".into(), Value::I64(42)),
+            ],
+        );
         let batch = cursor.next_batch(10).unwrap().unwrap();
         assert_eq!(batch.row_count(), 2);
         assert_eq!(batch.get_value(0, 1), Value::Str("test".into()));

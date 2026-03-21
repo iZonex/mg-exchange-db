@@ -99,11 +99,7 @@ fn drain_cursor(cursor: &mut dyn RecordCursor) -> Vec<Vec<Value>> {
 
 #[test]
 fn record_batch_roundtrip() {
-    let cols = vec![
-        "id".to_string(),
-        "name".to_string(),
-        "price".to_string(),
-    ];
+    let cols = vec!["id".to_string(), "name".to_string(), "price".to_string()];
     let rows = vec![
         vec![Value::I64(1), Value::Str("BTC".into()), Value::F64(50000.0)],
         vec![Value::I64(2), Value::Str("ETH".into()), Value::F64(3000.0)],
@@ -500,7 +496,7 @@ fn aggregate_cursor_no_group_by() {
 
     assert_eq!(result.len(), 1);
     assert_eq!(result[0][0], Value::F64(60.0)); // sum
-    assert_eq!(result[0][1], Value::I64(3));     // count
+    assert_eq!(result[0][1], Value::I64(3)); // count
     assert_eq!(result[0][2], Value::F64(20.0)); // avg
 }
 
@@ -524,11 +520,7 @@ fn aggregate_cursor_with_group_by() {
         (AggregateKind::Count, "value".to_string()),
     ];
 
-    let mut cursor = AggregateCursor::new(
-        mem,
-        vec!["category".to_string()],
-        aggregates,
-    );
+    let mut cursor = AggregateCursor::new(mem, vec!["category".to_string()], aggregates);
     let result = drain_cursor(&mut cursor);
 
     assert_eq!(result.len(), 2);

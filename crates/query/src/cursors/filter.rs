@@ -21,17 +21,27 @@ pub struct FilterCursor {
 
 impl FilterCursor {
     pub fn new(source: Box<dyn RecordCursor>, filter: Filter) -> Self {
-        Self { source, filter, compiled: None }
+        Self {
+            source,
+            filter,
+            compiled: None,
+        }
     }
 
     /// Build or retrieve the compiled filter from the schema.
-    fn get_compiled(&mut self, schema: &[(String, ColumnType)]) -> &crate::compiled_filter::LinearFilter {
+    fn get_compiled(
+        &mut self,
+        schema: &[(String, ColumnType)],
+    ) -> &crate::compiled_filter::LinearFilter {
         if self.compiled.is_none() {
             let mut col_indices = std::collections::HashMap::new();
             for (i, (name, _)) in schema.iter().enumerate() {
                 col_indices.insert(name.clone(), i);
             }
-            self.compiled = Some(crate::compiled_filter::build_linear_filter(&self.filter, &col_indices));
+            self.compiled = Some(crate::compiled_filter::build_linear_filter(
+                &self.filter,
+                &col_indices,
+            ));
         }
         self.compiled.as_ref().unwrap()
     }
@@ -57,9 +67,8 @@ impl RecordCursor for FilterCursor {
                 Some(b) => {
                     let compiled = self.compiled.as_ref().unwrap();
                     for r in 0..b.row_count() {
-                        let row: Vec<Value> = (0..b.columns.len())
-                            .map(|c| b.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> =
+                            (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                         if compiled.evaluate(&row) {
                             result.append_row(&row);
                             if result.row_count() >= max_rows {
@@ -82,7 +91,11 @@ impl RecordCursor for FilterCursor {
 // ── filter evaluation (kept for reference / fallback) ─────────────────
 
 #[allow(dead_code)]
-fn get_col_value<'a>(col: &str, row: &'a [Value], schema: &[(String, ColumnType)]) -> Option<&'a Value> {
+fn get_col_value<'a>(
+    col: &str,
+    row: &'a [Value],
+    schema: &[(String, ColumnType)],
+) -> Option<&'a Value> {
     schema
         .iter()
         .position(|(name, _)| name == col)
@@ -92,44 +105,45 @@ fn get_col_value<'a>(col: &str, row: &'a [Value], schema: &[(String, ColumnType)
 #[allow(dead_code)]
 fn evaluate_filter(filter: &Filter, row: &[Value], schema: &[(String, ColumnType)]) -> bool {
     match filter {
-        Filter::Eq(col, expected) => {
-            get_col_value(col, row, schema)
-                .map(|v| v.eq_coerce(expected))
-                .unwrap_or(false)
-        }
-        Filter::NotEq(col, expected) => {
-            get_col_value(col, row, schema)
-                .map(|v| !v.eq_coerce(expected))
-                .unwrap_or(true)
-        }
-        Filter::Gt(col, expected) => {
-            get_col_value(col, row, schema)
-                .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater))
-                .unwrap_or(false)
-        }
-        Filter::Lt(col, expected) => {
-            get_col_value(col, row, schema)
-                .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less))
-                .unwrap_or(false)
-        }
-        Filter::Gte(col, expected) => {
-            get_col_value(col, row, schema)
-                .map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)))
-                .unwrap_or(false)
-        }
-        Filter::Lte(col, expected) => {
-            get_col_value(col, row, schema)
-                .map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)))
-                .unwrap_or(false)
-        }
-        Filter::Between(col, low, high) => {
-            get_col_value(col, row, schema)
-                .map(|v| {
-                    matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                        && matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal))
-                })
-                .unwrap_or(false)
-        }
+        Filter::Eq(col, expected) => get_col_value(col, row, schema)
+            .map(|v| v.eq_coerce(expected))
+            .unwrap_or(false),
+        Filter::NotEq(col, expected) => get_col_value(col, row, schema)
+            .map(|v| !v.eq_coerce(expected))
+            .unwrap_or(true),
+        Filter::Gt(col, expected) => get_col_value(col, row, schema)
+            .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater))
+            .unwrap_or(false),
+        Filter::Lt(col, expected) => get_col_value(col, row, schema)
+            .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less))
+            .unwrap_or(false),
+        Filter::Gte(col, expected) => get_col_value(col, row, schema)
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(expected),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::Lte(col, expected) => get_col_value(col, row, schema)
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(expected),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::Between(col, low, high) => get_col_value(col, row, schema)
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(low),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    v.cmp_coerce(high),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
         Filter::And(parts) => parts.iter().all(|p| evaluate_filter(p, row, schema)),
         Filter::Or(parts) => parts.iter().any(|p| evaluate_filter(p, row, schema)),
         Filter::IsNull(col) => {
@@ -138,49 +152,39 @@ fn evaluate_filter(filter: &Filter, row: &[Value], schema: &[(String, ColumnType
         Filter::IsNotNull(col) => {
             matches!(get_col_value(col, row, schema), Some(v) if *v != Value::Null)
         }
-        Filter::In(col, list) => {
-            get_col_value(col, row, schema)
-                .map(|v| list.iter().any(|item| v.eq_coerce(item)))
-                .unwrap_or(false)
-        }
-        Filter::NotIn(col, list) => {
-            get_col_value(col, row, schema)
-                .map(|v| !list.iter().any(|item| v.eq_coerce(item)))
-                .unwrap_or(true)
-        }
-        Filter::Like(col, pattern) => {
-            get_col_value(col, row, schema)
-                .map(|v| {
-                    if let Value::Str(s) = v {
-                        crate::executor::like_match(s, pattern, false)
-                    } else {
-                        false
-                    }
-                })
-                .unwrap_or(false)
-        }
-        Filter::NotLike(col, pattern) => {
-            get_col_value(col, row, schema)
-                .map(|v| {
-                    if let Value::Str(s) = v {
-                        !crate::executor::like_match(s, pattern, false)
-                    } else {
-                        true
-                    }
-                })
-                .unwrap_or(true)
-        }
-        Filter::ILike(col, pattern) => {
-            get_col_value(col, row, schema)
-                .map(|v| {
-                    if let Value::Str(s) = v {
-                        crate::executor::like_match(s, pattern, true)
-                    } else {
-                        false
-                    }
-                })
-                .unwrap_or(false)
-        }
+        Filter::In(col, list) => get_col_value(col, row, schema)
+            .map(|v| list.iter().any(|item| v.eq_coerce(item)))
+            .unwrap_or(false),
+        Filter::NotIn(col, list) => get_col_value(col, row, schema)
+            .map(|v| !list.iter().any(|item| v.eq_coerce(item)))
+            .unwrap_or(true),
+        Filter::Like(col, pattern) => get_col_value(col, row, schema)
+            .map(|v| {
+                if let Value::Str(s) = v {
+                    crate::executor::like_match(s, pattern, false)
+                } else {
+                    false
+                }
+            })
+            .unwrap_or(false),
+        Filter::NotLike(col, pattern) => get_col_value(col, row, schema)
+            .map(|v| {
+                if let Value::Str(s) = v {
+                    !crate::executor::like_match(s, pattern, false)
+                } else {
+                    true
+                }
+            })
+            .unwrap_or(true),
+        Filter::ILike(col, pattern) => get_col_value(col, row, schema)
+            .map(|v| {
+                if let Value::Str(s) = v {
+                    crate::executor::like_match(s, pattern, true)
+                } else {
+                    false
+                }
+            })
+            .unwrap_or(false),
         Filter::Not(inner) => !evaluate_filter(inner, row, schema),
         Filter::Expression { left, op, right } => {
             let lv = eval_expr(left, row, schema);
@@ -190,41 +194,56 @@ fn evaluate_filter(filter: &Filter, row: &[Value], schema: &[(String, ColumnType
                 CompareOp::NotEq => !lv.eq_coerce(&rv),
                 CompareOp::Gt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Greater),
                 CompareOp::Lt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Less),
-                CompareOp::Gte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)),
-                CompareOp::Lte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)),
+                CompareOp::Gte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ),
+                CompareOp::Lte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                ),
             }
         }
-        Filter::BetweenSymmetric(col, low, high) => {
-            get_col_value(col, row, schema)
-                .map(|v| {
-                    let ge_low_le_high = matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                        && matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
-                    let ge_high_le_low = matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                        && matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
-                    ge_low_le_high || ge_high_le_low
-                })
-                .unwrap_or(false)
-        }
+        Filter::BetweenSymmetric(col, low, high) => get_col_value(col, row, schema)
+            .map(|v| {
+                let ge_low_le_high = matches!(
+                    v.cmp_coerce(low),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    v.cmp_coerce(high),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
+                let ge_high_le_low = matches!(
+                    v.cmp_coerce(high),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    v.cmp_coerce(low),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
+                ge_low_le_high || ge_high_le_low
+            })
+            .unwrap_or(false),
         // Subquery filters and ALL/ANY are not supported in cursor mode.
-        Filter::Subquery { .. } | Filter::InSubquery { .. } | Filter::Exists { .. }
-        | Filter::All { .. } | Filter::Any { .. } => false,
+        Filter::Subquery { .. }
+        | Filter::InSubquery { .. }
+        | Filter::Exists { .. }
+        | Filter::All { .. }
+        | Filter::Any { .. } => false,
     }
 }
 
 #[allow(dead_code)]
 fn eval_expr(expr: &PlanExpr, row: &[Value], schema: &[(String, ColumnType)]) -> Value {
     match expr {
-        PlanExpr::Column(name) => {
-            get_col_value(name, row, schema).cloned().unwrap_or(Value::Null)
-        }
+        PlanExpr::Column(name) => get_col_value(name, row, schema)
+            .cloned()
+            .unwrap_or(Value::Null),
         PlanExpr::Literal(v) => v.clone(),
-        PlanExpr::BinaryOp { left, op, right } => {
-            crate::executor::apply_binary_op(
-                &eval_expr(left, row, schema),
-                *op,
-                &eval_expr(right, row, schema),
-            )
-        }
+        PlanExpr::BinaryOp { left, op, right } => crate::executor::apply_binary_op(
+            &eval_expr(left, row, schema),
+            *op,
+            &eval_expr(right, row, schema),
+        ),
         PlanExpr::UnaryOp { op, expr } => {
             crate::executor::apply_unary_op(*op, &eval_expr(expr, row, schema))
         }

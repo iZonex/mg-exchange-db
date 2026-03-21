@@ -6,7 +6,7 @@
 //! string dictionary.
 
 use crate::column::{FixedColumnReader, FixedColumnWriter};
-use crate::index::symbol_map::{SymbolMap, SYMBOL_NULL};
+use crate::index::symbol_map::{SYMBOL_NULL, SymbolMap};
 use exchange_common::error::Result;
 use exchange_common::types::ColumnType;
 use std::path::Path;

@@ -60,7 +60,10 @@ fn assert_results_equal(sql: &str, regular: &QueryResult, cursor: &QueryResult) 
                 for (i, rr) in rows_r.iter().enumerate() {
                     let found = rows_c.iter().any(|cr| {
                         rr.len() == cr.len()
-                            && rr.iter().zip(cr.iter()).all(|(rv, cv)| values_equal(rv, cv))
+                            && rr
+                                .iter()
+                                .zip(cr.iter())
+                                .all(|(rv, cv)| values_equal(rv, cv))
                     });
                     assert!(
                         found,
@@ -313,7 +316,10 @@ fn equiv_max() {
 #[test]
 fn equiv_group_by_count() {
     let db = TestDb::with_trades(30);
-    verify_equivalent(&db, "SELECT symbol, count(price) FROM trades GROUP BY symbol");
+    verify_equivalent(
+        &db,
+        "SELECT symbol, count(price) FROM trades GROUP BY symbol",
+    );
 }
 
 #[test]
@@ -398,14 +404,26 @@ fn equiv_sample_by_1h() {
 
     // Both should return Rows with 2 columns and at least 1 row.
     if let (
-        QueryResult::Rows { columns: cr, rows: rr },
-        QueryResult::Rows { columns: cc, rows: rc },
+        QueryResult::Rows {
+            columns: cr,
+            rows: rr,
+        },
+        QueryResult::Rows {
+            columns: cc,
+            rows: rc,
+        },
     ) = (&result_regular, &result_cursor)
     {
         assert_eq!(cr.len(), 2);
         assert_eq!(cc.len(), 2);
-        assert!(!rr.is_empty(), "regular engine returned 0 rows for SAMPLE BY");
-        assert!(!rc.is_empty(), "cursor engine returned 0 rows for SAMPLE BY");
+        assert!(
+            !rr.is_empty(),
+            "regular engine returned 0 rows for SAMPLE BY"
+        );
+        assert!(
+            !rc.is_empty(),
+            "cursor engine returned 0 rows for SAMPLE BY"
+        );
     } else {
         panic!("expected Rows from both engines for `{sql}`");
     }
@@ -420,8 +438,14 @@ fn equiv_sample_by_sum() {
     let result_cursor = execute_via_cursors(db.path(), &plan).unwrap();
 
     if let (
-        QueryResult::Rows { columns: cr, rows: rr },
-        QueryResult::Rows { columns: cc, rows: rc },
+        QueryResult::Rows {
+            columns: cr,
+            rows: rr,
+        },
+        QueryResult::Rows {
+            columns: cc,
+            rows: rc,
+        },
     ) = (&result_regular, &result_cursor)
     {
         assert_eq!(cr.len(), 2);
@@ -525,10 +549,7 @@ fn equiv_count_with_filter() {
 #[test]
 fn equiv_sum_with_filter() {
     let db = TestDb::with_trades(30);
-    verify_equivalent(
-        &db,
-        "SELECT sum(price) FROM trades WHERE side = 'sell'",
-    );
+    verify_equivalent(&db, "SELECT sum(price) FROM trades WHERE side = 'sell'");
 }
 
 #[test]
@@ -543,10 +564,7 @@ fn equiv_avg_with_filter() {
 #[test]
 fn equiv_order_by_asc_limit() {
     let db = TestDb::with_trades(30);
-    verify_equivalent(
-        &db,
-        "SELECT * FROM trades ORDER BY price LIMIT 10",
-    );
+    verify_equivalent(&db, "SELECT * FROM trades ORDER BY price LIMIT 10");
 }
 
 #[test]
@@ -561,10 +579,7 @@ fn equiv_order_by_desc_limit_offset() {
 #[test]
 fn equiv_where_not_in() {
     let db = TestDb::with_trades(30);
-    verify_equivalent(
-        &db,
-        "SELECT * FROM trades WHERE symbol NOT IN ('BTC/USD')",
-    );
+    verify_equivalent(&db, "SELECT * FROM trades WHERE symbol NOT IN ('BTC/USD')");
 }
 
 #[test]
@@ -600,10 +615,7 @@ fn equiv_all_symbols_latest_on() {
 #[test]
 fn equiv_distinct_with_filter() {
     let db = TestDb::with_trades(30);
-    verify_equivalent(
-        &db,
-        "SELECT DISTINCT symbol FROM trades WHERE side = 'buy'",
-    );
+    verify_equivalent(&db, "SELECT DISTINCT symbol FROM trades WHERE side = 'buy'");
 }
 
 #[test]
@@ -617,4 +629,3 @@ fn equiv_order_by_timestamp_desc() {
     let db = TestDb::with_trades(20);
     verify_equivalent(&db, "SELECT * FROM trades ORDER BY timestamp DESC");
 }
-

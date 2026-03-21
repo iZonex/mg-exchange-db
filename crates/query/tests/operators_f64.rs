@@ -19,11 +19,7 @@ fn db_f64() -> TestDb {
     db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
     let vals = [-99.9, -0.001, 0.0, 0.001, 42.5, 99.9];
     for (i, val) in vals.iter().enumerate() {
-        db.exec_ok(&format!(
-            "INSERT INTO t VALUES ({}, {})",
-            ts(i as i64),
-            val
-        ));
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, {})", ts(i as i64), val));
     }
     db
 }
@@ -67,10 +63,7 @@ fn db_f64_grouped() -> TestDb {
 
 fn assert_f64_near(val: &Value, expected: f64, tol: f64) {
     match val {
-        Value::F64(v) => assert!(
-            (*v - expected).abs() < tol,
-            "expected ~{expected}, got {v}"
-        ),
+        Value::F64(v) => assert!((*v - expected).abs() < tol, "expected ~{expected}, got {v}"),
         Value::I64(v) => assert!(
             ((*v as f64) - expected).abs() < tol,
             "expected ~{expected}, got I64({v})"
@@ -650,14 +643,16 @@ mod in_op {
     #[test]
     fn in_all() {
         let db = db_f64();
-        let (_, rows) = db.query("SELECT v FROM t WHERE v IN (-99.9, -0.001, 0.0, 0.001, 42.5, 99.9)");
+        let (_, rows) =
+            db.query("SELECT v FROM t WHERE v IN (-99.9, -0.001, 0.0, 0.001, 42.5, 99.9)");
         assert_eq!(rows.len(), 6);
     }
 
     #[test]
     fn not_in_all() {
         let db = db_f64();
-        let (_, rows) = db.query("SELECT v FROM t WHERE v NOT IN (-99.9, -0.001, 0.0, 0.001, 42.5, 99.9)");
+        let (_, rows) =
+            db.query("SELECT v FROM t WHERE v NOT IN (-99.9, -0.001, 0.0, 0.001, 42.5, 99.9)");
         assert_eq!(rows.len(), 0);
     }
 }
@@ -1071,16 +1066,14 @@ mod group_by {
     #[test]
     fn group_by_with_order() {
         let db = db_f64_grouped();
-        let (_, rows) =
-            db.query("SELECT grp, sum(v) AS s FROM t GROUP BY grp ORDER BY grp DESC");
+        let (_, rows) = db.query("SELECT grp, sum(v) AS s FROM t GROUP BY grp ORDER BY grp DESC");
         assert_eq!(rows[0][0], Value::Str("C".into()));
     }
 
     #[test]
     fn group_by_with_limit() {
         let db = db_f64_grouped();
-        let (_, rows) =
-            db.query("SELECT grp, count(*) FROM t GROUP BY grp ORDER BY grp LIMIT 2");
+        let (_, rows) = db.query("SELECT grp, count(*) FROM t GROUP BY grp ORDER BY grp LIMIT 2");
         assert_eq!(rows.len(), 2);
     }
 }
@@ -1094,18 +1087,14 @@ mod having {
     #[test]
     fn having_count() {
         let db = db_f64_grouped();
-        let (_, rows) = db.query(
-            "SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c >= 3",
-        );
+        let (_, rows) = db.query("SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c >= 3");
         assert_eq!(rows.len(), 2); // A(3), B(3)
     }
 
     #[test]
     fn having_sum() {
         let db = db_f64_grouped();
-        let (_, rows) = db.query(
-            "SELECT grp, sum(v) AS s FROM t GROUP BY grp HAVING s > 100",
-        );
+        let (_, rows) = db.query("SELECT grp, sum(v) AS s FROM t GROUP BY grp HAVING s > 100");
         // A: 90, B: 141.5, C: 130.5 => B and C > 100; but check actual
         assert!(rows.len() >= 2);
     }
@@ -1113,27 +1102,22 @@ mod having {
     #[test]
     fn having_all() {
         let db = db_f64_grouped();
-        let (_, rows) = db.query(
-            "SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c >= 1",
-        );
+        let (_, rows) = db.query("SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c >= 1");
         assert_eq!(rows.len(), 3);
     }
 
     #[test]
     fn having_none() {
         let db = db_f64_grouped();
-        let (_, rows) = db.query(
-            "SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c > 100",
-        );
+        let (_, rows) = db.query("SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c > 100");
         assert_eq!(rows.len(), 0);
     }
 
     #[test]
     fn having_with_order() {
         let db = db_f64_grouped();
-        let (_, rows) = db.query(
-            "SELECT grp, sum(v) AS s FROM t GROUP BY grp HAVING s > 100 ORDER BY grp",
-        );
+        let (_, rows) =
+            db.query("SELECT grp, sum(v) AS s FROM t GROUP BY grp HAVING s > 100 ORDER BY grp");
         assert!(rows.len() >= 2);
     }
 }
@@ -1392,7 +1376,11 @@ mod arithmetic {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 10.0)", ts(0)));
-        assert_f64_near(&db.query_scalar("SELECT (v + 5.0) * 2.0 FROM t"), 30.0, 0.01);
+        assert_f64_near(
+            &db.query_scalar("SELECT (v + 5.0) * 2.0 FROM t"),
+            30.0,
+            0.01,
+        );
     }
 
     #[test]
@@ -1517,18 +1505,15 @@ mod case_when {
     #[test]
     fn case_positive_negative() {
         let db = db_f64();
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN v > 0 THEN 'positive' ELSE 'non_positive' END FROM t",
-        );
+        let (_, rows) =
+            db.query("SELECT CASE WHEN v > 0 THEN 'positive' ELSE 'non_positive' END FROM t");
         assert_eq!(rows.len(), 6);
     }
 
     #[test]
     fn case_zero_check() {
         let db = db_f64();
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN v = 0 THEN 'zero' ELSE 'nonzero' END FROM t",
-        );
+        let (_, rows) = db.query("SELECT CASE WHEN v = 0 THEN 'zero' ELSE 'nonzero' END FROM t");
         assert_eq!(rows.len(), 6);
     }
 
@@ -1544,45 +1529,35 @@ mod case_when {
     #[test]
     fn case_returns_number() {
         let db = db_f64();
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN v > 0 THEN 1 ELSE 0 END FROM t",
-        );
+        let (_, rows) = db.query("SELECT CASE WHEN v > 0 THEN 1 ELSE 0 END FROM t");
         assert_eq!(rows.len(), 6);
     }
 
     #[test]
     fn case_with_alias() {
         let db = db_f64();
-        let (cols, _) = db.query(
-            "SELECT CASE WHEN v > 0 THEN 'yes' ELSE 'no' END AS flag FROM t",
-        );
+        let (cols, _) = db.query("SELECT CASE WHEN v > 0 THEN 'yes' ELSE 'no' END AS flag FROM t");
         assert!(cols.contains(&"flag".to_string()));
     }
 
     #[test]
     fn case_high_low() {
         let db = db_f64();
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN v > 50 THEN 'high' ELSE 'low' END FROM t",
-        );
+        let (_, rows) = db.query("SELECT CASE WHEN v > 50 THEN 'high' ELSE 'low' END FROM t");
         assert_eq!(rows.len(), 6);
     }
 
     #[test]
     fn case_without_else() {
         let db = db_f64();
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN v > 50 THEN 'high' END FROM t",
-        );
+        let (_, rows) = db.query("SELECT CASE WHEN v > 50 THEN 'high' END FROM t");
         assert_eq!(rows.len(), 6);
     }
 
     #[test]
     fn case_all_else() {
         let db = db_f64();
-        let (_, rows) = db.query(
-            "SELECT CASE WHEN v > 1000 THEN 'huge' ELSE 'normal' END FROM t",
-        );
+        let (_, rows) = db.query("SELECT CASE WHEN v > 1000 THEN 'huge' ELSE 'normal' END FROM t");
         for r in &rows {
             assert_eq!(r[0], Value::Str("normal".into()));
         }
@@ -1627,8 +1602,7 @@ mod logical {
     #[test]
     fn and_or_combined() {
         let db = db_f64();
-        let (_, rows) =
-            db.query("SELECT v FROM t WHERE (v > 0 AND v < 50) OR v = -99.9");
+        let (_, rows) = db.query("SELECT v FROM t WHERE (v > 0 AND v < 50) OR v = -99.9");
         // 0.001, 42.5, -99.9 = 3
         assert_eq!(rows.len(), 3);
     }
@@ -1636,8 +1610,7 @@ mod logical {
     #[test]
     fn and_chain() {
         let db = db_f64();
-        let (_, rows) =
-            db.query("SELECT v FROM t WHERE v > -1 AND v < 1 AND v != 0");
+        let (_, rows) = db.query("SELECT v FROM t WHERE v > -1 AND v < 1 AND v != 0");
         // -0.001, 0.001 = 2
         assert_eq!(rows.len(), 2);
     }
@@ -1645,17 +1618,14 @@ mod logical {
     #[test]
     fn or_chain() {
         let db = db_f64();
-        let (_, rows) =
-            db.query("SELECT v FROM t WHERE v = 0.0 OR v = 42.5 OR v = 99.9");
+        let (_, rows) = db.query("SELECT v FROM t WHERE v = 0.0 OR v = 42.5 OR v = 99.9");
         assert_eq!(rows.len(), 3);
     }
 
     #[test]
     fn complex_predicate() {
         let db = db_f64();
-        let (_, rows) = db.query(
-            "SELECT v FROM t WHERE (v > 0 OR v < -50) AND v != 42.5",
-        );
+        let (_, rows) = db.query("SELECT v FROM t WHERE (v > 0 OR v < -50) AND v != 42.5");
         // v > 0 OR v < -50: {-99.9, 0.001, 42.5, 99.9} AND != 42.5: {-99.9, 0.001, 99.9} = 3
         assert_eq!(rows.len(), 3);
     }
@@ -1750,11 +1720,7 @@ mod sample_by {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..10 {
-            db.exec_ok(&format!(
-                "INSERT INTO t VALUES ({}, {}.5)",
-                ts(i * 60),
-                i
-            ));
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.5)", ts(i * 60), i));
         }
         let (_, rows) = db.query("SELECT sum(v) FROM t SAMPLE BY 5m");
         assert!(!rows.is_empty());
@@ -1765,11 +1731,7 @@ mod sample_by {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..10 {
-            db.exec_ok(&format!(
-                "INSERT INTO t VALUES ({}, {}.0)",
-                ts(i * 60),
-                i
-            ));
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i * 60), i));
         }
         let (_, rows) = db.query("SELECT count(*) FROM t SAMPLE BY 5m");
         assert!(!rows.is_empty());
@@ -1780,11 +1742,7 @@ mod sample_by {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..10 {
-            db.exec_ok(&format!(
-                "INSERT INTO t VALUES ({}, {}.0)",
-                ts(i * 60),
-                i
-            ));
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i * 60), i));
         }
         let (_, rows) = db.query("SELECT avg(v) FROM t SAMPLE BY 5m");
         assert!(!rows.is_empty());
@@ -1795,11 +1753,7 @@ mod sample_by {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..10 {
-            db.exec_ok(&format!(
-                "INSERT INTO t VALUES ({}, {}.0)",
-                ts(i * 60),
-                i
-            ));
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i * 60), i));
         }
         let (_, rows) = db.query("SELECT min(v) FROM t SAMPLE BY 5m");
         assert!(!rows.is_empty());
@@ -1810,11 +1764,7 @@ mod sample_by {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..10 {
-            db.exec_ok(&format!(
-                "INSERT INTO t VALUES ({}, {}.0)",
-                ts(i * 60),
-                i
-            ));
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i * 60), i));
         }
         let (_, rows) = db.query("SELECT max(v) FROM t SAMPLE BY 5m");
         assert!(!rows.is_empty());
@@ -1875,8 +1825,7 @@ mod edge_cases {
     #[test]
     fn where_order_limit() {
         let db = db_f64();
-        let (_, rows) =
-            db.query("SELECT v FROM t WHERE v >= 0 ORDER BY v DESC LIMIT 2");
+        let (_, rows) = db.query("SELECT v FROM t WHERE v >= 0 ORDER BY v DESC LIMIT 2");
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0][0], Value::F64(99.9));
     }
@@ -1901,9 +1850,8 @@ mod edge_cases {
     #[test]
     fn combined_in_and_between() {
         let db = db_f64();
-        let (_, rows) = db.query(
-            "SELECT v FROM t WHERE v IN (0.0, 0.001, 42.5) AND v BETWEEN 0.0 AND 1.0",
-        );
+        let (_, rows) =
+            db.query("SELECT v FROM t WHERE v IN (0.0, 0.001, 42.5) AND v BETWEEN 0.0 AND 1.0");
         // 0.0, 0.001 = 2
         assert_eq!(rows.len(), 2);
     }
@@ -1913,11 +1861,7 @@ mod edge_cases {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in (0..10).rev() {
-            db.exec_ok(&format!(
-                "INSERT INTO t VALUES ({}, {}.0)",
-                ts(9 - i),
-                i
-            ));
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(9 - i), i));
         }
         let (_, rows) = db.query("SELECT v FROM t ORDER BY v ASC");
         for i in 0..10 {
@@ -1959,8 +1903,7 @@ mod multi_agg {
     #[test]
     fn all_aggregates() {
         let db = db_f64();
-        let (_, rows) =
-            db.query("SELECT count(*), min(v), max(v), sum(v), avg(v) FROM t");
+        let (_, rows) = db.query("SELECT count(*), min(v), max(v), sum(v), avg(v) FROM t");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], Value::I64(6));
     }
@@ -1968,8 +1911,7 @@ mod multi_agg {
     #[test]
     fn aggregates_with_where() {
         let db = db_f64();
-        let (_, rows) =
-            db.query("SELECT count(*), min(v), max(v) FROM t WHERE v >= 0");
+        let (_, rows) = db.query("SELECT count(*), min(v), max(v) FROM t WHERE v >= 0");
         assert_eq!(rows[0][0], Value::I64(4));
         assert_eq!(rows[0][1], Value::F64(0.0));
         assert_eq!(rows[0][2], Value::F64(99.9));
@@ -1978,9 +1920,8 @@ mod multi_agg {
     #[test]
     fn group_multi_aggregates() {
         let db = db_f64_grouped();
-        let (_, rows) = db.query(
-            "SELECT grp, count(*), min(v), max(v), sum(v) FROM t GROUP BY grp ORDER BY grp",
-        );
+        let (_, rows) = db
+            .query("SELECT grp, count(*), min(v), max(v), sum(v) FROM t GROUP BY grp ORDER BY grp");
         assert_eq!(rows.len(), 3);
     }
 }
@@ -1991,30 +1932,168 @@ mod multi_agg {
 mod comparison_combos {
     use super::*;
 
-    #[test] fn eq_and_gt() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v = 42.5 AND v > 0"); assert_eq!(r.len(), 1); }
-    #[test] fn eq_and_lt() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v = -99.9 AND v < 0"); assert_eq!(r.len(), 1); }
-    #[test] fn ne_and_gt() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v != 0.0 AND v > 0"); assert_eq!(r.len(), 3); }
-    #[test] fn ne_and_lt() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v != -0.001 AND v < 0"); assert_eq!(r.len(), 1); }
-    #[test] fn gte_and_lte() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v >= -0.001 AND v <= 0.001"); assert_eq!(r.len(), 3); }
-    #[test] fn gt_and_ne() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v > -0.01 AND v != 0.0"); assert_eq!(r.len(), 4); }
-    #[test] fn lt_and_ne() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v < 50 AND v != -99.9"); assert_eq!(r.len(), 4); }
-    #[test] fn gte_and_ne() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v >= 0 AND v != 42.5"); assert_eq!(r.len(), 3); }
-    #[test] fn lte_and_ne() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v <= 42.5 AND v != 0.0"); assert_eq!(r.len(), 4); }
-    #[test] fn gt_or_eq() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v > 42.5 OR v = -99.9"); assert_eq!(r.len(), 2); }
-    #[test] fn lt_or_eq() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v < -0.001 OR v = 99.9"); assert_eq!(r.len(), 2); }
-    #[test] fn between_and_ne() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v BETWEEN 0 AND 100 AND v != 42.5"); assert_eq!(r.len(), 3); }
-    #[test] fn in_and_gt() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v IN (0.0, 0.001, 42.5, 99.9) AND v > 0"); assert_eq!(r.len(), 3); }
-    #[test] fn in_or_lt() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v IN (42.5, 99.9) OR v < -50"); assert_eq!(r.len(), 3); }
-    #[test] fn not_in_and_between() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v NOT IN (0.0) AND v BETWEEN -1 AND 1"); assert_eq!(r.len(), 2); }
-    #[test] fn gt_count() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 0"), Value::I64(3)); }
-    #[test] fn lt_count() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v < 0"), Value::I64(2)); }
-    #[test] fn eq_count() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v = 0.0"), Value::I64(1)); }
-    #[test] fn ne_count() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v != 0.0"), Value::I64(5)); }
-    #[test] fn gte_count() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v >= 0"), Value::I64(4)); }
-    #[test] fn lte_count() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v <= 0"), Value::I64(3)); }
-    #[test] fn between_count() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v BETWEEN -0.001 AND 0.001"), Value::I64(3)); }
-    #[test] fn in_count() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v IN (0.0, 42.5)"), Value::I64(2)); }
-    #[test] fn not_in_count() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v NOT IN (0.0, 42.5)"), Value::I64(4)); }
+    #[test]
+    fn eq_and_gt() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v = 42.5 AND v > 0");
+        assert_eq!(r.len(), 1);
+    }
+    #[test]
+    fn eq_and_lt() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v = -99.9 AND v < 0");
+        assert_eq!(r.len(), 1);
+    }
+    #[test]
+    fn ne_and_gt() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v != 0.0 AND v > 0");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn ne_and_lt() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v != -0.001 AND v < 0");
+        assert_eq!(r.len(), 1);
+    }
+    #[test]
+    fn gte_and_lte() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v >= -0.001 AND v <= 0.001");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn gt_and_ne() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v > -0.01 AND v != 0.0");
+        assert_eq!(r.len(), 4);
+    }
+    #[test]
+    fn lt_and_ne() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v < 50 AND v != -99.9");
+        assert_eq!(r.len(), 4);
+    }
+    #[test]
+    fn gte_and_ne() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v >= 0 AND v != 42.5");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn lte_and_ne() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v <= 42.5 AND v != 0.0");
+        assert_eq!(r.len(), 4);
+    }
+    #[test]
+    fn gt_or_eq() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v > 42.5 OR v = -99.9");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn lt_or_eq() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v < -0.001 OR v = 99.9");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn between_and_ne() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v BETWEEN 0 AND 100 AND v != 42.5");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn in_and_gt() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v IN (0.0, 0.001, 42.5, 99.9) AND v > 0");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn in_or_lt() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v IN (42.5, 99.9) OR v < -50");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn not_in_and_between() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v NOT IN (0.0) AND v BETWEEN -1 AND 1");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn gt_count() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 0"),
+            Value::I64(3)
+        );
+    }
+    #[test]
+    fn lt_count() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v < 0"),
+            Value::I64(2)
+        );
+    }
+    #[test]
+    fn eq_count() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v = 0.0"),
+            Value::I64(1)
+        );
+    }
+    #[test]
+    fn ne_count() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v != 0.0"),
+            Value::I64(5)
+        );
+    }
+    #[test]
+    fn gte_count() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v >= 0"),
+            Value::I64(4)
+        );
+    }
+    #[test]
+    fn lte_count() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v <= 0"),
+            Value::I64(3)
+        );
+    }
+    #[test]
+    fn between_count() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v BETWEEN -0.001 AND 0.001"),
+            Value::I64(3)
+        );
+    }
+    #[test]
+    fn in_count() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v IN (0.0, 42.5)"),
+            Value::I64(2)
+        );
+    }
+    #[test]
+    fn not_in_count() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v NOT IN (0.0, 42.5)"),
+            Value::I64(4)
+        );
+    }
 }
 
 // =============================================================================
@@ -2023,15 +2102,78 @@ mod comparison_combos {
 mod agg_variations {
     use super::*;
 
-    #[test] fn sum_where_eq() { let db = db_f64(); assert_f64_near(&db.query_scalar("SELECT sum(v) FROM t WHERE v = 42.5"), 42.5, 0.01); }
-    #[test] fn min_where_gt() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT min(v) FROM t WHERE v > 0"), Value::F64(0.001)); }
-    #[test] fn max_where_lt() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT max(v) FROM t WHERE v < 0"), Value::F64(-0.001)); }
-    #[test] fn avg_positive() { let db = db_f64(); let v = db.query_scalar("SELECT avg(v) FROM t WHERE v > 0"); assert_f64_near(&v, 47.467, 0.01); }
-    #[test] fn count_between() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v BETWEEN 0.001 AND 99.9"), Value::I64(3)); }
-    #[test] fn sum_between() { let db = db_f64(); assert_f64_near(&db.query_scalar("SELECT sum(v) FROM t WHERE v BETWEEN 0 AND 100"), 142.401, 0.01); }
-    #[test] fn first_where_gt() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT first(v) FROM t WHERE v > 0"), Value::F64(0.001)); }
-    #[test] fn last_where_lt() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT last(v) FROM t WHERE v < 0"), Value::F64(-0.001)); }
-    #[test] fn count_in() { let db = db_f64(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v IN (-99.9, 0.0, 99.9)"), Value::I64(3)); }
+    #[test]
+    fn sum_where_eq() {
+        let db = db_f64();
+        assert_f64_near(
+            &db.query_scalar("SELECT sum(v) FROM t WHERE v = 42.5"),
+            42.5,
+            0.01,
+        );
+    }
+    #[test]
+    fn min_where_gt() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT min(v) FROM t WHERE v > 0"),
+            Value::F64(0.001)
+        );
+    }
+    #[test]
+    fn max_where_lt() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT max(v) FROM t WHERE v < 0"),
+            Value::F64(-0.001)
+        );
+    }
+    #[test]
+    fn avg_positive() {
+        let db = db_f64();
+        let v = db.query_scalar("SELECT avg(v) FROM t WHERE v > 0");
+        assert_f64_near(&v, 47.467, 0.01);
+    }
+    #[test]
+    fn count_between() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v BETWEEN 0.001 AND 99.9"),
+            Value::I64(3)
+        );
+    }
+    #[test]
+    fn sum_between() {
+        let db = db_f64();
+        assert_f64_near(
+            &db.query_scalar("SELECT sum(v) FROM t WHERE v BETWEEN 0 AND 100"),
+            142.401,
+            0.01,
+        );
+    }
+    #[test]
+    fn first_where_gt() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT first(v) FROM t WHERE v > 0"),
+            Value::F64(0.001)
+        );
+    }
+    #[test]
+    fn last_where_lt() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT last(v) FROM t WHERE v < 0"),
+            Value::F64(-0.001)
+        );
+    }
+    #[test]
+    fn count_in() {
+        let db = db_f64();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v IN (-99.9, 0.0, 99.9)"),
+            Value::I64(3)
+        );
+    }
 
     #[test]
     fn grouped_count_a() {
@@ -2085,29 +2227,144 @@ mod agg_variations {
 mod extra_combos {
     use super::*;
 
-    #[test] fn add_100() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); db.exec_ok(&format!("INSERT INTO t VALUES ({}, 0.5)", ts(0))); assert_f64_near(&db.query_scalar("SELECT v + 100 FROM t"), 100.5, 0.01); }
-    #[test] fn sub_100() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); db.exec_ok(&format!("INSERT INTO t VALUES ({}, 200.5)", ts(0))); assert_f64_near(&db.query_scalar("SELECT v - 100 FROM t"), 100.5, 0.01); }
-    #[test] fn mul_10() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); db.exec_ok(&format!("INSERT INTO t VALUES ({}, 5.5)", ts(0))); assert_f64_near(&db.query_scalar("SELECT v * 10 FROM t"), 55.0, 0.01); }
-    #[test] fn div_4() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); db.exec_ok(&format!("INSERT INTO t VALUES ({}, 100.0)", ts(0))); assert_f64_near(&db.query_scalar("SELECT v / 4 FROM t"), 25.0, 0.01); }
-    #[test] fn paren_expr() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); db.exec_ok(&format!("INSERT INTO t VALUES ({}, 5.0)", ts(0))); assert_f64_near(&db.query_scalar("SELECT (v + 3) * 2 FROM t"), 16.0, 0.01); }
-    #[test] fn sub_self() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); db.exec_ok(&format!("INSERT INTO t VALUES ({}, 42.5)", ts(0))); assert_f64_near(&db.query_scalar("SELECT v - v FROM t"), 0.0, 0.01); }
-    #[test] fn add_self() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); db.exec_ok(&format!("INSERT INTO t VALUES ({}, 21.25)", ts(0))); assert_f64_near(&db.query_scalar("SELECT v + v FROM t"), 42.5, 0.01); }
+    #[test]
+    fn add_100() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 0.5)", ts(0)));
+        assert_f64_near(&db.query_scalar("SELECT v + 100 FROM t"), 100.5, 0.01);
+    }
+    #[test]
+    fn sub_100() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 200.5)", ts(0)));
+        assert_f64_near(&db.query_scalar("SELECT v - 100 FROM t"), 100.5, 0.01);
+    }
+    #[test]
+    fn mul_10() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 5.5)", ts(0)));
+        assert_f64_near(&db.query_scalar("SELECT v * 10 FROM t"), 55.0, 0.01);
+    }
+    #[test]
+    fn div_4() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 100.0)", ts(0)));
+        assert_f64_near(&db.query_scalar("SELECT v / 4 FROM t"), 25.0, 0.01);
+    }
+    #[test]
+    fn paren_expr() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 5.0)", ts(0)));
+        assert_f64_near(&db.query_scalar("SELECT (v + 3) * 2 FROM t"), 16.0, 0.01);
+    }
+    #[test]
+    fn sub_self() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 42.5)", ts(0)));
+        assert_f64_near(&db.query_scalar("SELECT v - v FROM t"), 0.0, 0.01);
+    }
+    #[test]
+    fn add_self() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 21.25)", ts(0)));
+        assert_f64_near(&db.query_scalar("SELECT v + v FROM t"), 42.5, 0.01);
+    }
 
-    #[test] fn case_gt_50() { let db = db_f64(); let (_, r) = db.query("SELECT CASE WHEN v > 50 THEN 'high' ELSE 'low' END FROM t"); assert_eq!(r.len(), 6); }
-    #[test] fn case_eq_zero() { let db = db_f64(); let (_, r) = db.query("SELECT CASE WHEN v = 0 THEN 'zero' ELSE 'nonzero' END FROM t"); assert_eq!(r.len(), 6); }
-    #[test] fn case_negative_check() { let db = db_f64(); let (_, r) = db.query("SELECT CASE WHEN v < 0 THEN 'neg' ELSE 'nonneg' END FROM t"); assert_eq!(r.len(), 6); }
-    #[test] fn case_three_branch() { let db = db_f64(); let (_, r) = db.query("SELECT CASE WHEN v < -50 THEN 'low' WHEN v < 50 THEN 'mid' ELSE 'high' END FROM t"); assert_eq!(r.len(), 6); }
-    #[test] fn case_with_where() { let db = db_f64(); let (_, r) = db.query("SELECT CASE WHEN v > 0 THEN 'pos' ELSE 'neg' END FROM t WHERE v != 0"); assert_eq!(r.len(), 5); }
-    #[test] fn case_with_limit() { let db = db_f64(); let (_, r) = db.query("SELECT CASE WHEN v > 0 THEN 'pos' ELSE 'neg' END FROM t LIMIT 3"); assert_eq!(r.len(), 3); }
+    #[test]
+    fn case_gt_50() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT CASE WHEN v > 50 THEN 'high' ELSE 'low' END FROM t");
+        assert_eq!(r.len(), 6);
+    }
+    #[test]
+    fn case_eq_zero() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT CASE WHEN v = 0 THEN 'zero' ELSE 'nonzero' END FROM t");
+        assert_eq!(r.len(), 6);
+    }
+    #[test]
+    fn case_negative_check() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT CASE WHEN v < 0 THEN 'neg' ELSE 'nonneg' END FROM t");
+        assert_eq!(r.len(), 6);
+    }
+    #[test]
+    fn case_three_branch() {
+        let db = db_f64();
+        let (_, r) = db.query(
+            "SELECT CASE WHEN v < -50 THEN 'low' WHEN v < 50 THEN 'mid' ELSE 'high' END FROM t",
+        );
+        assert_eq!(r.len(), 6);
+    }
+    #[test]
+    fn case_with_where() {
+        let db = db_f64();
+        let (_, r) =
+            db.query("SELECT CASE WHEN v > 0 THEN 'pos' ELSE 'neg' END FROM t WHERE v != 0");
+        assert_eq!(r.len(), 5);
+    }
+    #[test]
+    fn case_with_limit() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT CASE WHEN v > 0 THEN 'pos' ELSE 'neg' END FROM t LIMIT 3");
+        assert_eq!(r.len(), 3);
+    }
 
-    #[test] fn distinct_desc() { let db = db_f64(); let (_, r) = db.query("SELECT DISTINCT v FROM t ORDER BY v DESC"); assert_eq!(r[0][0], Value::F64(99.9)); }
-    #[test] fn distinct_limit() { let db = db_f64(); let (_, r) = db.query("SELECT DISTINCT v FROM t ORDER BY v ASC LIMIT 3"); assert_eq!(r.len(), 3); }
-    #[test] fn order_limit_one_asc() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t ORDER BY v ASC LIMIT 1"); assert_eq!(r[0][0], Value::F64(-99.9)); }
-    #[test] fn order_limit_one_desc() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t ORDER BY v DESC LIMIT 1"); assert_eq!(r[0][0], Value::F64(99.9)); }
-    #[test] fn offset_three() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t ORDER BY v ASC LIMIT 2 OFFSET 3"); assert_eq!(r[0][0], Value::F64(0.001)); }
-    #[test] fn distinct_where_gt() { let db = db_f64(); let (_, r) = db.query("SELECT DISTINCT v FROM t WHERE v > 0"); assert_eq!(r.len(), 3); }
-    #[test] fn distinct_where_lt() { let db = db_f64(); let (_, r) = db.query("SELECT DISTINCT v FROM t WHERE v < 0"); assert_eq!(r.len(), 2); }
-    #[test] fn order_where_between() { let db = db_f64(); let (_, r) = db.query("SELECT v FROM t WHERE v BETWEEN 0 AND 100 ORDER BY v DESC"); assert_eq!(r[0][0], Value::F64(99.9)); }
+    #[test]
+    fn distinct_desc() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT DISTINCT v FROM t ORDER BY v DESC");
+        assert_eq!(r[0][0], Value::F64(99.9));
+    }
+    #[test]
+    fn distinct_limit() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT DISTINCT v FROM t ORDER BY v ASC LIMIT 3");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn order_limit_one_asc() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t ORDER BY v ASC LIMIT 1");
+        assert_eq!(r[0][0], Value::F64(-99.9));
+    }
+    #[test]
+    fn order_limit_one_desc() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t ORDER BY v DESC LIMIT 1");
+        assert_eq!(r[0][0], Value::F64(99.9));
+    }
+    #[test]
+    fn offset_three() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t ORDER BY v ASC LIMIT 2 OFFSET 3");
+        assert_eq!(r[0][0], Value::F64(0.001));
+    }
+    #[test]
+    fn distinct_where_gt() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT DISTINCT v FROM t WHERE v > 0");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn distinct_where_lt() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT DISTINCT v FROM t WHERE v < 0");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn order_where_between() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT v FROM t WHERE v BETWEEN 0 AND 100 ORDER BY v DESC");
+        assert_eq!(r[0][0], Value::F64(99.9));
+    }
 }
 
 // =============================================================================
@@ -2116,13 +2373,51 @@ mod extra_combos {
 mod group_having_extra {
     use super::*;
 
-    #[test] fn having_avg() { let db = db_f64_grouped(); let (_, r) = db.query("SELECT grp, avg(v) AS a FROM t GROUP BY grp HAVING a > 40 ORDER BY grp"); assert!(r.len() >= 1); }
-    #[test] fn having_min() { let db = db_f64_grouped(); let (_, r) = db.query("SELECT grp, min(v) AS m FROM t GROUP BY grp HAVING m >= 20 ORDER BY grp"); assert!(r.len() >= 1); }
-    #[test] fn having_max() { let db = db_f64_grouped(); let (_, r) = db.query("SELECT grp, max(v) AS m FROM t GROUP BY grp HAVING m > 60 ORDER BY grp"); assert!(r.len() >= 1); }
-    #[test] fn group_order_desc() { let db = db_f64_grouped(); let (_, r) = db.query("SELECT grp, count(*) AS c FROM t GROUP BY grp ORDER BY c DESC"); assert_eq!(r.len(), 3); }
-    #[test] fn group_limit_1() { let db = db_f64_grouped(); let (_, r) = db.query("SELECT grp, sum(v) FROM t GROUP BY grp ORDER BY grp LIMIT 1"); assert_eq!(r.len(), 1); }
-    #[test] fn having_count_eq() { let db = db_f64_grouped(); let (_, r) = db.query("SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c = 2"); assert_eq!(r.len(), 1); }
-    #[test] fn having_count_gt2() { let db = db_f64_grouped(); let (_, r) = db.query("SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c > 2"); assert_eq!(r.len(), 2); }
+    #[test]
+    fn having_avg() {
+        let db = db_f64_grouped();
+        let (_, r) =
+            db.query("SELECT grp, avg(v) AS a FROM t GROUP BY grp HAVING a > 40 ORDER BY grp");
+        assert!(r.len() >= 1);
+    }
+    #[test]
+    fn having_min() {
+        let db = db_f64_grouped();
+        let (_, r) =
+            db.query("SELECT grp, min(v) AS m FROM t GROUP BY grp HAVING m >= 20 ORDER BY grp");
+        assert!(r.len() >= 1);
+    }
+    #[test]
+    fn having_max() {
+        let db = db_f64_grouped();
+        let (_, r) =
+            db.query("SELECT grp, max(v) AS m FROM t GROUP BY grp HAVING m > 60 ORDER BY grp");
+        assert!(r.len() >= 1);
+    }
+    #[test]
+    fn group_order_desc() {
+        let db = db_f64_grouped();
+        let (_, r) = db.query("SELECT grp, count(*) AS c FROM t GROUP BY grp ORDER BY c DESC");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn group_limit_1() {
+        let db = db_f64_grouped();
+        let (_, r) = db.query("SELECT grp, sum(v) FROM t GROUP BY grp ORDER BY grp LIMIT 1");
+        assert_eq!(r.len(), 1);
+    }
+    #[test]
+    fn having_count_eq() {
+        let db = db_f64_grouped();
+        let (_, r) = db.query("SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c = 2");
+        assert_eq!(r.len(), 1);
+    }
+    #[test]
+    fn having_count_gt2() {
+        let db = db_f64_grouped();
+        let (_, r) = db.query("SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c > 2");
+        assert_eq!(r.len(), 2);
+    }
 }
 
 // =============================================================================
@@ -2131,14 +2426,86 @@ mod group_having_extra {
 mod sample_coalesce_cast_extra {
     use super::*;
 
-    #[test] fn sample_1h() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); for i in 0..20 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.5)", ts(i * 600), i)); } let (_, r) = db.query("SELECT count(*) FROM t SAMPLE BY 1h"); assert!(!r.is_empty()); }
-    #[test] fn sample_30m() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); for i in 0..10 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i * 600), i)); } let (_, r) = db.query("SELECT sum(v) FROM t SAMPLE BY 30m"); assert!(!r.is_empty()); }
-    #[test] fn sample_15m() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); for i in 0..10 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i * 60), i)); } let (_, r) = db.query("SELECT avg(v) FROM t SAMPLE BY 15m"); assert!(!r.is_empty()); }
-    #[test] fn sample_1d() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); for i in 0..5 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i * 86400), i * 100)); } let (_, r) = db.query("SELECT count(*) FROM t SAMPLE BY 1d"); assert!(!r.is_empty()); }
-    #[test] fn sample_first_last() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); for i in 0..10 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i * 600), i * 10)); } let (_, r) = db.query("SELECT first(v), last(v) FROM t SAMPLE BY 1h"); assert!(!r.is_empty()); }
-    #[test] fn cast_with_limit() { let db = db_f64(); let (_, r) = db.query("SELECT CAST(v AS INT) FROM t LIMIT 3"); assert_eq!(r.len(), 3); }
-    #[test] fn coalesce_default_99() { let db = db_f64_nullable(); let (_, r) = db.query("SELECT coalesce(v, 99.0) FROM t"); assert_eq!(r.len(), 5); }
-    #[test] fn cast_negative_to_varchar() { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)"); db.exec_ok(&format!("INSERT INTO t VALUES ({}, -42.5)", ts(0))); match db.query_scalar("SELECT CAST(v AS VARCHAR) FROM t") { Value::Str(s) => assert!(s.contains("-42.5")), other => panic!("got {other:?}") } }
+    #[test]
+    fn sample_1h() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        for i in 0..20 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.5)", ts(i * 600), i));
+        }
+        let (_, r) = db.query("SELECT count(*) FROM t SAMPLE BY 1h");
+        assert!(!r.is_empty());
+    }
+    #[test]
+    fn sample_30m() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        for i in 0..10 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i * 600), i));
+        }
+        let (_, r) = db.query("SELECT sum(v) FROM t SAMPLE BY 30m");
+        assert!(!r.is_empty());
+    }
+    #[test]
+    fn sample_15m() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        for i in 0..10 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i * 60), i));
+        }
+        let (_, r) = db.query("SELECT avg(v) FROM t SAMPLE BY 15m");
+        assert!(!r.is_empty());
+    }
+    #[test]
+    fn sample_1d() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        for i in 0..5 {
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, {}.0)",
+                ts(i * 86400),
+                i * 100
+            ));
+        }
+        let (_, r) = db.query("SELECT count(*) FROM t SAMPLE BY 1d");
+        assert!(!r.is_empty());
+    }
+    #[test]
+    fn sample_first_last() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        for i in 0..10 {
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, {}.0)",
+                ts(i * 600),
+                i * 10
+            ));
+        }
+        let (_, r) = db.query("SELECT first(v), last(v) FROM t SAMPLE BY 1h");
+        assert!(!r.is_empty());
+    }
+    #[test]
+    fn cast_with_limit() {
+        let db = db_f64();
+        let (_, r) = db.query("SELECT CAST(v AS INT) FROM t LIMIT 3");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn coalesce_default_99() {
+        let db = db_f64_nullable();
+        let (_, r) = db.query("SELECT coalesce(v, 99.0) FROM t");
+        assert_eq!(r.len(), 5);
+    }
+    #[test]
+    fn cast_negative_to_varchar() {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
+        db.exec_ok(&format!("INSERT INTO t VALUES ({}, -42.5)", ts(0)));
+        match db.query_scalar("SELECT CAST(v AS VARCHAR) FROM t") {
+            Value::Str(s) => assert!(s.contains("-42.5")),
+            other => panic!("got {other:?}"),
+        }
+    }
 }
 
 // =============================================================================
@@ -2162,7 +2529,10 @@ mod wide_many {
     fn sum_three_cols() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, a DOUBLE, b DOUBLE, c DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 10.0, 20.0, 30.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t VALUES ({}, 10.0, 20.0, 30.0)",
+            ts(0)
+        ));
         assert_f64_near(&db.query_scalar("SELECT a + b + c FROM t"), 60.0, 0.01);
     }
 
@@ -2170,7 +2540,9 @@ mod wide_many {
     fn fifty_rows_count() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        for i in 0..50 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.5)", ts(i), i)); }
+        for i in 0..50 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.5)", ts(i), i));
+        }
         assert_eq!(db.query_scalar("SELECT count(*) FROM t"), Value::I64(50));
     }
 
@@ -2178,7 +2550,9 @@ mod wide_many {
     fn fifty_rows_sum() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        for i in 0..50 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i)); }
+        for i in 0..50 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i));
+        }
         assert_f64_near(&db.query_scalar("SELECT sum(v) FROM t"), 1225.0, 0.01);
     }
 
@@ -2186,7 +2560,9 @@ mod wide_many {
     fn fifty_rows_min_max() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        for i in 0..50 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i)); }
+        for i in 0..50 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i));
+        }
         assert_eq!(db.query_scalar("SELECT min(v) FROM t"), Value::F64(0.0));
         assert_eq!(db.query_scalar("SELECT max(v) FROM t"), Value::F64(49.0));
     }
@@ -2195,7 +2571,9 @@ mod wide_many {
     fn fifty_rows_distinct() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        for i in 0..50 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i % 10)); }
+        for i in 0..50 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i % 10));
+        }
         let (_, r) = db.query("SELECT DISTINCT v FROM t");
         assert_eq!(r.len(), 10);
     }
@@ -2204,7 +2582,9 @@ mod wide_many {
     fn fifty_rows_order() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        for i in 0..50 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), 49 - i)); }
+        for i in 0..50 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), 49 - i));
+        }
         let (_, r) = db.query("SELECT v FROM t ORDER BY v ASC LIMIT 5");
         assert_eq!(r[0][0], Value::F64(0.0));
     }
@@ -2213,7 +2593,9 @@ mod wide_many {
     fn fifty_rows_filter() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        for i in 0..50 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i)); }
+        for i in 0..50 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i));
+        }
         let (_, r) = db.query("SELECT v FROM t WHERE v >= 40");
         assert_eq!(r.len(), 10);
     }
@@ -2223,7 +2605,14 @@ mod wide_many {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, grp VARCHAR, v DOUBLE)");
         let grps = ["A", "B", "C", "D", "E"];
-        for i in 0..50 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, '{}', {}.0)", ts(i), grps[i as usize % 5], i)); }
+        for i in 0..50 {
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, '{}', {}.0)",
+                ts(i),
+                grps[i as usize % 5],
+                i
+            ));
+        }
         let (_, r) = db.query("SELECT grp, count(*) FROM t GROUP BY grp ORDER BY grp");
         assert_eq!(r.len(), 5);
     }
@@ -2232,7 +2621,9 @@ mod wide_many {
     fn fifty_rows_between() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        for i in 0..50 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i)); }
+        for i in 0..50 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i));
+        }
         let (_, r) = db.query("SELECT v FROM t WHERE v BETWEEN 10 AND 19");
         assert_eq!(r.len(), 10);
     }
@@ -2241,7 +2632,9 @@ mod wide_many {
     fn fifty_rows_in() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        for i in 0..50 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i)); }
+        for i in 0..50 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i));
+        }
         let (_, r) = db.query("SELECT v FROM t WHERE v IN (0, 10, 20, 30, 40)");
         assert_eq!(r.len(), 5);
     }
@@ -2251,7 +2644,14 @@ mod wide_many {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, grp VARCHAR, v DOUBLE)");
         let grps = ["A", "B", "C", "D", "E"];
-        for i in 0..50 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, '{}', {}.0)", ts(i), grps[i as usize % 5], i)); }
+        for i in 0..50 {
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, '{}', {}.0)",
+                ts(i),
+                grps[i as usize % 5],
+                i
+            ));
+        }
         let (_, r) = db.query("SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c = 10");
         assert_eq!(r.len(), 5);
     }
@@ -2260,7 +2660,10 @@ mod wide_many {
     fn mixed_types() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, d DOUBLE, i BIGINT, s VARCHAR)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3.14, 42, 'hello')", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t VALUES ({}, 3.14, 42, 'hello')",
+            ts(0)
+        ));
         let (_, r) = db.query("SELECT d, i, s FROM t");
         assert_eq!(r[0][0], Value::F64(3.14));
         assert_eq!(r[0][1], Value::I64(42));
@@ -2288,71 +2691,452 @@ mod bulk_comparisons {
     fn db10() -> TestDb {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        for i in 0..10 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i * 10)); }
+        for i in 0..10 {
+            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i * 10));
+        }
         db
     }
 
-    #[test] fn gt_v0() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 0"), Value::I64(9)); }
-    #[test] fn gt_v10() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 10"), Value::I64(8)); }
-    #[test] fn gt_v20() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 20"), Value::I64(7)); }
-    #[test] fn gt_v30() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 30"), Value::I64(6)); }
-    #[test] fn gt_v40() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 40"), Value::I64(5)); }
-    #[test] fn gt_v50() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 50"), Value::I64(4)); }
-    #[test] fn gt_v60() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 60"), Value::I64(3)); }
-    #[test] fn gt_v70() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 70"), Value::I64(2)); }
-    #[test] fn gt_v80() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 80"), Value::I64(1)); }
-    #[test] fn gt_v90() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 90"), Value::I64(0)); }
-    #[test] fn lt_v10() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v < 10"), Value::I64(1)); }
-    #[test] fn lt_v20() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v < 20"), Value::I64(2)); }
-    #[test] fn lt_v30() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v < 30"), Value::I64(3)); }
-    #[test] fn lt_v40() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v < 40"), Value::I64(4)); }
-    #[test] fn lt_v50() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v < 50"), Value::I64(5)); }
-    #[test] fn lt_v60() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v < 60"), Value::I64(6)); }
-    #[test] fn lt_v70() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v < 70"), Value::I64(7)); }
-    #[test] fn lt_v80() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v < 80"), Value::I64(8)); }
-    #[test] fn lt_v90() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v < 90"), Value::I64(9)); }
-    #[test] fn gte_v0() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v >= 0"), Value::I64(10)); }
-    #[test] fn gte_v50() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v >= 50"), Value::I64(5)); }
-    #[test] fn gte_v90() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v >= 90"), Value::I64(1)); }
-    #[test] fn lte_v0() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v <= 0"), Value::I64(1)); }
-    #[test] fn lte_v50() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v <= 50"), Value::I64(6)); }
-    #[test] fn lte_v90() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v <= 90"), Value::I64(10)); }
-    #[test] fn btw_0_90() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v BETWEEN 0 AND 90"), Value::I64(10)); }
-    #[test] fn btw_20_60() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v BETWEEN 20 AND 60"), Value::I64(5)); }
-    #[test] fn in_0_50_90() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v IN (0, 50, 90)"), Value::I64(3)); }
-    #[test] fn eq_v0() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v = 0"), Value::I64(1)); }
-    #[test] fn eq_v50() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v = 50"), Value::I64(1)); }
-    #[test] fn ne_v0() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v != 0"), Value::I64(9)); }
-    #[test] fn sum10() { let db = db10(); assert_f64_near(&db.query_scalar("SELECT sum(v) FROM t"), 450.0, 0.01); }
-    #[test] fn avg10() { let db = db10(); assert_f64_near(&db.query_scalar("SELECT avg(v) FROM t"), 45.0, 0.01); }
-    #[test] fn min10() { let db = db10(); assert_eq!(db.query_scalar("SELECT min(v) FROM t"), Value::F64(0.0)); }
-    #[test] fn max10() { let db = db10(); assert_eq!(db.query_scalar("SELECT max(v) FROM t"), Value::F64(90.0)); }
-    #[test] fn first10() { let db = db10(); assert_eq!(db.query_scalar("SELECT first(v) FROM t"), Value::F64(0.0)); }
-    #[test] fn last10() { let db = db10(); assert_eq!(db.query_scalar("SELECT last(v) FROM t"), Value::F64(90.0)); }
-    #[test] fn order_asc1() { let db = db10(); let (_, r) = db.query("SELECT v FROM t ORDER BY v ASC LIMIT 1"); assert_eq!(r[0][0], Value::F64(0.0)); }
-    #[test] fn order_desc1() { let db = db10(); let (_, r) = db.query("SELECT v FROM t ORDER BY v DESC LIMIT 1"); assert_eq!(r[0][0], Value::F64(90.0)); }
-    #[test] fn distinct10() { let db = db10(); let (_, r) = db.query("SELECT DISTINCT v FROM t"); assert_eq!(r.len(), 10); }
-    #[test] fn limit5() { let db = db10(); let (_, r) = db.query("SELECT v FROM t LIMIT 5"); assert_eq!(r.len(), 5); }
-    #[test] fn offset5() { let db = db10(); let (_, r) = db.query("SELECT v FROM t ORDER BY v ASC LIMIT 5 OFFSET 5"); assert_eq!(r[0][0], Value::F64(50.0)); }
-    #[test] fn case10() { let db = db10(); let (_, r) = db.query("SELECT CASE WHEN v >= 50 THEN 'high' ELSE 'low' END FROM t"); assert_eq!(r.len(), 10); }
-    #[test] fn add1() { let db = db10(); let (_, r) = db.query("SELECT v + 1 FROM t LIMIT 1"); assert_f64_near(&r[0][0], 1.0, 0.01); }
-    #[test] fn mul2() { let db = db10(); let (_, r) = db.query("SELECT v * 2 FROM t WHERE v = 50"); assert_f64_near(&r[0][0], 100.0, 0.01); }
-    #[test] fn neg10() { let db = db10(); let (_, r) = db.query("SELECT -v FROM t WHERE v = 30"); assert_f64_near(&r[0][0], -30.0, 0.01); }
-    #[test] fn cast_int() { let db = db10(); assert_eq!(db.query_scalar("SELECT CAST(v AS INT) FROM t WHERE v = 50"), Value::I64(50)); }
-    #[test] fn coalesce10() { let db = db10(); let (_, r) = db.query("SELECT coalesce(v, 0.0) FROM t"); assert_eq!(r.len(), 10); }
-    #[test] fn sum_gt_50() { let db = db10(); assert_f64_near(&db.query_scalar("SELECT sum(v) FROM t WHERE v > 50"), 300.0, 0.01); }
-    #[test] fn avg_lt_50() { let db = db10(); assert_f64_near(&db.query_scalar("SELECT avg(v) FROM t WHERE v < 50"), 20.0, 0.01); }
-    #[test] fn count_btw() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v BETWEEN 10 AND 80"), Value::I64(8)); }
-    #[test] fn min_gt_20() { let db = db10(); assert_eq!(db.query_scalar("SELECT min(v) FROM t WHERE v > 20"), Value::F64(30.0)); }
-    #[test] fn max_lt_70() { let db = db10(); assert_eq!(db.query_scalar("SELECT max(v) FROM t WHERE v < 70"), Value::F64(60.0)); }
-    #[test] fn and_gt_lt() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v > 20 AND v < 80"), Value::I64(5)); }
-    #[test] fn or_eq() { let db = db10(); assert_eq!(db.query_scalar("SELECT count(*) FROM t WHERE v = 0 OR v = 90"), Value::I64(2)); }
-    #[test] fn sample_10m() { let db = db10(); let (_, r) = db.query("SELECT count(*) FROM t SAMPLE BY 10m"); assert!(!r.is_empty()); }
-    #[test] fn div_10() { let db = db10(); let (_, r) = db.query("SELECT v / 10 FROM t WHERE v = 50"); assert_f64_near(&r[0][0], 5.0, 0.01); }
-    #[test] fn add_sub() { let db = db10(); let (_, r) = db.query("SELECT v + 10 - 5 FROM t WHERE v = 50"); assert_f64_near(&r[0][0], 55.0, 0.01); }
-    #[test] fn sub_10() { let db = db10(); let (_, r) = db.query("SELECT v - 10 FROM t WHERE v = 50"); assert_f64_near(&r[0][0], 40.0, 0.01); }
-    #[test] fn add_self() { let db = db10(); let (_, r) = db.query("SELECT v + v FROM t WHERE v = 30"); assert_f64_near(&r[0][0], 60.0, 0.01); }
-    #[test] fn sub_self() { let db = db10(); let (_, r) = db.query("SELECT v - v FROM t WHERE v = 30"); assert_f64_near(&r[0][0], 0.0, 0.01); }
+    #[test]
+    fn gt_v0() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 0"),
+            Value::I64(9)
+        );
+    }
+    #[test]
+    fn gt_v10() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 10"),
+            Value::I64(8)
+        );
+    }
+    #[test]
+    fn gt_v20() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 20"),
+            Value::I64(7)
+        );
+    }
+    #[test]
+    fn gt_v30() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 30"),
+            Value::I64(6)
+        );
+    }
+    #[test]
+    fn gt_v40() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 40"),
+            Value::I64(5)
+        );
+    }
+    #[test]
+    fn gt_v50() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 50"),
+            Value::I64(4)
+        );
+    }
+    #[test]
+    fn gt_v60() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 60"),
+            Value::I64(3)
+        );
+    }
+    #[test]
+    fn gt_v70() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 70"),
+            Value::I64(2)
+        );
+    }
+    #[test]
+    fn gt_v80() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 80"),
+            Value::I64(1)
+        );
+    }
+    #[test]
+    fn gt_v90() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 90"),
+            Value::I64(0)
+        );
+    }
+    #[test]
+    fn lt_v10() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v < 10"),
+            Value::I64(1)
+        );
+    }
+    #[test]
+    fn lt_v20() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v < 20"),
+            Value::I64(2)
+        );
+    }
+    #[test]
+    fn lt_v30() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v < 30"),
+            Value::I64(3)
+        );
+    }
+    #[test]
+    fn lt_v40() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v < 40"),
+            Value::I64(4)
+        );
+    }
+    #[test]
+    fn lt_v50() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v < 50"),
+            Value::I64(5)
+        );
+    }
+    #[test]
+    fn lt_v60() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v < 60"),
+            Value::I64(6)
+        );
+    }
+    #[test]
+    fn lt_v70() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v < 70"),
+            Value::I64(7)
+        );
+    }
+    #[test]
+    fn lt_v80() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v < 80"),
+            Value::I64(8)
+        );
+    }
+    #[test]
+    fn lt_v90() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v < 90"),
+            Value::I64(9)
+        );
+    }
+    #[test]
+    fn gte_v0() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v >= 0"),
+            Value::I64(10)
+        );
+    }
+    #[test]
+    fn gte_v50() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v >= 50"),
+            Value::I64(5)
+        );
+    }
+    #[test]
+    fn gte_v90() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v >= 90"),
+            Value::I64(1)
+        );
+    }
+    #[test]
+    fn lte_v0() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v <= 0"),
+            Value::I64(1)
+        );
+    }
+    #[test]
+    fn lte_v50() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v <= 50"),
+            Value::I64(6)
+        );
+    }
+    #[test]
+    fn lte_v90() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v <= 90"),
+            Value::I64(10)
+        );
+    }
+    #[test]
+    fn btw_0_90() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v BETWEEN 0 AND 90"),
+            Value::I64(10)
+        );
+    }
+    #[test]
+    fn btw_20_60() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v BETWEEN 20 AND 60"),
+            Value::I64(5)
+        );
+    }
+    #[test]
+    fn in_0_50_90() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v IN (0, 50, 90)"),
+            Value::I64(3)
+        );
+    }
+    #[test]
+    fn eq_v0() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v = 0"),
+            Value::I64(1)
+        );
+    }
+    #[test]
+    fn eq_v50() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v = 50"),
+            Value::I64(1)
+        );
+    }
+    #[test]
+    fn ne_v0() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v != 0"),
+            Value::I64(9)
+        );
+    }
+    #[test]
+    fn sum10() {
+        let db = db10();
+        assert_f64_near(&db.query_scalar("SELECT sum(v) FROM t"), 450.0, 0.01);
+    }
+    #[test]
+    fn avg10() {
+        let db = db10();
+        assert_f64_near(&db.query_scalar("SELECT avg(v) FROM t"), 45.0, 0.01);
+    }
+    #[test]
+    fn min10() {
+        let db = db10();
+        assert_eq!(db.query_scalar("SELECT min(v) FROM t"), Value::F64(0.0));
+    }
+    #[test]
+    fn max10() {
+        let db = db10();
+        assert_eq!(db.query_scalar("SELECT max(v) FROM t"), Value::F64(90.0));
+    }
+    #[test]
+    fn first10() {
+        let db = db10();
+        assert_eq!(db.query_scalar("SELECT first(v) FROM t"), Value::F64(0.0));
+    }
+    #[test]
+    fn last10() {
+        let db = db10();
+        assert_eq!(db.query_scalar("SELECT last(v) FROM t"), Value::F64(90.0));
+    }
+    #[test]
+    fn order_asc1() {
+        let db = db10();
+        let (_, r) = db.query("SELECT v FROM t ORDER BY v ASC LIMIT 1");
+        assert_eq!(r[0][0], Value::F64(0.0));
+    }
+    #[test]
+    fn order_desc1() {
+        let db = db10();
+        let (_, r) = db.query("SELECT v FROM t ORDER BY v DESC LIMIT 1");
+        assert_eq!(r[0][0], Value::F64(90.0));
+    }
+    #[test]
+    fn distinct10() {
+        let db = db10();
+        let (_, r) = db.query("SELECT DISTINCT v FROM t");
+        assert_eq!(r.len(), 10);
+    }
+    #[test]
+    fn limit5() {
+        let db = db10();
+        let (_, r) = db.query("SELECT v FROM t LIMIT 5");
+        assert_eq!(r.len(), 5);
+    }
+    #[test]
+    fn offset5() {
+        let db = db10();
+        let (_, r) = db.query("SELECT v FROM t ORDER BY v ASC LIMIT 5 OFFSET 5");
+        assert_eq!(r[0][0], Value::F64(50.0));
+    }
+    #[test]
+    fn case10() {
+        let db = db10();
+        let (_, r) = db.query("SELECT CASE WHEN v >= 50 THEN 'high' ELSE 'low' END FROM t");
+        assert_eq!(r.len(), 10);
+    }
+    #[test]
+    fn add1() {
+        let db = db10();
+        let (_, r) = db.query("SELECT v + 1 FROM t LIMIT 1");
+        assert_f64_near(&r[0][0], 1.0, 0.01);
+    }
+    #[test]
+    fn mul2() {
+        let db = db10();
+        let (_, r) = db.query("SELECT v * 2 FROM t WHERE v = 50");
+        assert_f64_near(&r[0][0], 100.0, 0.01);
+    }
+    #[test]
+    fn neg10() {
+        let db = db10();
+        let (_, r) = db.query("SELECT -v FROM t WHERE v = 30");
+        assert_f64_near(&r[0][0], -30.0, 0.01);
+    }
+    #[test]
+    fn cast_int() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT CAST(v AS INT) FROM t WHERE v = 50"),
+            Value::I64(50)
+        );
+    }
+    #[test]
+    fn coalesce10() {
+        let db = db10();
+        let (_, r) = db.query("SELECT coalesce(v, 0.0) FROM t");
+        assert_eq!(r.len(), 10);
+    }
+    #[test]
+    fn sum_gt_50() {
+        let db = db10();
+        assert_f64_near(
+            &db.query_scalar("SELECT sum(v) FROM t WHERE v > 50"),
+            300.0,
+            0.01,
+        );
+    }
+    #[test]
+    fn avg_lt_50() {
+        let db = db10();
+        assert_f64_near(
+            &db.query_scalar("SELECT avg(v) FROM t WHERE v < 50"),
+            20.0,
+            0.01,
+        );
+    }
+    #[test]
+    fn count_btw() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v BETWEEN 10 AND 80"),
+            Value::I64(8)
+        );
+    }
+    #[test]
+    fn min_gt_20() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT min(v) FROM t WHERE v > 20"),
+            Value::F64(30.0)
+        );
+    }
+    #[test]
+    fn max_lt_70() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT max(v) FROM t WHERE v < 70"),
+            Value::F64(60.0)
+        );
+    }
+    #[test]
+    fn and_gt_lt() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v > 20 AND v < 80"),
+            Value::I64(5)
+        );
+    }
+    #[test]
+    fn or_eq() {
+        let db = db10();
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM t WHERE v = 0 OR v = 90"),
+            Value::I64(2)
+        );
+    }
+    #[test]
+    fn sample_10m() {
+        let db = db10();
+        let (_, r) = db.query("SELECT count(*) FROM t SAMPLE BY 10m");
+        assert!(!r.is_empty());
+    }
+    #[test]
+    fn div_10() {
+        let db = db10();
+        let (_, r) = db.query("SELECT v / 10 FROM t WHERE v = 50");
+        assert_f64_near(&r[0][0], 5.0, 0.01);
+    }
+    #[test]
+    fn add_sub() {
+        let db = db10();
+        let (_, r) = db.query("SELECT v + 10 - 5 FROM t WHERE v = 50");
+        assert_f64_near(&r[0][0], 55.0, 0.01);
+    }
+    #[test]
+    fn sub_10() {
+        let db = db10();
+        let (_, r) = db.query("SELECT v - 10 FROM t WHERE v = 50");
+        assert_f64_near(&r[0][0], 40.0, 0.01);
+    }
+    #[test]
+    fn add_self() {
+        let db = db10();
+        let (_, r) = db.query("SELECT v + v FROM t WHERE v = 30");
+        assert_f64_near(&r[0][0], 60.0, 0.01);
+    }
+    #[test]
+    fn sub_self() {
+        let db = db10();
+        let (_, r) = db.query("SELECT v - v FROM t WHERE v = 30");
+        assert_f64_near(&r[0][0], 0.0, 0.01);
+    }
 }
 
 // =============================================================================
@@ -2361,57 +3145,284 @@ mod bulk_comparisons {
 mod where_agg_combos {
     use super::*;
 
-    fn mk() -> TestDb { let db = TestDb::new(); db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE, g VARCHAR)"); for i in 0..20 { db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.5, '{}')", ts(i), i * 5, if i % 2 == 0 { "even" } else { "odd" })); } db }
+    fn mk() -> TestDb {
+        let db = TestDb::new();
+        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE, g VARCHAR)");
+        for i in 0..20 {
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, {}.5, '{}')",
+                ts(i),
+                i * 5,
+                if i % 2 == 0 { "even" } else { "odd" }
+            ));
+        }
+        db
+    }
 
-    #[test] fn count_all() { assert_eq!(mk().query_scalar("SELECT count(*) FROM t"), Value::I64(20)); }
-    #[test] fn count_even() { assert_eq!(mk().query_scalar("SELECT count(*) FROM t WHERE g = 'even'"), Value::I64(10)); }
-    #[test] fn count_odd() { assert_eq!(mk().query_scalar("SELECT count(*) FROM t WHERE g = 'odd'"), Value::I64(10)); }
-    #[test] fn sum_all() { assert_f64_near(&mk().query_scalar("SELECT sum(v) FROM t"), 960.0, 1.0); }
-    #[test] fn min_all() { assert_f64_near(&mk().query_scalar("SELECT min(v) FROM t"), 0.5, 0.01); }
-    #[test] fn max_all() { assert_f64_near(&mk().query_scalar("SELECT max(v) FROM t"), 95.5, 0.01); }
-    #[test] fn avg_all() { assert_f64_near(&mk().query_scalar("SELECT avg(v) FROM t"), 48.0, 0.01); }
-    #[test] fn first_all() { assert_f64_near(&mk().query_scalar("SELECT first(v) FROM t"), 0.5, 0.01); }
-    #[test] fn last_all() { assert_f64_near(&mk().query_scalar("SELECT last(v) FROM t"), 95.5, 0.01); }
-    #[test] fn count_gt_50() { assert_eq!(mk().query_scalar("SELECT count(*) FROM t WHERE v > 50"), Value::I64(10)); }
-    #[test] fn count_lt_50() { assert_eq!(mk().query_scalar("SELECT count(*) FROM t WHERE v < 50"), Value::I64(10)); }
-    #[test] fn count_btw() { assert_eq!(mk().query_scalar("SELECT count(*) FROM t WHERE v BETWEEN 20 AND 70"), Value::I64(10)); }
-    #[test] fn grp_count() { let (_, r) = mk().query("SELECT g, count(*) FROM t GROUP BY g ORDER BY g"); assert_eq!(r.len(), 2); }
-    #[test] fn grp_sum() { let (_, r) = mk().query("SELECT g, sum(v) FROM t GROUP BY g ORDER BY g"); assert_eq!(r.len(), 2); }
-    #[test] fn grp_min() { let (_, r) = mk().query("SELECT g, min(v) FROM t GROUP BY g ORDER BY g"); assert_eq!(r.len(), 2); }
-    #[test] fn grp_max() { let (_, r) = mk().query("SELECT g, max(v) FROM t GROUP BY g ORDER BY g"); assert_eq!(r.len(), 2); }
-    #[test] fn grp_avg() { let (_, r) = mk().query("SELECT g, avg(v) FROM t GROUP BY g ORDER BY g"); assert_eq!(r.len(), 2); }
-    #[test] fn grp_first() { let (_, r) = mk().query("SELECT g, first(v) FROM t GROUP BY g ORDER BY g"); assert_eq!(r.len(), 2); }
-    #[test] fn grp_last() { let (_, r) = mk().query("SELECT g, last(v) FROM t GROUP BY g ORDER BY g"); assert_eq!(r.len(), 2); }
-    #[test] fn having_gt_5() { let (_, r) = mk().query("SELECT g, count(*) AS c FROM t GROUP BY g HAVING c > 5"); assert_eq!(r.len(), 2); }
-    #[test] fn having_sum_gt_400() { let (_, r) = mk().query("SELECT g, sum(v) AS s FROM t GROUP BY g HAVING s > 400"); assert_eq!(r.len(), 2); }
-    #[test] fn order_asc_l5() { let (_, r) = mk().query("SELECT v FROM t ORDER BY v ASC LIMIT 5"); assert_eq!(r.len(), 5); }
-    #[test] fn order_desc_l5() { let (_, r) = mk().query("SELECT v FROM t ORDER BY v DESC LIMIT 5"); assert_eq!(r.len(), 5); }
-    #[test] fn distinct_g() { let (_, r) = mk().query("SELECT DISTINCT g FROM t"); assert_eq!(r.len(), 2); }
-    #[test] fn distinct_v() { let (_, r) = mk().query("SELECT DISTINCT v FROM t"); assert_eq!(r.len(), 20); }
-    #[test] fn case_hl() { let (_, r) = mk().query("SELECT CASE WHEN v > 50 THEN 'high' ELSE 'low' END FROM t"); assert_eq!(r.len(), 20); }
-    #[test] fn add_10() { let (_, r) = mk().query("SELECT v + 10 FROM t LIMIT 1"); assert_f64_near(&r[0][0], 10.5, 0.01); }
-    #[test] fn neg_v() { let v = mk().query_scalar("SELECT -v FROM t WHERE v = 50.5"); assert_f64_near(&v, -50.5, 0.01); }
-    #[test] fn in_3() { assert_eq!(mk().query_scalar("SELECT count(*) FROM t WHERE v IN (0.5, 50.5, 95.5)"), Value::I64(3)); }
-    #[test] fn not_in_3() { assert_eq!(mk().query_scalar("SELECT count(*) FROM t WHERE v NOT IN (0.5, 50.5, 95.5)"), Value::I64(17)); }
-    #[test] fn cast_int() { assert_eq!(mk().query_scalar("SELECT CAST(v AS INT) FROM t WHERE v = 50.5"), Value::I64(50)); }
-    #[test] fn coalesce_v() { let (_, r) = mk().query("SELECT coalesce(v, 0.0) FROM t"); assert_eq!(r.len(), 20); }
-    #[test] fn sample_1h() { let (_, r) = mk().query("SELECT count(*) FROM t SAMPLE BY 1h"); assert!(!r.is_empty()); }
-    #[test] fn limit_10() { let (_, r) = mk().query("SELECT v FROM t LIMIT 10"); assert_eq!(r.len(), 10); }
-    #[test] fn offset_10() { let (_, r) = mk().query("SELECT v FROM t ORDER BY v ASC LIMIT 10 OFFSET 10"); assert_eq!(r.len(), 10); }
-    #[test] fn star() { let (c, r) = mk().query("SELECT * FROM t LIMIT 5"); assert_eq!(c.len(), 3); assert_eq!(r.len(), 5); }
-    #[test] fn where_and_order() { let (_, r) = mk().query("SELECT v FROM t WHERE v > 50 ORDER BY v ASC LIMIT 3"); assert_eq!(r.len(), 3); }
-    #[test] fn where_and_distinct() { let (_, r) = mk().query("SELECT DISTINCT g FROM t WHERE v > 50"); assert_eq!(r.len(), 2); }
-    #[test] fn mul_3() { let v = mk().query_scalar("SELECT v * 3 FROM t WHERE v = 10.5"); assert_f64_near(&v, 31.5, 0.01); }
-    #[test] fn sub_5() { let v = mk().query_scalar("SELECT v - 5 FROM t WHERE v = 10.5"); assert_f64_near(&v, 5.5, 0.01); }
-    #[test] fn div_5() { let v = mk().query_scalar("SELECT v / 5 FROM t WHERE v = 50.5"); assert_f64_near(&v, 10.1, 0.01); }
-    #[test] fn alias_select() { let (c, _) = mk().query("SELECT v AS val, g AS grp FROM t LIMIT 1"); assert!(c.contains(&"val".to_string())); }
-    #[test] fn two_aggs() { let (_, r) = mk().query("SELECT min(v), max(v) FROM t"); assert_eq!(r.len(), 1); }
-    #[test] fn three_aggs() { let (_, r) = mk().query("SELECT count(*), sum(v), avg(v) FROM t"); assert_eq!(r[0][0], Value::I64(20)); }
-    #[test] fn four_aggs() { let (_, r) = mk().query("SELECT count(*), min(v), max(v), sum(v) FROM t"); assert_eq!(r.len(), 1); }
-    #[test] fn grp_limit() { let (_, r) = mk().query("SELECT g, sum(v) FROM t GROUP BY g ORDER BY g LIMIT 1"); assert_eq!(r.len(), 1); }
-    #[test] fn eq_and_order() { let (_, r) = mk().query("SELECT v FROM t WHERE g = 'even' ORDER BY v ASC LIMIT 3"); assert_eq!(r.len(), 3); }
-    #[test] fn btw_and_grp() { let (_, r) = mk().query("SELECT g, count(*) FROM t WHERE v BETWEEN 20 AND 70 GROUP BY g ORDER BY g"); assert_eq!(r.len(), 2); }
-    #[test] fn case_even_odd() { let (_, r) = mk().query("SELECT CASE WHEN g = 'even' THEN 'E' ELSE 'O' END FROM t"); assert_eq!(r.len(), 20); }
-    #[test] fn add_sub() { let v = mk().query_scalar("SELECT v + 10 - 5 FROM t WHERE v = 50.5"); assert_f64_near(&v, 55.5, 0.01); }
-    #[test] fn mul_div() { let v = mk().query_scalar("SELECT v * 2 / 2 FROM t WHERE v = 50.5"); assert_f64_near(&v, 50.5, 0.01); }
+    #[test]
+    fn count_all() {
+        assert_eq!(mk().query_scalar("SELECT count(*) FROM t"), Value::I64(20));
+    }
+    #[test]
+    fn count_even() {
+        assert_eq!(
+            mk().query_scalar("SELECT count(*) FROM t WHERE g = 'even'"),
+            Value::I64(10)
+        );
+    }
+    #[test]
+    fn count_odd() {
+        assert_eq!(
+            mk().query_scalar("SELECT count(*) FROM t WHERE g = 'odd'"),
+            Value::I64(10)
+        );
+    }
+    #[test]
+    fn sum_all() {
+        assert_f64_near(&mk().query_scalar("SELECT sum(v) FROM t"), 960.0, 1.0);
+    }
+    #[test]
+    fn min_all() {
+        assert_f64_near(&mk().query_scalar("SELECT min(v) FROM t"), 0.5, 0.01);
+    }
+    #[test]
+    fn max_all() {
+        assert_f64_near(&mk().query_scalar("SELECT max(v) FROM t"), 95.5, 0.01);
+    }
+    #[test]
+    fn avg_all() {
+        assert_f64_near(&mk().query_scalar("SELECT avg(v) FROM t"), 48.0, 0.01);
+    }
+    #[test]
+    fn first_all() {
+        assert_f64_near(&mk().query_scalar("SELECT first(v) FROM t"), 0.5, 0.01);
+    }
+    #[test]
+    fn last_all() {
+        assert_f64_near(&mk().query_scalar("SELECT last(v) FROM t"), 95.5, 0.01);
+    }
+    #[test]
+    fn count_gt_50() {
+        assert_eq!(
+            mk().query_scalar("SELECT count(*) FROM t WHERE v > 50"),
+            Value::I64(10)
+        );
+    }
+    #[test]
+    fn count_lt_50() {
+        assert_eq!(
+            mk().query_scalar("SELECT count(*) FROM t WHERE v < 50"),
+            Value::I64(10)
+        );
+    }
+    #[test]
+    fn count_btw() {
+        assert_eq!(
+            mk().query_scalar("SELECT count(*) FROM t WHERE v BETWEEN 20 AND 70"),
+            Value::I64(10)
+        );
+    }
+    #[test]
+    fn grp_count() {
+        let (_, r) = mk().query("SELECT g, count(*) FROM t GROUP BY g ORDER BY g");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn grp_sum() {
+        let (_, r) = mk().query("SELECT g, sum(v) FROM t GROUP BY g ORDER BY g");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn grp_min() {
+        let (_, r) = mk().query("SELECT g, min(v) FROM t GROUP BY g ORDER BY g");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn grp_max() {
+        let (_, r) = mk().query("SELECT g, max(v) FROM t GROUP BY g ORDER BY g");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn grp_avg() {
+        let (_, r) = mk().query("SELECT g, avg(v) FROM t GROUP BY g ORDER BY g");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn grp_first() {
+        let (_, r) = mk().query("SELECT g, first(v) FROM t GROUP BY g ORDER BY g");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn grp_last() {
+        let (_, r) = mk().query("SELECT g, last(v) FROM t GROUP BY g ORDER BY g");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn having_gt_5() {
+        let (_, r) = mk().query("SELECT g, count(*) AS c FROM t GROUP BY g HAVING c > 5");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn having_sum_gt_400() {
+        let (_, r) = mk().query("SELECT g, sum(v) AS s FROM t GROUP BY g HAVING s > 400");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn order_asc_l5() {
+        let (_, r) = mk().query("SELECT v FROM t ORDER BY v ASC LIMIT 5");
+        assert_eq!(r.len(), 5);
+    }
+    #[test]
+    fn order_desc_l5() {
+        let (_, r) = mk().query("SELECT v FROM t ORDER BY v DESC LIMIT 5");
+        assert_eq!(r.len(), 5);
+    }
+    #[test]
+    fn distinct_g() {
+        let (_, r) = mk().query("SELECT DISTINCT g FROM t");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn distinct_v() {
+        let (_, r) = mk().query("SELECT DISTINCT v FROM t");
+        assert_eq!(r.len(), 20);
+    }
+    #[test]
+    fn case_hl() {
+        let (_, r) = mk().query("SELECT CASE WHEN v > 50 THEN 'high' ELSE 'low' END FROM t");
+        assert_eq!(r.len(), 20);
+    }
+    #[test]
+    fn add_10() {
+        let (_, r) = mk().query("SELECT v + 10 FROM t LIMIT 1");
+        assert_f64_near(&r[0][0], 10.5, 0.01);
+    }
+    #[test]
+    fn neg_v() {
+        let v = mk().query_scalar("SELECT -v FROM t WHERE v = 50.5");
+        assert_f64_near(&v, -50.5, 0.01);
+    }
+    #[test]
+    fn in_3() {
+        assert_eq!(
+            mk().query_scalar("SELECT count(*) FROM t WHERE v IN (0.5, 50.5, 95.5)"),
+            Value::I64(3)
+        );
+    }
+    #[test]
+    fn not_in_3() {
+        assert_eq!(
+            mk().query_scalar("SELECT count(*) FROM t WHERE v NOT IN (0.5, 50.5, 95.5)"),
+            Value::I64(17)
+        );
+    }
+    #[test]
+    fn cast_int() {
+        assert_eq!(
+            mk().query_scalar("SELECT CAST(v AS INT) FROM t WHERE v = 50.5"),
+            Value::I64(50)
+        );
+    }
+    #[test]
+    fn coalesce_v() {
+        let (_, r) = mk().query("SELECT coalesce(v, 0.0) FROM t");
+        assert_eq!(r.len(), 20);
+    }
+    #[test]
+    fn sample_1h() {
+        let (_, r) = mk().query("SELECT count(*) FROM t SAMPLE BY 1h");
+        assert!(!r.is_empty());
+    }
+    #[test]
+    fn limit_10() {
+        let (_, r) = mk().query("SELECT v FROM t LIMIT 10");
+        assert_eq!(r.len(), 10);
+    }
+    #[test]
+    fn offset_10() {
+        let (_, r) = mk().query("SELECT v FROM t ORDER BY v ASC LIMIT 10 OFFSET 10");
+        assert_eq!(r.len(), 10);
+    }
+    #[test]
+    fn star() {
+        let (c, r) = mk().query("SELECT * FROM t LIMIT 5");
+        assert_eq!(c.len(), 3);
+        assert_eq!(r.len(), 5);
+    }
+    #[test]
+    fn where_and_order() {
+        let (_, r) = mk().query("SELECT v FROM t WHERE v > 50 ORDER BY v ASC LIMIT 3");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn where_and_distinct() {
+        let (_, r) = mk().query("SELECT DISTINCT g FROM t WHERE v > 50");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn mul_3() {
+        let v = mk().query_scalar("SELECT v * 3 FROM t WHERE v = 10.5");
+        assert_f64_near(&v, 31.5, 0.01);
+    }
+    #[test]
+    fn sub_5() {
+        let v = mk().query_scalar("SELECT v - 5 FROM t WHERE v = 10.5");
+        assert_f64_near(&v, 5.5, 0.01);
+    }
+    #[test]
+    fn div_5() {
+        let v = mk().query_scalar("SELECT v / 5 FROM t WHERE v = 50.5");
+        assert_f64_near(&v, 10.1, 0.01);
+    }
+    #[test]
+    fn alias_select() {
+        let (c, _) = mk().query("SELECT v AS val, g AS grp FROM t LIMIT 1");
+        assert!(c.contains(&"val".to_string()));
+    }
+    #[test]
+    fn two_aggs() {
+        let (_, r) = mk().query("SELECT min(v), max(v) FROM t");
+        assert_eq!(r.len(), 1);
+    }
+    #[test]
+    fn three_aggs() {
+        let (_, r) = mk().query("SELECT count(*), sum(v), avg(v) FROM t");
+        assert_eq!(r[0][0], Value::I64(20));
+    }
+    #[test]
+    fn four_aggs() {
+        let (_, r) = mk().query("SELECT count(*), min(v), max(v), sum(v) FROM t");
+        assert_eq!(r.len(), 1);
+    }
+    #[test]
+    fn grp_limit() {
+        let (_, r) = mk().query("SELECT g, sum(v) FROM t GROUP BY g ORDER BY g LIMIT 1");
+        assert_eq!(r.len(), 1);
+    }
+    #[test]
+    fn eq_and_order() {
+        let (_, r) = mk().query("SELECT v FROM t WHERE g = 'even' ORDER BY v ASC LIMIT 3");
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn btw_and_grp() {
+        let (_, r) =
+            mk().query("SELECT g, count(*) FROM t WHERE v BETWEEN 20 AND 70 GROUP BY g ORDER BY g");
+        assert_eq!(r.len(), 2);
+    }
+    #[test]
+    fn case_even_odd() {
+        let (_, r) = mk().query("SELECT CASE WHEN g = 'even' THEN 'E' ELSE 'O' END FROM t");
+        assert_eq!(r.len(), 20);
+    }
+    #[test]
+    fn add_sub() {
+        let v = mk().query_scalar("SELECT v + 10 - 5 FROM t WHERE v = 50.5");
+        assert_f64_near(&v, 55.5, 0.01);
+    }
+    #[test]
+    fn mul_div() {
+        let v = mk().query_scalar("SELECT v * 2 / 2 FROM t WHERE v = 50.5");
+        assert_f64_near(&v, 50.5, 0.01);
+    }
 }

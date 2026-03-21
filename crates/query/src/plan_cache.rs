@@ -5,8 +5,8 @@
 //! when they exceed the configured TTL.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use exchange_common::hash::xxh3_64;
@@ -95,10 +95,11 @@ impl PlanCache {
 
                 // Upgrade to write lock to update access time.
                 if let Ok(mut cache) = self.cache.write()
-                    && let Some(entry) = cache.get_mut(&hash) {
-                        entry.last_accessed = now;
-                        entry.hit_count += 1;
-                    }
+                    && let Some(entry) = cache.get_mut(&hash)
+                {
+                    entry.last_accessed = now;
+                    entry.hit_count += 1;
+                }
 
                 self.hits.fetch_add(1, Ordering::Relaxed);
                 return Some(plan);
@@ -204,22 +205,27 @@ fn plan_references_table(plan: &QueryPlan, table_name: &str) -> bool {
         QueryPlan::Insert { table, .. } => table == table_name,
         QueryPlan::Delete { table, .. } => table == table_name,
         QueryPlan::Update { table, .. } => table == table_name,
-        QueryPlan::Join { left_table, right_table, .. } => {
-            left_table == table_name || right_table == table_name
-        }
-        QueryPlan::MultiJoin { left, right_table, .. } => {
-            right_table == table_name || plan_references_table(left, table_name)
-        }
-        QueryPlan::AsofJoin { left_table, right_table, .. } => {
-            left_table == table_name || right_table == table_name
-        }
+        QueryPlan::Join {
+            left_table,
+            right_table,
+            ..
+        } => left_table == table_name || right_table == table_name,
+        QueryPlan::MultiJoin {
+            left, right_table, ..
+        } => right_table == table_name || plan_references_table(left, table_name),
+        QueryPlan::AsofJoin {
+            left_table,
+            right_table,
+            ..
+        } => left_table == table_name || right_table == table_name,
         QueryPlan::Explain { query } => plan_references_table(query, table_name),
         QueryPlan::ExplainAnalyze { query } => plan_references_table(query, table_name),
         QueryPlan::SetOperation { left, right, .. } => {
             plan_references_table(left, table_name) || plan_references_table(right, table_name)
         }
         QueryPlan::WithCte { ctes, body } => {
-            ctes.iter().any(|c| plan_references_table(&c.query, table_name))
+            ctes.iter()
+                .any(|c| plan_references_table(&c.query, table_name))
                 || plan_references_table(body, table_name)
         }
         QueryPlan::DerivedScan { subquery, .. } => plan_references_table(subquery, table_name),
@@ -236,7 +242,7 @@ fn plan_references_table(plan: &QueryPlan, table_name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plan::{SelectColumn, Value, Filter, OrderBy};
+    use crate::plan::{Filter, OrderBy, SelectColumn, Value};
 
     fn sample_plan(table: &str) -> QueryPlan {
         QueryPlan::Select {

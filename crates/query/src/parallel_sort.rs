@@ -9,11 +9,7 @@ use crate::plan::{OrderBy, Value};
 ///
 /// Splits `rows` into `parallelism` chunks, sorts each in parallel with
 /// rayon, then merges. Falls back to sequential sort for small datasets.
-pub fn parallel_sort(
-    rows: &mut Vec<Vec<Value>>,
-    order_by: &[OrderBy],
-    parallelism: usize,
-) {
+pub fn parallel_sort(rows: &mut Vec<Vec<Value>>, order_by: &[OrderBy], parallelism: usize) {
     if rows.len() < 1024 || parallelism <= 1 || order_by.is_empty() {
         // For small datasets, sequential sort is faster (no thread overhead).
         sequential_sort(rows, order_by);
@@ -99,10 +95,7 @@ fn column_index_for_sort(col: &str) -> Option<usize> {
 }
 
 /// K-way merge of pre-sorted chunks.
-fn k_way_merge(
-    chunks: Vec<Vec<Vec<Value>>>,
-    order_by: &[OrderBy],
-) -> Vec<Vec<Value>> {
+fn k_way_merge(chunks: Vec<Vec<Vec<Value>>>, order_by: &[OrderBy]) -> Vec<Vec<Value>> {
     let total: usize = chunks.iter().map(|c| c.len()).sum();
     let mut result = Vec::with_capacity(total);
 
@@ -151,10 +144,7 @@ mod tests {
 
     #[test]
     fn parallel_sort_matches_sequential() {
-        let mut rows_par: Vec<Vec<Value>> = (0..1000)
-            .rev()
-            .map(|i| make_row(i))
-            .collect();
+        let mut rows_par: Vec<Vec<Value>> = (0..1000).rev().map(|i| make_row(i)).collect();
         let mut rows_seq = rows_par.clone();
 
         let order_by = vec![OrderBy {

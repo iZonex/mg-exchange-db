@@ -16,7 +16,11 @@ pub struct SampledScanCursor {
 
 impl SampledScanCursor {
     pub fn new(source: Box<dyn RecordCursor>, step: usize) -> Self {
-        Self { source, step: step.max(1), counter: 0 }
+        Self {
+            source,
+            step: step.max(1),
+            counter: 0,
+        }
     }
 }
 
@@ -37,14 +41,20 @@ impl RecordCursor for SampledScanCursor {
                             let row: Vec<Value> =
                                 (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                             result.append_row(&row);
-                            if result.row_count() >= max_rows { break; }
+                            if result.row_count() >= max_rows {
+                                break;
+                            }
                         }
                         self.counter += 1;
                     }
                 }
             }
         }
-        if result.row_count() == 0 { Ok(None) } else { Ok(Some(result)) }
+        if result.row_count() == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(result))
+        }
     }
 }
 

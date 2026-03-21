@@ -21,15 +21,23 @@ impl ParallelAggregateCursor {
             ("sum".to_string(), ColumnType::F64),
             ("count".to_string(), ColumnType::I64),
         ];
-        Self { children, schema, emitted: false }
+        Self {
+            children,
+            schema,
+            emitted: false,
+        }
     }
 }
 
 impl RecordCursor for ParallelAggregateCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, _max_rows: usize) -> Result<Option<RecordBatch>> {
-        if self.emitted { return Ok(None); }
+        if self.emitted {
+            return Ok(None);
+        }
         self.emitted = true;
 
         let mut total_sum = 0.0f64;
@@ -38,8 +46,12 @@ impl RecordCursor for ParallelAggregateCursor {
         for child in &mut self.children {
             while let Some(b) = child.next_batch(1024)? {
                 for r in 0..b.row_count() {
-                    if let Value::F64(s) = b.get_value(r, 0) { total_sum += s; }
-                    if let Value::I64(c) = b.get_value(r, 1) { total_count += c; }
+                    if let Value::F64(s) = b.get_value(r, 0) {
+                        total_sum += s;
+                    }
+                    if let Value::I64(c) = b.get_value(r, 1) {
+                        total_count += c;
+                    }
                 }
             }
         }
@@ -57,7 +69,10 @@ mod tests {
 
     #[test]
     fn merges_partial_aggregates() {
-        let schema = vec![("sum".to_string(), ColumnType::F64), ("count".to_string(), ColumnType::I64)];
+        let schema = vec![
+            ("sum".to_string(), ColumnType::F64),
+            ("count".to_string(), ColumnType::I64),
+        ];
         let c1 = MemoryCursor::from_rows(schema.clone(), &[vec![Value::F64(100.0), Value::I64(5)]]);
         let c2 = MemoryCursor::from_rows(schema, &[vec![Value::F64(200.0), Value::I64(10)]]);
         let mut cursor = ParallelAggregateCursor::new(vec![Box::new(c1), Box::new(c2)]);

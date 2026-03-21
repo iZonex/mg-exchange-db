@@ -2,8 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use sha2::{Digest, Sha256};
 
 /// Errors that can occur during service account operations.
@@ -116,10 +116,7 @@ impl ServiceAccountStore {
         data.accounts.push(account);
         self.save(&data)?;
 
-        Ok(ServiceAccountCredentials {
-            api_key,
-            secret,
-        })
+        Ok(ServiceAccountCredentials { api_key, secret })
     }
 
     /// Authenticate a service account using an API key and plaintext secret.
@@ -249,7 +246,7 @@ fn generate_secret() -> String {
 ///
 /// Returns a PHC-formatted hash string (includes salt, params, and hash).
 fn hash_secret(secret: &str) -> String {
-    use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
+    use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
     let salt = SaltString::generate(&mut rand::thread_rng());
     Argon2::default()
         .hash_password(secret.as_bytes(), &salt)
@@ -264,7 +261,7 @@ fn hash_secret(secret: &str) -> String {
 fn verify_secret(secret: &str, stored_hash: &str) -> bool {
     // Argon2id PHC hashes start with "$argon2id$"
     if stored_hash.starts_with("$argon2") {
-        use argon2::{password_hash::PasswordHash, Argon2, PasswordVerifier};
+        use argon2::{Argon2, PasswordVerifier, password_hash::PasswordHash};
         match PasswordHash::new(stored_hash) {
             Ok(parsed) => Argon2::default()
                 .verify_password(secret.as_bytes(), &parsed)
@@ -323,13 +320,14 @@ pub fn extract_credentials(headers: &axum::http::HeaderMap) -> Option<(String, S
     // Try Authorization: Basic.
     if let Some(auth) = headers.get("authorization").and_then(|v| v.to_str().ok())
         && let Some(encoded) = auth.strip_prefix("Basic ")
-            && let Ok(decoded) = URL_SAFE_NO_PAD
-                .decode(encoded)
-                .or_else(|_| base64::engine::general_purpose::STANDARD.decode(encoded))
-                && let Ok(cred_str) = String::from_utf8(decoded)
-                    && let Some((key, secret)) = cred_str.split_once(':') {
-                        return Some((key.to_string(), secret.to_string()));
-                    }
+        && let Ok(decoded) = URL_SAFE_NO_PAD
+            .decode(encoded)
+            .or_else(|_| base64::engine::general_purpose::STANDARD.decode(encoded))
+        && let Ok(cred_str) = String::from_utf8(decoded)
+        && let Some((key, secret)) = cred_str.split_once(':')
+    {
+        return Some((key.to_string(), secret.to_string()));
+    }
 
     None
 }
@@ -383,9 +381,7 @@ mod tests {
     fn test_authenticate_unknown_key() {
         let (_dir, store) = setup_store();
 
-        let result = store
-            .authenticate("unknown-key", "some-secret")
-            .unwrap();
+        let result = store.authenticate("unknown-key", "some-secret").unwrap();
         assert!(result.is_none());
     }
 

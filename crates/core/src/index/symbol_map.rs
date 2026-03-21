@@ -50,15 +50,15 @@ impl SymbolMap {
         // Rebuild in-memory index from persisted data.
         for id in 0..symbol_count {
             let off_pos = id as u64 * 8;
-            let char_offset = u64::from_le_bytes(
-                offsets.read_at(off_pos, 8).try_into().unwrap(),
-            );
+            let char_offset = u64::from_le_bytes(offsets.read_at(off_pos, 8).try_into().unwrap());
 
             let len_bytes = chars.read_at(char_offset, 4);
             let str_len = u32::from_le_bytes(len_bytes.try_into().unwrap()) as usize;
             let str_bytes = chars.read_at(char_offset + 4, str_len);
             let s = std::str::from_utf8(str_bytes)
-                .map_err(|e| ExchangeDbError::Corruption(format!("invalid UTF-8 in symbol map: {}", e)))?
+                .map_err(|e| {
+                    ExchangeDbError::Corruption(format!("invalid UTF-8 in symbol map: {}", e))
+                })?
                 .to_string();
 
             let hash = xxh3_64(s.as_bytes());

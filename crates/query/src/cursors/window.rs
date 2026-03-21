@@ -6,7 +6,7 @@ use exchange_common::types::ColumnType;
 use crate::batch::RecordBatch;
 use crate::plan::Value;
 use crate::record_cursor::RecordCursor;
-use crate::window::{apply_window_functions, WindowFunction};
+use crate::window::{WindowFunction, apply_window_functions};
 
 /// Window function cursor: materializes the source, applies window functions,
 /// and streams out the result with window columns appended.
@@ -33,10 +33,7 @@ impl WindowCursor {
 
         // Add output columns for each window function.
         for wf in &window_fns {
-            let col_name = wf
-                .alias
-                .clone()
-                .unwrap_or_else(|| format!("{}", wf));
+            let col_name = wf.alias.clone().unwrap_or_else(|| format!("{}", wf));
             // Window functions typically produce I64 (row_number, rank, count)
             // or F64 (sum, avg) or same type as input (lag, lead, first_value, last_value).
             // Use I64 as default — the RecordBatch will coerce.

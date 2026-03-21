@@ -25,15 +25,28 @@ pub struct CaseWhenCursor {
 }
 
 impl CaseWhenCursor {
-    pub fn new(source: Box<dyn RecordCursor>, branches: Vec<WhenBranch>, else_val: Value, output_name: &str) -> Self {
+    pub fn new(
+        source: Box<dyn RecordCursor>,
+        branches: Vec<WhenBranch>,
+        else_val: Value,
+        output_name: &str,
+    ) -> Self {
         let mut schema = source.schema().to_vec();
         schema.push((output_name.to_string(), ColumnType::Varchar));
-        Self { source, branches, else_val, output_name: output_name.to_string(), schema }
+        Self {
+            source,
+            branches,
+            else_val,
+            output_name: output_name.to_string(),
+            schema,
+        }
     }
 }
 
 impl RecordCursor for CaseWhenCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
         match self.source.next_batch(max_rows)? {
@@ -43,7 +56,9 @@ impl RecordCursor for CaseWhenCursor {
                 let ncols = b.columns.len();
                 for r in 0..b.row_count() {
                     let mut row: Vec<Value> = (0..ncols).map(|c| b.get_value(r, c)).collect();
-                    let case_result = self.branches.iter()
+                    let case_result = self
+                        .branches
+                        .iter()
                         .find(|br| b.get_value(r, br.col_idx).eq_coerce(&br.equals))
                         .map(|br| br.then_val.clone())
                         .unwrap_or_else(|| self.else_val.clone());
@@ -64,13 +79,25 @@ mod tests {
     #[test]
     fn case_when_evaluates() {
         let schema = vec![("status".to_string(), ColumnType::I64)];
-        let rows = vec![vec![Value::I64(1)], vec![Value::I64(2)], vec![Value::I64(3)]];
+        let rows = vec![
+            vec![Value::I64(1)],
+            vec![Value::I64(2)],
+            vec![Value::I64(3)],
+        ];
         let source = MemoryCursor::from_rows(schema, &rows);
         let mut cursor = CaseWhenCursor::new(
             Box::new(source),
             vec![
-                WhenBranch { col_idx: 0, equals: Value::I64(1), then_val: Value::Str("active".into()) },
-                WhenBranch { col_idx: 0, equals: Value::I64(2), then_val: Value::Str("inactive".into()) },
+                WhenBranch {
+                    col_idx: 0,
+                    equals: Value::I64(1),
+                    then_val: Value::Str("active".into()),
+                },
+                WhenBranch {
+                    col_idx: 0,
+                    equals: Value::I64(2),
+                    then_val: Value::Str("inactive".into()),
+                },
             ],
             Value::Str("unknown".into()),
             "label",

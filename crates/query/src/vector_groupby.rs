@@ -239,7 +239,12 @@ pub fn can_use_vector_groupby(
 
     columns.iter().all(|c| match c {
         SelectColumn::Name(name) => group_by.contains(name),
-        SelectColumn::Aggregate { function, arg_expr, filter, .. } => {
+        SelectColumn::Aggregate {
+            function,
+            arg_expr,
+            filter,
+            ..
+        } => {
             // Vectorized path only handles simple column aggregates (no expressions, no filters).
             if arg_expr.is_some() || filter.is_some() {
                 return false;
@@ -340,9 +345,10 @@ fn accumulate_partition(
     // Iterate rows, build group keys, and accumulate.
     for row_idx in 0..row_count {
         if let Some(ref mask) = row_mask
-            && !mask[row_idx] {
-                continue;
-            }
+            && !mask[row_idx]
+        {
+            continue;
+        }
 
         let mut key = GroupKey::new();
         let mut key_values: Vec<Value> = Vec::with_capacity(group_columns.len());
@@ -465,9 +471,7 @@ fn load_column_data(partition_dir: &Path, meta: &TableMeta, col_name: &str) -> R
         .columns
         .iter()
         .find(|c| c.name == col_name)
-        .ok_or_else(|| {
-            ExchangeDbError::Query(format!("column not found: {col_name}"))
-        })?;
+        .ok_or_else(|| ExchangeDbError::Query(format!("column not found: {col_name}")))?;
 
     let col_type: ColumnType = col_def.col_type.into();
     let data_path = partition_dir.join(format!("{}.d", col_name));
@@ -606,14 +610,66 @@ fn compute_filter_mask(
             }
             Ok(mask)
         }
-        Filter::Gt(col, expected) => compute_cmp_mask(partition_dir, meta, col, expected, row_count, |a, b| a > b, |a, b| a > b),
-        Filter::Lt(col, expected) => compute_cmp_mask(partition_dir, meta, col, expected, row_count, |a, b| a < b, |a, b| a < b),
-        Filter::Gte(col, expected) => compute_cmp_mask(partition_dir, meta, col, expected, row_count, |a, b| a >= b, |a, b| a >= b),
-        Filter::Lte(col, expected) => compute_cmp_mask(partition_dir, meta, col, expected, row_count, |a, b| a <= b, |a, b| a <= b),
+        Filter::Gt(col, expected) => compute_cmp_mask(
+            partition_dir,
+            meta,
+            col,
+            expected,
+            row_count,
+            |a, b| a > b,
+            |a, b| a > b,
+        ),
+        Filter::Lt(col, expected) => compute_cmp_mask(
+            partition_dir,
+            meta,
+            col,
+            expected,
+            row_count,
+            |a, b| a < b,
+            |a, b| a < b,
+        ),
+        Filter::Gte(col, expected) => compute_cmp_mask(
+            partition_dir,
+            meta,
+            col,
+            expected,
+            row_count,
+            |a, b| a >= b,
+            |a, b| a >= b,
+        ),
+        Filter::Lte(col, expected) => compute_cmp_mask(
+            partition_dir,
+            meta,
+            col,
+            expected,
+            row_count,
+            |a, b| a <= b,
+            |a, b| a <= b,
+        ),
         Filter::Between(col, low, high) => {
-            let mask_low = compute_cmp_mask(partition_dir, meta, col, low, row_count, |a, b| a >= b, |a, b| a >= b)?;
-            let mask_high = compute_cmp_mask(partition_dir, meta, col, high, row_count, |a, b| a <= b, |a, b| a <= b)?;
-            Ok(mask_low.iter().zip(mask_high.iter()).map(|(a, b)| *a && *b).collect())
+            let mask_low = compute_cmp_mask(
+                partition_dir,
+                meta,
+                col,
+                low,
+                row_count,
+                |a, b| a >= b,
+                |a, b| a >= b,
+            )?;
+            let mask_high = compute_cmp_mask(
+                partition_dir,
+                meta,
+                col,
+                high,
+                row_count,
+                |a, b| a <= b,
+                |a, b| a <= b,
+            )?;
+            Ok(mask_low
+                .iter()
+                .zip(mask_high.iter())
+                .map(|(a, b)| *a && *b)
+                .collect())
         }
         Filter::And(parts) => {
             let mut combined = vec![true; row_count];
@@ -726,24 +782,46 @@ fn compute_filter_mask(
             let mut mask = vec![false; row_count];
             match &data {
                 ColData::Str(vals) => {
-                    let set: std::collections::HashSet<&str> = values.iter().filter_map(|v| match v { Value::Str(s) => Some(s.as_str()), _ => None }).collect();
+                    let set: std::collections::HashSet<&str> = values
+                        .iter()
+                        .filter_map(|v| match v {
+                            Value::Str(s) => Some(s.as_str()),
+                            _ => None,
+                        })
+                        .collect();
                     for (i, v) in vals.iter().enumerate() {
                         mask[i] = set.contains(v.as_str());
                     }
                 }
                 ColData::I64(vals) => {
-                    let set: std::collections::HashSet<i64> = values.iter().filter_map(|v| match v { Value::I64(n) => Some(*n), _ => None }).collect();
+                    let set: std::collections::HashSet<i64> = values
+                        .iter()
+                        .filter_map(|v| match v {
+                            Value::I64(n) => Some(*n),
+                            _ => None,
+                        })
+                        .collect();
                     for (i, v) in vals.iter().enumerate() {
                         mask[i] = set.contains(v);
                     }
                 }
                 ColData::F64(vals) => {
                     for (i, v) in vals.iter().enumerate() {
-                        mask[i] = values.iter().any(|ev| match ev { Value::F64(e) => *v == *e, Value::I64(e) => *v == *e as f64, _ => false });
+                        mask[i] = values.iter().any(|ev| match ev {
+                            Value::F64(e) => *v == *e,
+                            Value::I64(e) => *v == *e as f64,
+                            _ => false,
+                        });
                     }
                 }
                 ColData::I32(vals) => {
-                    let set: std::collections::HashSet<i64> = values.iter().filter_map(|v| match v { Value::I64(n) => Some(*n), _ => None }).collect();
+                    let set: std::collections::HashSet<i64> = values
+                        .iter()
+                        .filter_map(|v| match v {
+                            Value::I64(n) => Some(*n),
+                            _ => None,
+                        })
+                        .collect();
                     for (i, v) in vals.iter().enumerate() {
                         mask[i] = set.contains(&(*v as i64));
                     }
@@ -752,7 +830,12 @@ fn compute_filter_mask(
             Ok(mask)
         }
         Filter::NotIn(col, values) => {
-            let in_mask = compute_filter_mask(partition_dir, meta, &Filter::In(col.clone(), values.clone()), row_count)?;
+            let in_mask = compute_filter_mask(
+                partition_dir,
+                meta,
+                &Filter::In(col.clone(), values.clone()),
+                row_count,
+            )?;
             Ok(in_mask.iter().map(|v| !v).collect())
         }
         Filter::Like(col, pattern) => {
@@ -769,20 +852,29 @@ fn compute_filter_mask(
             // Build a row-level evaluation using the parallel evaluator.
             let mut mask = vec![false; row_count];
             // Load all needed columns.
-            let all_col_data: Vec<(String, ColData)> = meta.columns.iter().map(|c| {
-                let d = load_column_data(partition_dir, meta, &c.name).unwrap_or(ColData::I64(vec![]));
-                (c.name.clone(), d)
-            }).collect();
+            let all_col_data: Vec<(String, ColData)> = meta
+                .columns
+                .iter()
+                .map(|c| {
+                    let d = load_column_data(partition_dir, meta, &c.name)
+                        .unwrap_or(ColData::I64(vec![]));
+                    (c.name.clone(), d)
+                })
+                .collect();
             for row_idx in 0..row_count {
-                let values: Vec<(usize, Value)> = all_col_data.iter().enumerate().map(|(ci, (_, cd))| {
-                    let v = match cd {
-                        ColData::I64(vals) => Value::I64(vals[row_idx]),
-                        ColData::F64(vals) => Value::F64(vals[row_idx]),
-                        ColData::I32(vals) => Value::I64(vals[row_idx] as i64),
-                        ColData::Str(vals) => Value::Str(vals[row_idx].clone()),
-                    };
-                    (ci, v)
-                }).collect();
+                let values: Vec<(usize, Value)> = all_col_data
+                    .iter()
+                    .enumerate()
+                    .map(|(ci, (_, cd))| {
+                        let v = match cd {
+                            ColData::I64(vals) => Value::I64(vals[row_idx]),
+                            ColData::F64(vals) => Value::F64(vals[row_idx]),
+                            ColData::I32(vals) => Value::I64(vals[row_idx] as i64),
+                            ColData::Str(vals) => Value::Str(vals[row_idx].clone()),
+                        };
+                        (ci, v)
+                    })
+                    .collect();
                 let lv = crate::parallel::eval_plan_expr_parallel_pub(left, &values, meta);
                 let rv = crate::parallel::eval_plan_expr_parallel_pub(right, &values, meta);
                 mask[row_idx] = match op {
@@ -790,16 +882,36 @@ fn compute_filter_mask(
                     CompareOp::NotEq => !lv.eq_coerce(&rv),
                     CompareOp::Gt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Greater),
                     CompareOp::Lt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Less),
-                    CompareOp::Gte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)),
-                    CompareOp::Lte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)),
+                    CompareOp::Gte => matches!(
+                        lv.cmp_coerce(&rv),
+                        Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                    ),
+                    CompareOp::Lte => matches!(
+                        lv.cmp_coerce(&rv),
+                        Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                    ),
                 };
             }
             Ok(mask)
         }
         Filter::BetweenSymmetric(col, low, high) => {
-            let mask_a = compute_filter_mask(partition_dir, meta, &Filter::Between(col.clone(), low.clone(), high.clone()), row_count)?;
-            let mask_b = compute_filter_mask(partition_dir, meta, &Filter::Between(col.clone(), high.clone(), low.clone()), row_count)?;
-            Ok(mask_a.iter().zip(mask_b.iter()).map(|(a, b)| *a || *b).collect())
+            let mask_a = compute_filter_mask(
+                partition_dir,
+                meta,
+                &Filter::Between(col.clone(), low.clone(), high.clone()),
+                row_count,
+            )?;
+            let mask_b = compute_filter_mask(
+                partition_dir,
+                meta,
+                &Filter::Between(col.clone(), high.clone(), low.clone()),
+                row_count,
+            )?;
+            Ok(mask_a
+                .iter()
+                .zip(mask_b.iter())
+                .map(|(a, b)| *a || *b)
+                .collect())
         }
         // For unsupported filter types, pass all rows.
         _ => Ok(vec![true; row_count]),
@@ -912,7 +1024,13 @@ mod tests {
     }
 
     /// Create a partition directory with group and aggregate columns.
-    fn setup_partition(dir: &Path, name: &str, symbols: &[i32], prices: &[f64], volumes: &[i64]) -> PathBuf {
+    fn setup_partition(
+        dir: &Path,
+        name: &str,
+        symbols: &[i32],
+        prices: &[f64],
+        volumes: &[i64],
+    ) -> PathBuf {
         let part_dir = dir.join(name);
         std::fs::create_dir_all(&part_dir).unwrap();
         write_i32_column(&part_dir.join("symbol.d"), symbols);
@@ -955,7 +1073,8 @@ mod tests {
         let meta = make_meta();
 
         let p1 = setup_partition(
-            dir.path(), "p1",
+            dir.path(),
+            "p1",
             &[1, 2, 1, 2, 1],
             &[10.0, 20.0, 30.0, 40.0, 50.0],
             &[100, 200, 300, 400, 500],
@@ -963,8 +1082,22 @@ mod tests {
 
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Sum, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Count, column: "*".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Sum,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Count,
+                column: "*".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
 
         let aggregates = vec![
@@ -981,7 +1114,8 @@ mod tests {
             &aggregates,
             &None,
             &select_cols,
-        ).unwrap();
+        )
+        .unwrap();
 
         if let QueryResult::Rows { rows, .. } = &result {
             assert_eq!(rows.len(), 2);
@@ -1010,7 +1144,8 @@ mod tests {
         let meta = make_meta();
 
         let p1 = setup_partition(
-            dir.path(), "p1",
+            dir.path(),
+            "p1",
             &[1, 2, 1, 2],
             &[10.0, 20.0, 30.0, 40.0],
             &[100, 200, 300, 400],
@@ -1018,9 +1153,30 @@ mod tests {
 
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Min, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Max, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Avg, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Min,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Max,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Avg,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
 
         let aggregates = vec![
@@ -1030,10 +1186,16 @@ mod tests {
         ];
 
         let result = vector_group_by(
-            dir.path(), "test", &meta, &[p1],
+            dir.path(),
+            "test",
+            &meta,
+            &[p1],
             &["symbol".to_string()],
-            &aggregates, &None, &select_cols,
-        ).unwrap();
+            &aggregates,
+            &None,
+            &select_cols,
+        )
+        .unwrap();
 
         if let QueryResult::Rows { rows, .. } = &result {
             assert_eq!(rows.len(), 2);
@@ -1060,7 +1222,8 @@ mod tests {
         let meta = make_meta();
 
         let p1 = setup_partition(
-            dir.path(), "p1",
+            dir.path(),
+            "p1",
             &[1, 2, 1, 2, 1],
             &[10.0, 20.0, 30.0, 40.0, 50.0],
             &[100, 200, 300, 400, 500],
@@ -1068,7 +1231,14 @@ mod tests {
 
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Sum, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Sum,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
 
         let aggregates = vec![(AggregateKind::Sum, "price".to_string())];
@@ -1077,10 +1247,16 @@ mod tests {
         let filter = Some(Filter::Gt("price".to_string(), Value::F64(25.0)));
 
         let result = vector_group_by(
-            dir.path(), "test", &meta, &[p1],
+            dir.path(),
+            "test",
+            &meta,
+            &[p1],
             &["symbol".to_string()],
-            &aggregates, &filter, &select_cols,
-        ).unwrap();
+            &aggregates,
+            &filter,
+            &select_cols,
+        )
+        .unwrap();
 
         if let QueryResult::Rows { rows, .. } = &result {
             let mut sorted = rows.clone();
@@ -1108,8 +1284,22 @@ mod tests {
 
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Sum, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Count, column: "*".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Sum,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Count,
+                column: "*".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
 
         let aggregates = vec![
@@ -1118,10 +1308,16 @@ mod tests {
         ];
 
         let result = vector_group_by(
-            dir.path(), "test", &meta, &[p1, p2],
+            dir.path(),
+            "test",
+            &meta,
+            &[p1, p2],
             &["symbol".to_string()],
-            &aggregates, &None, &select_cols,
-        ).unwrap();
+            &aggregates,
+            &None,
+            &select_cols,
+        )
+        .unwrap();
 
         if let QueryResult::Rows { rows, .. } = &result {
             assert_eq!(rows.len(), 2);
@@ -1144,7 +1340,14 @@ mod tests {
     fn can_use_vector_groupby_checks() {
         let cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Sum, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Sum,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let group_by = vec!["symbol".to_string()];
 
@@ -1156,7 +1359,14 @@ mod tests {
         // With unsupported aggregate.
         let cols2 = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::StdDev, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::StdDev,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         assert!(!can_use_vector_groupby(&cols2, &group_by, false, false));
     }
@@ -1174,15 +1384,28 @@ mod tests {
 
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Sum, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Sum,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let aggregates = vec![(AggregateKind::Sum, "price".to_string())];
 
         let result = vector_group_by(
-            dir.path(), "test", &meta, &[p1],
+            dir.path(),
+            "test",
+            &meta,
+            &[p1],
             &["symbol".to_string()],
-            &aggregates, &None, &select_cols,
-        ).unwrap();
+            &aggregates,
+            &None,
+            &select_cols,
+        )
+        .unwrap();
 
         if let QueryResult::Rows { rows, .. } = &result {
             assert_eq!(rows.len(), 0);

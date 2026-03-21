@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use exchange_common::error::{ExchangeDbError, Result};
 
-use super::node::NodeRole;
+use super::ClusterManager;
 #[cfg(test)]
 use super::node::ClusterNode;
-use super::ClusterManager;
+use super::node::NodeRole;
 
 /// Routes queries to appropriate cluster nodes.
 pub struct QueryRouter {
@@ -23,14 +23,11 @@ impl QueryRouter {
     /// Route a read query: pick the least-loaded healthy replica (or primary)
     /// that serves the given table.
     pub fn route_read(&self, table: &str) -> Result<String> {
-        let node = self
-            .cluster
-            .route_query(table)
-            .ok_or_else(|| {
-                ExchangeDbError::Query(format!(
-                    "no healthy node available for reading table '{table}'"
-                ))
-            })?;
+        let node = self.cluster.route_query(table).ok_or_else(|| {
+            ExchangeDbError::Query(format!(
+                "no healthy node available for reading table '{table}'"
+            ))
+        })?;
         Ok(node.addr.clone())
     }
 
@@ -101,8 +98,8 @@ pub enum MergeStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cluster::node::{ClusterNode, NodeRole, NodeStatus};
     use crate::cluster::ClusterConfig;
+    use crate::cluster::node::{ClusterNode, NodeRole, NodeStatus};
 
     fn make_cluster(nodes_spec: Vec<(&str, &str, NodeRole, Vec<&str>)>) -> Arc<ClusterManager> {
         let config = ClusterConfig {
@@ -156,9 +153,12 @@ mod tests {
 
     #[test]
     fn route_write_fails_without_primary() {
-        let cluster = make_cluster(vec![
-            ("r1", "10.0.0.2:9000", NodeRole::ReadReplica, vec!["trades"]),
-        ]);
+        let cluster = make_cluster(vec![(
+            "r1",
+            "10.0.0.2:9000",
+            NodeRole::ReadReplica,
+            vec!["trades"],
+        )]);
 
         let router = QueryRouter::new(cluster);
         assert!(router.route_write("trades").is_err());
@@ -166,9 +166,12 @@ mod tests {
 
     #[test]
     fn route_read_fails_for_unknown_table() {
-        let cluster = make_cluster(vec![
-            ("p1", "10.0.0.1:9000", NodeRole::Primary, vec!["trades"]),
-        ]);
+        let cluster = make_cluster(vec![(
+            "p1",
+            "10.0.0.1:9000",
+            NodeRole::Primary,
+            vec!["trades"],
+        )]);
 
         let router = QueryRouter::new(cluster);
         assert!(router.route_read("unknown_table").is_err());

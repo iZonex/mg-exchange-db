@@ -5,15 +5,13 @@
 //! after which it accepts writes.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::column::FixedColumnReader;
-use exchange_core::replication::config::{
-    ReplicationConfig, ReplicationRole, ReplicationSyncMode,
-};
+use exchange_core::replication::config::{ReplicationConfig, ReplicationRole, ReplicationSyncMode};
 use exchange_core::replication::health_monitor::PrimaryHealthMonitor;
 use exchange_core::replication::manager::ReplicationManager;
 use exchange_core::replication::wal_receiver::WalReceiver;
@@ -172,9 +170,7 @@ async fn full_failover_cycle() {
     create_trades_table(replica_dir.path());
 
     // Start a TCP listener to simulate a reachable primary.
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let primary_addr = listener.local_addr().unwrap().to_string();
 
     // 1. Write data on primary and ship to replica.
@@ -207,7 +203,10 @@ async fn full_failover_cycle() {
     ));
 
     // Replica should be read-only initially.
-    assert!(repl_mgr.is_read_only(), "replica must be read-only before failover");
+    assert!(
+        repl_mgr.is_read_only(),
+        "replica must be read-only before failover"
+    );
 
     // 3. Start health monitor.
     let promoted = Arc::new(AtomicBool::new(false));
@@ -217,7 +216,7 @@ async fn full_failover_cycle() {
     let monitor = Arc::new(PrimaryHealthMonitor::new(
         primary_addr.clone(),
         Duration::from_millis(50), // fast checks for testing
-        3,                          // fail after 3 consecutive failures
+        3,                         // fail after 3 consecutive failures
     ));
 
     let monitor_handle = tokio::spawn({
@@ -282,8 +281,7 @@ async fn full_failover_cycle() {
 
     // 9. Verify data correctness.
     let part_dir = replica_dir.path().join("trades").join("2024-03-15");
-    let price_reader =
-        FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
+    let price_reader = FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
     // First row from replication.
     assert_eq!(price_reader.read_f64(0), 100.0);
     // Last replicated row.
@@ -299,9 +297,7 @@ async fn full_failover_cycle() {
 #[tokio::test]
 async fn health_monitor_does_not_promote_while_primary_alive() {
     // Start a TCP listener that stays alive throughout the test.
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let primary_addr = listener.local_addr().unwrap().to_string();
 
     let promoted = Arc::new(AtomicBool::new(false));

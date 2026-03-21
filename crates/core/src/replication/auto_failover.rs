@@ -4,8 +4,8 @@
 //! primary has been unreachable for a configurable number of
 //! consecutive health check failures.
 
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use exchange_common::error::Result;
@@ -148,7 +148,9 @@ mod tests {
         );
 
         // start_monitoring should return after promoting.
-        let result = af.start_monitoring(failover_mgr.clone(), "127.0.0.1:19998").await;
+        let result = af
+            .start_monitoring(failover_mgr.clone(), "127.0.0.1:19998")
+            .await;
         assert!(result.is_ok());
 
         // Verify the node was promoted.

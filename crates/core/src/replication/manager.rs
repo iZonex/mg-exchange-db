@@ -104,9 +104,7 @@ impl ReplicationManager {
             }
             ReplicationRole::Replica => {
                 let primary_addr = self.config.primary_addr.clone().ok_or_else(|| {
-                    ExchangeDbError::Wal(
-                        "replica mode requires primary_addr to be set".into(),
-                    )
+                    ExchangeDbError::Wal("replica mode requires primary_addr to be set".into())
                 })?;
                 tracing::info!(
                     primary = %primary_addr,
@@ -198,7 +196,11 @@ impl ReplicationManager {
     }
 
     /// Ensure schema is synced to all replicas for the given table.
-    pub async fn ensure_schema_synced(&self, table: &str, table_dir: &std::path::Path) -> Result<()> {
+    pub async fn ensure_schema_synced(
+        &self,
+        table: &str,
+        table_dir: &std::path::Path,
+    ) -> Result<()> {
         if self.config.role != ReplicationRole::Primary {
             return Ok(());
         }
@@ -434,9 +436,7 @@ mod tests {
         std::fs::write(&segment_path, b"fake-wal-data").unwrap();
 
         // In async mode, this should succeed even though the replica is unreachable.
-        let result = mgr
-            .on_wal_commit("test_table", &segment_path)
-            .await;
+        let result = mgr.on_wal_commit("test_table", &segment_path).await;
         assert!(result.is_ok());
 
         mgr.stop().await.unwrap();

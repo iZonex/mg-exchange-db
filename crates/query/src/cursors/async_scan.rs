@@ -15,7 +15,11 @@ pub struct AsyncScanCursor {
 
 impl AsyncScanCursor {
     pub fn new(source: Box<dyn RecordCursor>) -> Self {
-        Self { source, prefetched: None, started: false }
+        Self {
+            source,
+            prefetched: None,
+            started: false,
+        }
     }
 }
 

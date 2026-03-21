@@ -2,8 +2,8 @@
 //! command tag inference, COPY IN parsing, CSV parsing, and field info inference.
 
 use exchange_common::types::ColumnType;
-use exchange_net::pgwire::handler::{pg_type_for_column, infer_command_tag};
 use exchange_net::pgwire::copy::{CopyInOptions, parse_csv_line};
+use exchange_net::pgwire::handler::{infer_command_tag, pg_type_for_column};
 use pgwire::api::Type;
 
 // =============================================================================
@@ -180,17 +180,22 @@ fn oid_char_is_18() {
 // =============================================================================
 
 #[test]
-#[ignore] fn tag_insert() {
+#[ignore]
+fn tag_insert() {
     assert_eq!(infer_command_tag("INSERT INTO t VALUES (1)"), "INSERT 0");
 }
 
 #[test]
-#[ignore] #[ignore] fn tag_insert_lowercase() {
+#[ignore]
+#[ignore]
+fn tag_insert_lowercase() {
     assert_eq!(infer_command_tag("insert into t values (1)"), "INSERT 0");
 }
 
 #[test]
-#[ignore] #[ignore] fn tag_insert_mixed_case() {
+#[ignore]
+#[ignore]
+fn tag_insert_mixed_case() {
     assert_eq!(infer_command_tag("Insert INTO t VALUES (1)"), "INSERT 0");
 }
 
@@ -437,7 +442,10 @@ fn csv_empty_fields() {
 
 #[test]
 fn csv_quoted_field() {
-    assert_eq!(parse_csv_line(r#""hello",world"#, ','), vec!["hello", "world"]);
+    assert_eq!(
+        parse_csv_line(r#""hello",world"#, ','),
+        vec!["hello", "world"]
+    );
 }
 
 #[test]
@@ -496,7 +504,10 @@ fn csv_mixed_quoted_unquoted() {
 
 #[test]
 fn csv_many_fields() {
-    let line: String = (0..20).map(|i| format!("f{i}")).collect::<Vec<_>>().join(",");
+    let line: String = (0..20)
+        .map(|i| format!("f{i}"))
+        .collect::<Vec<_>>()
+        .join(",");
     let fields = parse_csv_line(&line, ',');
     assert_eq!(fields.len(), 20);
 }
@@ -516,10 +527,7 @@ fn csv_whitespace_preserved() {
 
 #[test]
 fn csv_quoted_whitespace() {
-    assert_eq!(
-        parse_csv_line(r#"" a "," b ""#, ','),
-        vec![" a ", " b "]
-    );
+    assert_eq!(parse_csv_line(r#"" a "," b ""#, ','), vec![" a ", " b "]);
 }
 
 // =============================================================================
@@ -569,7 +577,11 @@ macro_rules! cmd_tag_test {
 }
 
 cmd_tag_test!(tag_insert_basic, "INSERT INTO t (a) VALUES (1)", "INSERT 0");
-cmd_tag_test!(tag_insert_multi, "INSERT INTO t VALUES (1),(2),(3)", "INSERT 0");
+cmd_tag_test!(
+    tag_insert_multi,
+    "INSERT INTO t VALUES (1),(2),(3)",
+    "INSERT 0"
+);
 cmd_tag_test!(tag_select_star, "SELECT *", "SELECT");
 cmd_tag_test!(tag_select_1, "SELECT 1", "SELECT");
 cmd_tag_test!(tag_select_cols, "SELECT a, b FROM t", "SELECT");
@@ -1119,7 +1131,11 @@ fn type_mapping_every_column_type_is_mapped() {
     ];
     for ct in all_types {
         let pg = pg_type_for_column(ct);
-        assert!(pg.oid() > 0, "ColumnType {:?} should map to a valid PG type", ct);
+        assert!(
+            pg.oid() > 0,
+            "ColumnType {:?} should map to a valid PG type",
+            ct
+        );
     }
 }
 
@@ -1145,10 +1161,7 @@ fn csv_trade_data() {
 
 #[test]
 fn csv_log_data_with_quotes() {
-    let fields = parse_csv_line(
-        r#"2024-03-15,"error: connection refused","nginx",502"#,
-        ',',
-    );
+    let fields = parse_csv_line(r#"2024-03-15,"error: connection refused","nginx",502"#, ',');
     assert_eq!(fields.len(), 4);
     assert_eq!(fields[1], "error: connection refused");
 }
@@ -1181,12 +1194,7 @@ macro_rules! copy_option_test {
     };
 }
 
-copy_option_test!(
-    copy_opt_default,
-    "COPY t FROM STDIN",
-    false,
-    ','
-);
+copy_option_test!(copy_opt_default, "COPY t FROM STDIN", false, ',');
 copy_option_test!(
     copy_opt_header_only,
     "COPY t FROM STDIN WITH (HEADER true)",
@@ -1213,10 +1221,22 @@ copy_option_test!(
 #[test]
 fn fixed_size_all_fixed_types_have_some() {
     let fixed_types = [
-        ColumnType::Boolean, ColumnType::I8, ColumnType::I16, ColumnType::I32,
-        ColumnType::I64, ColumnType::F32, ColumnType::F64, ColumnType::Timestamp,
-        ColumnType::Symbol, ColumnType::Uuid, ColumnType::Date, ColumnType::Char,
-        ColumnType::IPv4, ColumnType::Long128, ColumnType::Long256, ColumnType::GeoHash,
+        ColumnType::Boolean,
+        ColumnType::I8,
+        ColumnType::I16,
+        ColumnType::I32,
+        ColumnType::I64,
+        ColumnType::F32,
+        ColumnType::F64,
+        ColumnType::Timestamp,
+        ColumnType::Symbol,
+        ColumnType::Uuid,
+        ColumnType::Date,
+        ColumnType::Char,
+        ColumnType::IPv4,
+        ColumnType::Long128,
+        ColumnType::Long256,
+        ColumnType::GeoHash,
     ];
     for ct in fixed_types {
         assert!(ct.fixed_size().is_some(), "{:?} should have fixed size", ct);
@@ -1227,7 +1247,11 @@ fn fixed_size_all_fixed_types_have_some() {
 fn fixed_size_all_variable_types_have_none() {
     let var_types = [ColumnType::Varchar, ColumnType::Binary];
     for ct in var_types {
-        assert!(ct.fixed_size().is_none(), "{:?} should not have fixed size", ct);
+        assert!(
+            ct.fixed_size().is_none(),
+            "{:?} should not have fixed size",
+            ct
+        );
     }
 }
 
@@ -1245,14 +1269,13 @@ fn tag_select_with_join() {
 
 #[test]
 fn tag_select_subquery() {
-    assert_eq!(
-        infer_command_tag("SELECT * FROM (SELECT 1)"),
-        "SELECT"
-    );
+    assert_eq!(infer_command_tag("SELECT * FROM (SELECT 1)"), "SELECT");
 }
 
 #[test]
-#[ignore] #[ignore] fn tag_insert_select() {
+#[ignore]
+#[ignore]
+fn tag_insert_select() {
     assert_eq!(
         infer_command_tag("INSERT INTO t SELECT * FROM t2"),
         "INSERT 0"
@@ -1328,7 +1351,13 @@ full_type_test!(ft_i32, ColumnType::I32, Type::INT4, 23, Some(4));
 full_type_test!(ft_i64, ColumnType::I64, Type::INT8, 20, Some(8));
 full_type_test!(ft_f32, ColumnType::F32, Type::FLOAT4, 700, Some(4));
 full_type_test!(ft_f64, ColumnType::F64, Type::FLOAT8, 701, Some(8));
-full_type_test!(ft_ts, ColumnType::Timestamp, Type::TIMESTAMPTZ, 1184, Some(8));
+full_type_test!(
+    ft_ts,
+    ColumnType::Timestamp,
+    Type::TIMESTAMPTZ,
+    1184,
+    Some(8)
+);
 full_type_test!(ft_sym, ColumnType::Symbol, Type::VARCHAR, 1043, Some(4));
 full_type_test!(ft_vc, ColumnType::Varchar, Type::TEXT, 25, None);
 full_type_test!(ft_bin, ColumnType::Binary, Type::BYTEA, 17, None);
@@ -1388,16 +1417,36 @@ tag_sql_test!(tag_sel_count, "SELECT COUNT(*) FROM t", "SELECT");
 tag_sql_test!(tag_sel_distinct, "SELECT DISTINCT col FROM t", "SELECT");
 tag_sql_test!(tag_sel_limit, "SELECT * FROM t LIMIT 10", "SELECT");
 tag_sql_test!(tag_sel_order, "SELECT * FROM t ORDER BY id", "SELECT");
-tag_sql_test!(tag_sel_group, "SELECT col, COUNT(*) FROM t GROUP BY col", "SELECT");
-tag_sql_test!(tag_sel_having, "SELECT col, COUNT(*) FROM t GROUP BY col HAVING COUNT(*) > 1", "SELECT");
+tag_sql_test!(
+    tag_sel_group,
+    "SELECT col, COUNT(*) FROM t GROUP BY col",
+    "SELECT"
+);
+tag_sql_test!(
+    tag_sel_having,
+    "SELECT col, COUNT(*) FROM t GROUP BY col HAVING COUNT(*) > 1",
+    "SELECT"
+);
 tag_sql_test!(tag_sel_union, "SELECT 1 UNION SELECT 2", "SELECT");
 tag_sql_test!(tag_sel_exists, "SELECT EXISTS(SELECT 1)", "SELECT");
-tag_sql_test!(tag_sel_case, "SELECT CASE WHEN x=1 THEN 'a' END FROM t", "SELECT");
+tag_sql_test!(
+    tag_sel_case,
+    "SELECT CASE WHEN x=1 THEN 'a' END FROM t",
+    "SELECT"
+);
 tag_sql_test!(tag_ins_default, "INSERT INTO t DEFAULT VALUES", "INSERT 0");
-tag_sql_test!(tag_ins_returning, "INSERT INTO t (a) VALUES (1) RETURNING id", "INSERT 0");
+tag_sql_test!(
+    tag_ins_returning,
+    "INSERT INTO t (a) VALUES (1) RETURNING id",
+    "INSERT 0"
+);
 tag_sql_test!(tag_upd_set_multi, "UPDATE t SET a=1, b=2", "UPDATE");
 tag_sql_test!(tag_del_cascade, "DELETE FROM t CASCADE", "DELETE");
-tag_sql_test!(tag_create_if, "CREATE TABLE IF NOT EXISTS t (id INT)", "CREATE TABLE");
+tag_sql_test!(
+    tag_create_if,
+    "CREATE TABLE IF NOT EXISTS t (id INT)",
+    "CREATE TABLE"
+);
 tag_sql_test!(tag_drop_if, "DROP TABLE IF EXISTS t", "DROP TABLE");
 tag_sql_test!(tag_begin_iso, "BEGIN ISOLATION LEVEL SERIALIZABLE", "BEGIN");
 tag_sql_test!(tag_set_local, "SET LOCAL timezone = 'UTC'", "SET");
@@ -1428,15 +1477,63 @@ macro_rules! copy_exhaustive_test {
 }
 
 copy_exhaustive_test!(ce_basic, "COPY t FROM STDIN", "t", false, ',');
-copy_exhaustive_test!(ce_hdr, "COPY t FROM STDIN WITH (HEADER true)", "t", true, ',');
-copy_exhaustive_test!(ce_pipe, "COPY t FROM STDIN WITH (DELIMITER '|')", "t", false, '|');
-copy_exhaustive_test!(ce_semi, "COPY t FROM STDIN WITH (DELIMITER ';')", "t", false, ';');
-copy_exhaustive_test!(ce_hdr_pipe, "COPY t FROM STDIN WITH (HEADER true, DELIMITER '|')", "t", true, '|');
-copy_exhaustive_test!(ce_hdr_semi, "COPY t FROM STDIN WITH (HEADER true, DELIMITER ';')", "t", true, ';');
-copy_exhaustive_test!(ce_fmt, "COPY t FROM STDIN WITH (FORMAT csv)", "t", false, ',');
-copy_exhaustive_test!(ce_fmt_hdr, "COPY t FROM STDIN WITH (FORMAT csv, HEADER true)", "t", true, ',');
+copy_exhaustive_test!(
+    ce_hdr,
+    "COPY t FROM STDIN WITH (HEADER true)",
+    "t",
+    true,
+    ','
+);
+copy_exhaustive_test!(
+    ce_pipe,
+    "COPY t FROM STDIN WITH (DELIMITER '|')",
+    "t",
+    false,
+    '|'
+);
+copy_exhaustive_test!(
+    ce_semi,
+    "COPY t FROM STDIN WITH (DELIMITER ';')",
+    "t",
+    false,
+    ';'
+);
+copy_exhaustive_test!(
+    ce_hdr_pipe,
+    "COPY t FROM STDIN WITH (HEADER true, DELIMITER '|')",
+    "t",
+    true,
+    '|'
+);
+copy_exhaustive_test!(
+    ce_hdr_semi,
+    "COPY t FROM STDIN WITH (HEADER true, DELIMITER ';')",
+    "t",
+    true,
+    ';'
+);
+copy_exhaustive_test!(
+    ce_fmt,
+    "COPY t FROM STDIN WITH (FORMAT csv)",
+    "t",
+    false,
+    ','
+);
+copy_exhaustive_test!(
+    ce_fmt_hdr,
+    "COPY t FROM STDIN WITH (FORMAT csv, HEADER true)",
+    "t",
+    true,
+    ','
+);
 copy_exhaustive_test!(ce_trades, "COPY trades FROM STDIN", "trades", false, ',');
-copy_exhaustive_test!(ce_quotes, "COPY my_table FROM STDIN WITH (HEADER ON)", "my_table", true, ',');
+copy_exhaustive_test!(
+    ce_quotes,
+    "COPY my_table FROM STDIN WITH (HEADER ON)",
+    "my_table",
+    true,
+    ','
+);
 
 // =============================================================================
 // 30. Repeated mapping determinism (18 tests x 3 calls = deterministic)
@@ -1718,7 +1815,11 @@ csv_quoted_test!(cq_with_space, "\"a b\"", "a b");
 csv_quoted_test!(cq_with_dquote, "\"a\"\"b\"", "a\"b");
 csv_quoted_test!(cq_empty, "\"\"", "");
 csv_quoted_test!(cq_num, "\"42\"", "42");
-csv_quoted_test!(cq_long, "\"abcdefghijklmnopqrstuvwxyz\"", "abcdefghijklmnopqrstuvwxyz");
+csv_quoted_test!(
+    cq_long,
+    "\"abcdefghijklmnopqrstuvwxyz\"",
+    "abcdefghijklmnopqrstuvwxyz"
+);
 
 // =============================================================================
 // 40. Fixed size vs OID cross-check (18 tests)
@@ -1858,7 +1959,11 @@ copy_form_test!(cf_invalid_to, "COPY t TO STDOUT", false);
 copy_form_test!(cf_invalid_empty, "", false);
 copy_form_test!(cf_invalid_partial, "COPY", false);
 copy_form_test!(cf_invalid_from_file, "COPY t FROM '/path'", false);
-copy_form_test!(cf_valid_header, "COPY t FROM STDIN WITH (HEADER true)", true);
+copy_form_test!(
+    cf_valid_header,
+    "COPY t FROM STDIN WITH (HEADER true)",
+    true
+);
 
 // =============================================================================
 // 44. Parametric SQL commands (20 tests)
@@ -1884,7 +1989,11 @@ sql_variety_test!(sv_upd1, "UPDATE t SET a=a+1", "UPDATE");
 sql_variety_test!(sv_upd2, "UPDATE t SET a=NULL WHERE id=1", "UPDATE");
 sql_variety_test!(sv_del1, "DELETE FROM t WHERE id > 100", "DELETE");
 sql_variety_test!(sv_del2, "DELETE FROM t WHERE id IN (1,2,3)", "DELETE");
-sql_variety_test!(sv_cre1, "CREATE TABLE t (id SERIAL PRIMARY KEY)", "CREATE TABLE");
+sql_variety_test!(
+    sv_cre1,
+    "CREATE TABLE t (id SERIAL PRIMARY KEY)",
+    "CREATE TABLE"
+);
 sql_variety_test!(sv_cre2, "CREATE TABLE t AS SELECT 1", "CREATE TABLE");
 sql_variety_test!(sv_drp1, "DROP TABLE IF EXISTS t CASCADE", "DROP TABLE");
 sql_variety_test!(sv_set1, "SET statement_timeout = '5s'", "SET");

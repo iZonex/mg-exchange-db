@@ -8,10 +8,10 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect, Response};
-use axum::Json;
 use serde::Deserialize;
 
 use crate::auth::AuthMethod;
@@ -158,9 +158,7 @@ pub async fn token_info(
         }
     };
 
-    let auth_header = headers
-        .get("authorization")
-        .and_then(|v| v.to_str().ok());
+    let auth_header = headers.get("authorization").and_then(|v| v.to_str().ok());
 
     let token = match auth_header {
         Some(header) if header.starts_with("Bearer ") => &header[7..],

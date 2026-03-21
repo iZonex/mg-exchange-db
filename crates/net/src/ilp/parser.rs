@@ -113,10 +113,15 @@ impl std::fmt::Display for IlpParseError {
             Self::InvalidField(s) => write!(f, "invalid field: {s}"),
             Self::InvalidTimestamp(s) => write!(f, "invalid timestamp: {s}"),
             Self::InvalidEscape(s) => write!(f, "invalid escape sequence: {s}"),
-            Self::LineTooLong(n) => write!(f, "line too long: {n} bytes (max {MAX_ILP_LINE_LENGTH})"),
+            Self::LineTooLong(n) => {
+                write!(f, "line too long: {n} bytes (max {MAX_ILP_LINE_LENGTH})")
+            }
             Self::TooManyTags(n) => write!(f, "too many tags: {n} (max {MAX_ILP_TAGS})"),
             Self::TooManyFields(n) => write!(f, "too many fields: {n} (max {MAX_ILP_FIELDS})"),
-            Self::MeasurementTooLong(n) => write!(f, "measurement name too long: {n} bytes (max {MAX_MEASUREMENT_LENGTH})"),
+            Self::MeasurementTooLong(n) => write!(
+                f,
+                "measurement name too long: {n} bytes (max {MAX_MEASUREMENT_LENGTH})"
+            ),
         }
     }
 }
@@ -146,8 +151,8 @@ pub fn parse_ilp_line(line: &str) -> Result<IlpLine, IlpParseError> {
     // Split into: measurement_and_tags, fields, optional_timestamp
     // The first space separates measurement+tags from fields.
     // The second space (if present) separates fields from timestamp.
-    let (measurement_tags, rest) = split_first_unescaped_space(line)
-        .ok_or(IlpParseError::MissingFields)?;
+    let (measurement_tags, rest) =
+        split_first_unescaped_space(line).ok_or(IlpParseError::MissingFields)?;
 
     let (fields_str, timestamp_str) = match split_first_unescaped_space(rest) {
         Some((f, t)) => (f, Some(t)),
@@ -239,10 +244,7 @@ fn parse_measurement_tags(s: &str) -> Result<(String, BTreeMap<String, String>),
         let (key, value) = part
             .split_once('=')
             .ok_or_else(|| IlpParseError::InvalidField(part.to_string()))?;
-        tags.insert(
-            unescape_tag_key(key),
-            unescape_tag_value(value),
-        );
+        tags.insert(unescape_tag_key(key), unescape_tag_value(value));
     }
 
     Ok((measurement, tags))
@@ -475,10 +477,7 @@ mod tests {
         assert_eq!(parsed.tags.get("city").unwrap(), "nyc");
         assert_eq!(parsed.tags.get("state").unwrap(), "ny");
         assert_eq!(parsed.fields.len(), 2);
-        assert_eq!(
-            parsed.fields.get("temp").unwrap(),
-            &IlpValue::Float(72.5)
-        );
+        assert_eq!(parsed.fields.get("temp").unwrap(), &IlpValue::Float(72.5));
         assert_eq!(
             parsed.fields.get("humidity").unwrap(),
             &IlpValue::Integer(65)
@@ -516,10 +515,7 @@ mod tests {
     fn test_negative_integer() {
         let line = "sensor,id=1 temp=-10i 1000";
         let parsed = parse_ilp_line(line).unwrap();
-        assert_eq!(
-            parsed.fields.get("temp").unwrap(),
-            &IlpValue::Integer(-10)
-        );
+        assert_eq!(parsed.fields.get("temp").unwrap(), &IlpValue::Integer(-10));
     }
 
     #[test]
@@ -536,10 +532,7 @@ mod tests {
     fn test_boolean_variants() {
         let line = "check ok=T,fail=F 1000";
         let parsed = parse_ilp_line(line).unwrap();
-        assert_eq!(
-            parsed.fields.get("ok").unwrap(),
-            &IlpValue::Boolean(true)
-        );
+        assert_eq!(parsed.fields.get("ok").unwrap(), &IlpValue::Boolean(true));
         assert_eq!(
             parsed.fields.get("fail").unwrap(),
             &IlpValue::Boolean(false)
@@ -584,9 +577,15 @@ mod tests {
         let parsed = parse_ilp_line(line).unwrap();
         assert_eq!(parsed.fields.get("price").unwrap(), &IlpValue::Float(100.5));
         assert_eq!(parsed.fields.get("count").unwrap(), &IlpValue::Integer(42));
-        assert_eq!(parsed.fields.get("sym").unwrap(), &IlpValue::Symbol("ETH".to_string()));
+        assert_eq!(
+            parsed.fields.get("sym").unwrap(),
+            &IlpValue::Symbol("ETH".to_string())
+        );
         assert_eq!(parsed.fields.get("ts").unwrap(), &IlpValue::Timestamp(999));
-        assert_eq!(parsed.fields.get("hash").unwrap(), &IlpValue::Long256("ab".to_string()));
+        assert_eq!(
+            parsed.fields.get("hash").unwrap(),
+            &IlpValue::Long256("ab".to_string())
+        );
     }
 
     // ── Protocol version detection tests ────────────────────────────────

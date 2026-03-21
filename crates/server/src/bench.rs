@@ -14,15 +14,23 @@ use std::time::{Duration, Instant};
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::engine::Engine;
 use exchange_core::table::{ColumnValue, TableBuilder};
-use exchange_query::{execute, plan_query, QueryResult};
+use exchange_query::{QueryResult, execute, plan_query};
 
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
 
 const SYMBOLS: &[&str] = &[
-    "BTC/USD", "ETH/USD", "SOL/USD", "DOGE/USD", "XRP/USD",
-    "ADA/USD", "AVAX/USD", "DOT/USD", "MATIC/USD", "LINK/USD",
+    "BTC/USD",
+    "ETH/USD",
+    "SOL/USD",
+    "DOGE/USD",
+    "XRP/USD",
+    "ADA/USD",
+    "AVAX/USD",
+    "DOT/USD",
+    "MATIC/USD",
+    "LINK/USD",
 ];
 
 const HUNDRED_K: u64 = 100_000;
@@ -164,7 +172,10 @@ fn bench_inserts(results: &mut Vec<BenchResult>) {
 }
 
 fn bench_queries(db_root: &Path, num_rows: u64, results: &mut Vec<BenchResult>) {
-    println!("\n=== QUERY BENCHMARKS ({} rows) ===\n", format_count(num_rows));
+    println!(
+        "\n=== QUERY BENCHMARKS ({} rows) ===\n",
+        format_count(num_rows)
+    );
 
     let iterations = 5;
     let base_ts: i64 = 1_704_067_200_000_000_000;
@@ -173,9 +184,7 @@ fn bench_queries(db_root: &Path, num_rows: u64, results: &mut Vec<BenchResult>) 
     {
         // Pick a timestamp in the middle of the dataset.
         let target_ts = base_ts + (num_rows / 2) as i64 * 1_000_000;
-        let sql = format!(
-            "SELECT * FROM trades WHERE symbol = 0 AND timestamp = {target_ts}"
-        );
+        let sql = format!("SELECT * FROM trades WHERE symbol = 0 AND timestamp = {target_ts}");
         let (duration, rows) = run_query_n(db_root, &sql, iterations);
         results.push(BenchResult {
             operation: "Point query (symbol + timestamp)".to_string(),
@@ -214,7 +223,8 @@ fn bench_queries(db_root: &Path, num_rows: u64, results: &mut Vec<BenchResult>) 
     //    vwap is registered as vwap(sum_pv, sum_v), so we compute it manually
     //    or use the scalar: SELECT symbol, sum(price * volume) / sum(volume) ...
     {
-        let sql = "SELECT symbol, sum(price * volume) / sum(volume) as vwap FROM trades GROUP BY symbol";
+        let sql =
+            "SELECT symbol, sum(price * volume) / sum(volume) as vwap FROM trades GROUP BY symbol";
         let (duration, rows) = run_query_n(db_root, sql, iterations);
         results.push(BenchResult {
             operation: "VWAP (price*volume/volume)".to_string(),

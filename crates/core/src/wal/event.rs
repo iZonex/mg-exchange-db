@@ -108,9 +108,7 @@ impl WalEvent {
     /// one complete event (header + payload + checksum).
     pub fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() < EVENT_OVERHEAD {
-            return Err(ExchangeDbError::Corruption(
-                "WAL event too short".into(),
-            ));
+            return Err(ExchangeDbError::Corruption("WAL event too short".into()));
         }
 
         let event_type = EventType::from_u8(data[0])?;
@@ -130,8 +128,11 @@ impl WalEvent {
 
         // Verify checksum.
         let checksum_offset = EVENT_HEADER_SIZE + payload_len;
-        let stored_checksum =
-            u32::from_le_bytes(data[checksum_offset..checksum_offset + 4].try_into().unwrap());
+        let stored_checksum = u32::from_le_bytes(
+            data[checksum_offset..checksum_offset + 4]
+                .try_into()
+                .unwrap(),
+        );
         let computed = compute_checksum(&data[..checksum_offset]);
 
         if stored_checksum != computed {

@@ -16,9 +16,16 @@ pub struct ColumnOnlyScanCursor {
 impl ColumnOnlyScanCursor {
     pub fn new(source: Box<dyn RecordCursor>, col_name: &str) -> Self {
         let src_schema = source.schema();
-        let col_idx = src_schema.iter().position(|(n, _)| n == col_name).unwrap_or(0);
+        let col_idx = src_schema
+            .iter()
+            .position(|(n, _)| n == col_name)
+            .unwrap_or(0);
         let schema = vec![src_schema[col_idx].clone()];
-        Self { source, col_idx, schema }
+        Self {
+            source,
+            col_idx,
+            schema,
+        }
     }
 }
 
@@ -49,7 +56,10 @@ mod tests {
 
     #[test]
     fn reads_single_column() {
-        let schema = vec![("a".to_string(), ColumnType::I64), ("b".to_string(), ColumnType::Varchar)];
+        let schema = vec![
+            ("a".to_string(), ColumnType::I64),
+            ("b".to_string(), ColumnType::Varchar),
+        ];
         let rows = vec![
             vec![Value::I64(1), Value::Str("x".into())],
             vec![Value::I64(2), Value::Str("y".into())],

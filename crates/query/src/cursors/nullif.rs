@@ -16,7 +16,11 @@ pub struct NullIfCursor {
 
 impl NullIfCursor {
     pub fn new(source: Box<dyn RecordCursor>, col_idx: usize, sentinel: Value) -> Self {
-        Self { source, col_idx, sentinel }
+        Self {
+            source,
+            col_idx,
+            sentinel,
+        }
     }
 }
 
@@ -58,7 +62,11 @@ mod tests {
     #[test]
     fn nullif_replaces_sentinel() {
         let schema = vec![("v".to_string(), ColumnType::F64)];
-        let rows = vec![vec![Value::F64(0.0)], vec![Value::F64(42.0)], vec![Value::F64(0.0)]];
+        let rows = vec![
+            vec![Value::F64(0.0)],
+            vec![Value::F64(42.0)],
+            vec![Value::F64(0.0)],
+        ];
         let source = MemoryCursor::from_rows(schema, &rows);
         let mut cursor = NullIfCursor::new(Box::new(source), 0, Value::F64(0.0));
         let batch = cursor.next_batch(10).unwrap().unwrap();

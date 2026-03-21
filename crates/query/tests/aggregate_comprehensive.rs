@@ -78,10 +78,7 @@ fn db_grouped(data: &[(&str, f64)]) -> TestDb {
 
 fn assert_f64_near(val: &Value, expected: f64, tol: f64) {
     match val {
-        Value::F64(v) => assert!(
-            (*v - expected).abs() < tol,
-            "expected ~{expected}, got {v}"
-        ),
+        Value::F64(v) => assert!((*v - expected).abs() < tol, "expected ~{expected}, got {v}"),
         Value::I64(v) => assert!(
             ((*v as f64) - expected).abs() < tol,
             "expected ~{expected}, got {v}"
@@ -140,7 +137,7 @@ mod sum_tests {
         match val {
             Value::F64(v) => assert!(v.is_nan() || v.abs() >= 0.0, "got {v}"),
             Value::I64(_) => {} // acceptable
-            Value::Null => {} // acceptable
+            Value::Null => {}   // acceptable
             _ => panic!("expected numeric"),
         }
     }
@@ -179,10 +176,15 @@ mod sum_tests {
 
     #[test]
     fn sum_with_having() {
-        let db = db_grouped(&[("A", 10.0), ("B", 20.0), ("A", 30.0), ("B", 40.0), ("C", 1.0)]);
-        let (_, rows) = db.query(
-            "SELECT sym, sum(v) AS s FROM t GROUP BY sym HAVING s > 10 ORDER BY sym",
-        );
+        let db = db_grouped(&[
+            ("A", 10.0),
+            ("B", 20.0),
+            ("A", 30.0),
+            ("B", 40.0),
+            ("C", 1.0),
+        ]);
+        let (_, rows) =
+            db.query("SELECT sym, sum(v) AS s FROM t GROUP BY sym HAVING s > 10 ORDER BY sym");
         // A=40, B=60 pass; C=1 does not
         assert!(rows.len() >= 2);
     }
@@ -198,9 +200,7 @@ mod sum_tests {
     fn sum_many_rows() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let values: Vec<String> = (0..100)
-            .map(|i| format!("({}, {}.0)", ts(i), i))
-            .collect();
+        let values: Vec<String> = (0..100).map(|i| format!("({}, {}.0)", ts(i), i)).collect();
         db.exec_ok(&format!(
             "INSERT INTO t (timestamp, v) VALUES {}",
             values.join(", ")
@@ -241,9 +241,7 @@ mod sum_tests {
     #[test]
     fn sum_with_order_by() {
         let db = db_grouped(&[("A", 10.0), ("B", 5.0), ("A", 20.0), ("B", 15.0)]);
-        let (_, rows) = db.query(
-            "SELECT sym, sum(v) AS s FROM t GROUP BY sym ORDER BY s ASC",
-        );
+        let (_, rows) = db.query("SELECT sym, sum(v) AS s FROM t GROUP BY sym ORDER BY s ASC");
         assert_eq!(rows.len(), 2);
         // B=20, A=30
         assert_f64_near(&rows[0][1], 20.0, 0.01);
@@ -305,9 +303,7 @@ mod avg_tests {
     fn avg_many_rows() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let values: Vec<String> = (0..100)
-            .map(|i| format!("({}, {}.0)", ts(i), i))
-            .collect();
+        let values: Vec<String> = (0..100).map(|i| format!("({}, {}.0)", ts(i), i)).collect();
         db.exec_ok(&format!(
             "INSERT INTO t (timestamp, v) VALUES {}",
             values.join(", ")
@@ -319,9 +315,7 @@ mod avg_tests {
     #[test]
     fn avg_with_having() {
         let db = db_grouped(&[("A", 10.0), ("B", 100.0), ("A", 30.0), ("B", 200.0)]);
-        let (_, rows) = db.query(
-            "SELECT sym, avg(v) AS a FROM t GROUP BY sym HAVING a > 50",
-        );
+        let (_, rows) = db.query("SELECT sym, avg(v) AS a FROM t GROUP BY sym HAVING a > 50");
         assert!(rows.len() >= 1);
     }
 
@@ -342,9 +336,7 @@ mod avg_tests {
     #[test]
     fn avg_with_order_by() {
         let db = db_grouped(&[("A", 10.0), ("B", 100.0), ("A", 30.0)]);
-        let (_, rows) = db.query(
-            "SELECT sym, avg(v) AS a FROM t GROUP BY sym ORDER BY a DESC",
-        );
+        let (_, rows) = db.query("SELECT sym, avg(v) AS a FROM t GROUP BY sym ORDER BY a DESC");
         assert_eq!(rows.len(), 2);
     }
 }
@@ -423,9 +415,7 @@ mod min_tests {
     #[test]
     fn min_with_order_by() {
         let db = db_grouped(&[("A", 10.0), ("B", 5.0), ("A", 3.0), ("B", 1.0)]);
-        let (_, rows) = db.query(
-            "SELECT sym, min(v) AS m FROM t GROUP BY sym ORDER BY m ASC",
-        );
+        let (_, rows) = db.query("SELECT sym, min(v) AS m FROM t GROUP BY sym ORDER BY m ASC");
         assert_eq!(rows.len(), 2);
         assert_f64_near(&rows[0][1], 1.0, 0.01);
     }
@@ -434,9 +424,7 @@ mod min_tests {
     fn min_many_rows() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let values: Vec<String> = (1..=50)
-            .map(|i| format!("({}, {}.0)", ts(i), i))
-            .collect();
+        let values: Vec<String> = (1..=50).map(|i| format!("({}, {}.0)", ts(i), i)).collect();
         db.exec_ok(&format!(
             "INSERT INTO t (timestamp, v) VALUES {}",
             values.join(", ")
@@ -520,9 +508,7 @@ mod max_tests {
     #[test]
     fn max_with_having() {
         let db = db_grouped(&[("A", 10.0), ("B", 100.0), ("A", 50.0), ("B", 200.0)]);
-        let (_, rows) = db.query(
-            "SELECT sym, max(v) AS m FROM t GROUP BY sym HAVING m > 80",
-        );
+        let (_, rows) = db.query("SELECT sym, max(v) AS m FROM t GROUP BY sym HAVING m > 80");
         assert!(rows.len() >= 1);
     }
 
@@ -592,9 +578,7 @@ mod count_tests {
     fn count_star_many_rows() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let values: Vec<String> = (0..100)
-            .map(|i| format!("({}, {}.0)", ts(i), i))
-            .collect();
+        let values: Vec<String> = (0..100).map(|i| format!("({}, {}.0)", ts(i), i)).collect();
         db.exec_ok(&format!(
             "INSERT INTO t (timestamp, v) VALUES {}",
             values.join(", ")
@@ -606,13 +590,15 @@ mod count_tests {
     #[test]
     fn count_with_having() {
         let db = db_grouped(&[
-            ("A", 1.0), ("A", 2.0), ("A", 3.0),
-            ("B", 4.0), ("B", 5.0),
+            ("A", 1.0),
+            ("A", 2.0),
+            ("A", 3.0),
+            ("B", 4.0),
+            ("B", 5.0),
             ("C", 6.0),
         ]);
-        let (_, rows) = db.query(
-            "SELECT sym, count(*) AS c FROM t GROUP BY sym HAVING c >= 2 ORDER BY sym",
-        );
+        let (_, rows) =
+            db.query("SELECT sym, count(*) AS c FROM t GROUP BY sym HAVING c >= 2 ORDER BY sym");
         assert!(rows.len() >= 2);
     }
 
@@ -625,13 +611,8 @@ mod count_tests {
 
     #[test]
     fn count_with_order_by() {
-        let db = db_grouped(&[
-            ("A", 1.0), ("A", 2.0), ("A", 3.0),
-            ("B", 4.0), ("B", 5.0),
-        ]);
-        let (_, rows) = db.query(
-            "SELECT sym, count(*) AS c FROM t GROUP BY sym ORDER BY c DESC",
-        );
+        let db = db_grouped(&[("A", 1.0), ("A", 2.0), ("A", 3.0), ("B", 4.0), ("B", 5.0)]);
+        let (_, rows) = db.query("SELECT sym, count(*) AS c FROM t GROUP BY sym ORDER BY c DESC");
         assert_eq!(rows.len(), 2);
         assert_i64(&rows[0][1], 3);
     }
@@ -772,8 +753,12 @@ mod stddev_variance_tests {
     #[test]
     fn stddev_group_by() {
         let db = db_grouped(&[
-            ("A", 1.0), ("A", 2.0), ("A", 3.0),
-            ("B", 10.0), ("B", 20.0), ("B", 30.0),
+            ("A", 1.0),
+            ("A", 2.0),
+            ("A", 3.0),
+            ("B", 10.0),
+            ("B", 20.0),
+            ("B", 30.0),
         ]);
         let (_, rows) = db.query("SELECT sym, stddev(v) FROM t GROUP BY sym ORDER BY sym");
         assert_eq!(rows.len(), 2);
@@ -798,10 +783,7 @@ mod stddev_variance_tests {
 
     #[test]
     fn variance_group_by() {
-        let db = db_grouped(&[
-            ("A", 1.0), ("A", 3.0),
-            ("B", 10.0), ("B", 20.0),
-        ]);
+        let db = db_grouped(&[("A", 1.0), ("A", 3.0), ("B", 10.0), ("B", 20.0)]);
         let (_, rows) = db.query("SELECT sym, variance(v) FROM t GROUP BY sym ORDER BY sym");
         assert_eq!(rows.len(), 2);
     }
@@ -855,8 +837,12 @@ mod median_tests {
     #[test]
     fn median_group_by() {
         let db = db_grouped(&[
-            ("A", 1.0), ("A", 3.0), ("A", 5.0),
-            ("B", 10.0), ("B", 20.0), ("B", 30.0),
+            ("A", 1.0),
+            ("A", 3.0),
+            ("A", 5.0),
+            ("B", 10.0),
+            ("B", 20.0),
+            ("B", 30.0),
         ]);
         let (_, rows) = db.query("SELECT sym, median(v) FROM t GROUP BY sym ORDER BY sym");
         assert_eq!(rows.len(), 2);
@@ -957,9 +943,8 @@ mod multi_aggregate_tests {
     #[test]
     fn all_aggregates_at_once() {
         let db = db_with_doubles(&[10.0, 20.0, 30.0, 40.0, 50.0]);
-        let (cols, rows) = db.query(
-            "SELECT count(*), sum(v), avg(v), min(v), max(v), first(v), last(v) FROM t",
-        );
+        let (cols, rows) =
+            db.query("SELECT count(*), sum(v), avg(v), min(v), max(v), first(v), last(v) FROM t");
         assert_eq!(cols.len(), 7);
         assert_eq!(rows.len(), 1);
         assert_i64(&rows[0][0], 5);
@@ -973,9 +958,7 @@ mod multi_aggregate_tests {
 
     #[test]
     fn multiple_aggs_group_by() {
-        let db = db_grouped(&[
-            ("A", 10.0), ("B", 20.0), ("A", 30.0), ("B", 40.0),
-        ]);
+        let db = db_grouped(&[("A", 10.0), ("B", 20.0), ("A", 30.0), ("B", 40.0)]);
         let (cols, rows) = db.query(
             "SELECT sym, count(*), sum(v), avg(v), min(v), max(v) FROM t GROUP BY sym ORDER BY sym",
         );
@@ -994,9 +977,7 @@ mod multi_aggregate_tests {
     #[test]
     fn first_and_last_group_by() {
         let db = db_grouped(&[("X", 1.0), ("Y", 2.0), ("X", 3.0), ("Y", 4.0), ("X", 5.0)]);
-        let (_, rows) = db.query(
-            "SELECT sym, first(v), last(v) FROM t GROUP BY sym ORDER BY sym",
-        );
+        let (_, rows) = db.query("SELECT sym, first(v), last(v) FROM t GROUP BY sym ORDER BY sym");
         assert_eq!(rows.len(), 2);
         assert_f64_near(&rows[0][1], 1.0, 0.01); // X first
         assert_f64_near(&rows[0][2], 5.0, 0.01); // X last
@@ -1007,9 +988,13 @@ mod multi_aggregate_tests {
     #[test]
     fn sum_avg_with_order_limit() {
         let db = db_grouped(&[
-            ("A", 10.0), ("A", 20.0), ("A", 30.0),
-            ("B", 1.0), ("B", 2.0),
-            ("C", 100.0), ("C", 200.0),
+            ("A", 10.0),
+            ("A", 20.0),
+            ("A", 30.0),
+            ("B", 1.0),
+            ("B", 2.0),
+            ("C", 100.0),
+            ("C", 200.0),
         ]);
         let (_, rows) = db.query(
             "SELECT sym, sum(v) AS s, avg(v) AS a FROM t GROUP BY sym ORDER BY s DESC LIMIT 2",
@@ -1095,9 +1080,8 @@ mod aggregate_sample_by {
     #[test]
     fn sum_sample_by_with_where() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT sum(price) FROM trades WHERE symbol = 'BTC/USD' SAMPLE BY 1h",
-        );
+        let (_, rows) =
+            db.query("SELECT sum(price) FROM trades WHERE symbol = 'BTC/USD' SAMPLE BY 1h");
         assert!(!rows.is_empty());
     }
 
@@ -1249,18 +1233,16 @@ mod aggregate_integration {
     #[test]
     fn group_by_with_having_filter() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING c >= 4",
-        );
+        let (_, rows) =
+            db.query("SELECT symbol, count(*) AS c FROM trades GROUP BY symbol HAVING c >= 4");
         assert_eq!(rows.len(), 3); // all have 4
     }
 
     #[test]
     fn group_by_order_by_agg() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, avg(price) AS ap FROM trades GROUP BY symbol ORDER BY ap DESC",
-        );
+        let (_, rows) = db
+            .query("SELECT symbol, avg(price) AS ap FROM trades GROUP BY symbol ORDER BY ap DESC");
         assert_eq!(rows.len(), 3);
         // BTC should be highest avg price
         assert_eq!(rows[0][0], Value::Str("BTC/USD".to_string()));
@@ -1269,18 +1251,14 @@ mod aggregate_integration {
     #[test]
     fn group_by_limit() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) FROM trades GROUP BY symbol LIMIT 2",
-        );
+        let (_, rows) = db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol LIMIT 2");
         assert_eq!(rows.len(), 2);
     }
 
     #[test]
     fn group_by_symbol_side() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, side, count(*) FROM trades GROUP BY symbol, side",
-        );
+        let (_, rows) = db.query("SELECT symbol, side, count(*) FROM trades GROUP BY symbol, side");
         assert_eq!(rows.len(), 6); // 3 symbols * 2 sides
     }
 

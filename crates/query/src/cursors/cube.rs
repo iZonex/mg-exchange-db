@@ -21,9 +21,16 @@ pub struct CubeCursor {
 impl CubeCursor {
     pub fn new(source: Box<dyn RecordCursor>, key_cols: Vec<usize>) -> Self {
         let src = source.schema();
-        let mut schema: Vec<(String, ColumnType)> = key_cols.iter().map(|&i| src[i].clone()).collect();
+        let mut schema: Vec<(String, ColumnType)> =
+            key_cols.iter().map(|&i| src[i].clone()).collect();
         schema.push(("count".to_string(), ColumnType::I64));
-        Self { source: Some(source), key_cols, schema, result: None, offset: 0 }
+        Self {
+            source: Some(source),
+            key_cols,
+            schema,
+            result: None,
+            offset: 0,
+        }
     }
 
     fn materialize(&mut self) -> Result<()> {
@@ -44,7 +51,13 @@ impl CubeCursor {
             let mut groups: HashMap<String, (Vec<Value>, i64)> = HashMap::new();
             for row in &all_rows {
                 let key: Vec<Value> = (0..n)
-                    .map(|i| if mask & (1 << i) != 0 { row[i].clone() } else { Value::Null })
+                    .map(|i| {
+                        if mask & (1 << i) != 0 {
+                            row[i].clone()
+                        } else {
+                            Value::Null
+                        }
+                    })
                     .collect();
                 let k = format!("{key:?}");
                 groups.entry(k).or_insert_with(|| (key, 0)).1 += 1;
@@ -62,12 +75,18 @@ impl CubeCursor {
 }
 
 impl RecordCursor for CubeCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
-        if self.result.is_none() { self.materialize()?; }
+        if self.result.is_none() {
+            self.materialize()?;
+        }
         let mat = self.result.as_ref().unwrap();
-        if self.offset >= mat.row_count() { return Ok(None); }
+        if self.offset >= mat.row_count() {
+            return Ok(None);
+        }
         let n = max_rows.min(mat.row_count() - self.offset);
         let batch = mat.slice(self.offset, n);
         self.offset += n;
@@ -82,7 +101,10 @@ mod tests {
 
     #[test]
     fn cube_all_combos() {
-        let schema = vec![("a".to_string(), ColumnType::I64), ("b".to_string(), ColumnType::I64)];
+        let schema = vec![
+            ("a".to_string(), ColumnType::I64),
+            ("b".to_string(), ColumnType::I64),
+        ];
         let rows = vec![
             vec![Value::I64(1), Value::I64(10)],
             vec![Value::I64(1), Value::I64(20)],
@@ -91,7 +113,9 @@ mod tests {
         let source = MemoryCursor::from_rows(schema, &rows);
         let mut cursor = CubeCursor::new(Box::new(source), vec![0, 1]);
         let mut total = 0;
-        while let Some(b) = cursor.next_batch(100).unwrap() { total += b.row_count(); }
+        while let Some(b) = cursor.next_batch(100).unwrap() {
+            total += b.row_count();
+        }
         // 2^2 = 4 subsets, each with varying group counts.
         assert!(total >= 4);
     }

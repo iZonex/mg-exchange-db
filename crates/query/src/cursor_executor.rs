@@ -68,7 +68,10 @@ pub fn execute_via_cursors(db_root: &Path, plan: &QueryPlan) -> Result<QueryResu
         }
     }
 
-    Ok(QueryResult::Rows { columns, rows: all_rows })
+    Ok(QueryResult::Rows {
+        columns,
+        rows: all_rows,
+    })
 }
 
 /// Configuration flag for enabling cursor-based execution.
@@ -79,7 +82,6 @@ pub fn execute_via_cursors(db_root: &Path, plan: &QueryPlan) -> Result<QueryResu
 pub struct CursorEngineConfig {
     pub use_cursor_engine: bool,
 }
-
 
 /// Execute a query plan, routing through the cursor engine when configured.
 ///
@@ -101,15 +103,15 @@ pub fn execute_with_engine(
 mod tests {
     use super::*;
     use crate::batch::RecordBatch;
-    use crate::cursors::memory::MemoryCursor;
     use crate::cursors::filter::FilterCursor;
-    use crate::cursors::sort::SortCursor;
-    use crate::cursors::limit::LimitCursor;
-    use crate::cursors::topk::TopKCursor;
-    use crate::cursors::union::UnionCursor;
     use crate::cursors::hash_join::HashJoinCursor;
+    use crate::cursors::limit::LimitCursor;
+    use crate::cursors::memory::MemoryCursor;
     use crate::cursors::merge_sort::MergeSortCursor;
     use crate::cursors::sample_by::SampleByCursor;
+    use crate::cursors::sort::SortCursor;
+    use crate::cursors::topk::TopKCursor;
+    use crate::cursors::union::UnionCursor;
     use crate::plan::{AggregateKind, FillMode, JoinType, OrderBy};
     use exchange_common::types::ColumnType;
 
@@ -259,15 +261,27 @@ mod tests {
 
         let s1 = MemoryCursor::from_rows(
             schema.clone(),
-            &[vec![Value::I64(1)], vec![Value::I64(4)], vec![Value::I64(7)]],
+            &[
+                vec![Value::I64(1)],
+                vec![Value::I64(4)],
+                vec![Value::I64(7)],
+            ],
         );
         let s2 = MemoryCursor::from_rows(
             schema.clone(),
-            &[vec![Value::I64(2)], vec![Value::I64(5)], vec![Value::I64(8)]],
+            &[
+                vec![Value::I64(2)],
+                vec![Value::I64(5)],
+                vec![Value::I64(8)],
+            ],
         );
         let s3 = MemoryCursor::from_rows(
             schema.clone(),
-            &[vec![Value::I64(3)], vec![Value::I64(6)], vec![Value::I64(9)]],
+            &[
+                vec![Value::I64(3)],
+                vec![Value::I64(6)],
+                vec![Value::I64(9)],
+            ],
         );
 
         let mut cursor = MergeSortCursor::new(
@@ -316,7 +330,10 @@ mod tests {
             })
             .collect();
 
-        assert_eq!(values, vec![9999, 9998, 9997, 9996, 9995, 9994, 9993, 9992, 9991, 9990]);
+        assert_eq!(
+            values,
+            vec![9999, 9998, 9997, 9996, 9995, 9994, 9993, 9992, 9991, 9990]
+        );
     }
 
     #[test]
@@ -356,14 +373,10 @@ mod tests {
     fn union_cursor_concatenates_two_cursors() {
         let schema = vec![("val".to_string(), ColumnType::I64)];
 
-        let s1 = MemoryCursor::from_rows(
-            schema.clone(),
-            &[vec![Value::I64(1)], vec![Value::I64(2)]],
-        );
-        let s2 = MemoryCursor::from_rows(
-            schema.clone(),
-            &[vec![Value::I64(3)], vec![Value::I64(4)]],
-        );
+        let s1 =
+            MemoryCursor::from_rows(schema.clone(), &[vec![Value::I64(1)], vec![Value::I64(2)]]);
+        let s2 =
+            MemoryCursor::from_rows(schema.clone(), &[vec![Value::I64(3)], vec![Value::I64(4)]]);
 
         let mut cursor = UnionCursor::new(vec![Box::new(s1), Box::new(s2)]);
         let result = drain_cursor(&mut cursor);

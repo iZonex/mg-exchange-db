@@ -104,7 +104,10 @@ pub enum SelectColumn {
     /// A window function call with OVER clause.
     WindowFunction(crate::window::WindowFunction),
     /// A scalar function call: e.g. `upper(symbol)`, `round(price, 2)`.
-    ScalarFunction { name: String, args: Vec<SelectColumnArg> },
+    ScalarFunction {
+        name: String,
+        args: Vec<SelectColumnArg>,
+    },
     /// A scalar subquery in SELECT: (SELECT count(*) FROM t).
     ScalarSubquery {
         subquery: Box<QueryPlan>,
@@ -120,7 +123,10 @@ pub enum SelectColumn {
         expr_else: Option<PlanExpr>,
     },
     /// A computed expression: e.g. `price * volume AS notional`.
-    Expression { expr: PlanExpr, alias: Option<String> },
+    Expression {
+        expr: PlanExpr,
+        alias: Option<String>,
+    },
 }
 
 /// Supported aggregate function kinds.
@@ -431,7 +437,11 @@ pub enum PlanExpr {
     /// A literal value.
     Literal(Value),
     /// A binary operation: `left op right`.
-    BinaryOp { left: Box<PlanExpr>, op: BinaryOp, right: Box<PlanExpr> },
+    BinaryOp {
+        left: Box<PlanExpr>,
+        op: BinaryOp,
+        right: Box<PlanExpr>,
+    },
     /// A unary operation: `op expr`.
     UnaryOp { op: UnaryOp, expr: Box<PlanExpr> },
     /// A function call: `name(args...)`.
@@ -617,11 +627,25 @@ pub enum JoinSelectColumn {
     /// A column with an alias: (table, column, alias).
     QualifiedAlias(String, String, String),
     /// An expression in JOIN select: e.g. `a.id + b.value AS total`.
-    Expression { expr: PlanExpr, alias: Option<String> },
+    Expression {
+        expr: PlanExpr,
+        alias: Option<String>,
+    },
     /// CASE WHEN in JOIN select.
-    CaseWhen { conditions: Vec<(Filter, Value)>, else_value: Option<Value>, alias: Option<String>, expr_conditions: Option<Vec<(Filter, PlanExpr)>>, expr_else: Option<PlanExpr> },
+    CaseWhen {
+        conditions: Vec<(Filter, Value)>,
+        else_value: Option<Value>,
+        alias: Option<String>,
+        expr_conditions: Option<Vec<(Filter, PlanExpr)>>,
+        expr_else: Option<PlanExpr>,
+    },
     /// An aggregate in JOIN select: e.g. `count(*)`.
-    Aggregate { function: AggregateKind, column: String, alias: Option<String>, arg_expr: Option<PlanExpr> },
+    Aggregate {
+        function: AggregateKind,
+        column: String,
+        alias: Option<String>,
+        arg_expr: Option<PlanExpr>,
+    },
 }
 
 /// Column definition used in CREATE TABLE plans.
@@ -703,7 +727,9 @@ pub struct PivotValue {
 #[derive(Debug, Clone, PartialEq)]
 pub enum OnConflictAction {
     DoNothing,
-    DoUpdate { assignments: Vec<(String, PlanExpr)> },
+    DoUpdate {
+        assignments: Vec<(String, PlanExpr)>,
+    },
 }
 
 /// ON CONFLICT specification for INSERT.
@@ -717,7 +743,9 @@ pub struct OnConflictClause {
 #[derive(Debug, Clone, PartialEq)]
 pub enum MergeWhen {
     /// WHEN MATCHED THEN UPDATE SET col = expr, ...
-    MatchedUpdate { assignments: Vec<(String, PlanExpr)> },
+    MatchedUpdate {
+        assignments: Vec<(String, PlanExpr)>,
+    },
     /// WHEN MATCHED THEN DELETE
     MatchedDelete,
     /// WHEN NOT MATCHED THEN INSERT VALUES (exprs...)
@@ -807,10 +835,7 @@ pub enum QueryPlan {
         column_type: String,
     },
     /// Drop a column from a table.
-    DropColumn {
-        table: String,
-        column_name: String,
-    },
+    DropColumn { table: String, column_name: String },
     /// Rename a column in a table.
     RenameColumn {
         table: String,
@@ -824,10 +849,7 @@ pub enum QueryPlan {
         new_type: String,
     },
     /// Drop a table entirely.
-    DropTable {
-        table: String,
-        if_exists: bool,
-    },
+    DropTable { table: String, if_exists: bool },
     /// DELETE rows from a table.
     Delete {
         table: String,
@@ -877,48 +899,26 @@ pub enum QueryPlan {
         options: CopyOptions,
     },
     /// EXPLAIN a query plan without executing it.
-    Explain {
-        query: Box<QueryPlan>,
-    },
+    Explain { query: Box<QueryPlan> },
     /// EXPLAIN ANALYZE: execute the query with profiling instrumentation
     /// and return timing/row-count data instead of query results.
-    ExplainAnalyze {
-        query: Box<QueryPlan>,
-    },
+    ExplainAnalyze { query: Box<QueryPlan> },
     /// VACUUM a table to reclaim space.
-    Vacuum {
-        table: String,
-    },
+    Vacuum { table: String },
     /// Create a materialized view backed by a stored query.
-    CreateMatView {
-        name: String,
-        source_sql: String,
-    },
+    CreateMatView { name: String, source_sql: String },
     /// Refresh a materialized view by re-executing its defining query.
-    RefreshMatView {
-        name: String,
-    },
+    RefreshMatView { name: String },
     /// Drop a materialized view and its backing table.
-    DropMatView {
-        name: String,
-    },
+    DropMatView { name: String },
     /// CREATE USER <name> WITH PASSWORD '<password>'
-    CreateUser {
-        username: String,
-        password: String,
-    },
+    CreateUser { username: String, password: String },
     /// DROP USER <name>
-    DropUser {
-        username: String,
-    },
+    DropUser { username: String },
     /// CREATE ROLE <name>
-    CreateRole {
-        name: String,
-    },
+    CreateRole { name: String },
     /// DROP ROLE <name>
-    DropRole {
-        name: String,
-    },
+    DropRole { name: String },
     /// GRANT <permission> [ON <table>] TO <role_or_user>
     Grant {
         permission: GrantPermission,
@@ -932,13 +932,9 @@ pub enum QueryPlan {
     /// SHOW TABLES
     ShowTables,
     /// SHOW COLUMNS FROM <table> / DESCRIBE <table>
-    ShowColumns {
-        table: String,
-    },
+    ShowColumns { table: String },
     /// SHOW CREATE TABLE <table>
-    ShowCreateTable {
-        table: String,
-    },
+    ShowCreateTable { table: String },
     /// SELECT x FROM long_sequence(N) — virtual table generating 1..N.
     LongSequence {
         count: u64,
@@ -965,14 +961,9 @@ pub enum QueryPlan {
     /// ROLLBACK — no-op for client compatibility.
     Rollback,
     /// SET variable = value — no-op for client compatibility.
-    Set {
-        name: String,
-        value: String,
-    },
+    Set { name: String, value: String },
     /// SHOW variable — returns the variable value.
-    Show {
-        name: String,
-    },
+    Show { name: String },
     /// INSERT INTO ... SELECT: insert results of a query into a table.
     InsertSelect {
         target_table: String,
@@ -980,19 +971,11 @@ pub enum QueryPlan {
         source: Box<QueryPlan>,
     },
     /// TRUNCATE TABLE: delete all rows from a table.
-    TruncateTable {
-        table: String,
-    },
+    TruncateTable { table: String },
     /// ALTER TABLE ... DETACH PARTITION '<name>'
-    DetachPartition {
-        table: String,
-        partition: String,
-    },
+    DetachPartition { table: String, partition: String },
     /// ALTER TABLE ... ATTACH PARTITION '<name>'
-    AttachPartition {
-        table: String,
-        partition: String,
-    },
+    AttachPartition { table: String, partition: String },
     /// ALTER TABLE ... SQUASH PARTITIONS '<p1>', '<p2>'
     SquashPartitions {
         table: String,
@@ -1033,14 +1016,9 @@ pub enum QueryPlan {
         columns: Vec<String>,
     },
     /// DROP INDEX idx_name
-    DropIndex {
-        name: String,
-    },
+    DropIndex { name: String },
     /// ALTER TABLE t RENAME TO new_name
-    RenameTable {
-        old_name: String,
-        new_name: String,
-    },
+    RenameTable { old_name: String, new_name: String },
     /// CREATE SEQUENCE seq_name START n INCREMENT n
     CreateSequence {
         name: String,
@@ -1048,26 +1026,15 @@ pub enum QueryPlan {
         increment: i64,
     },
     /// DROP SEQUENCE seq_name
-    DropSequence {
-        name: String,
-    },
+    DropSequence { name: String },
     /// SELECT nextval('seq') / currval('seq') / setval('seq', n)
-    SequenceOp {
-        op: SequenceOpKind,
-    },
+    SequenceOp { op: SequenceOpKind },
     /// CREATE PROCEDURE <name> AS BEGIN <body> END
-    CreateProcedure {
-        name: String,
-        body: String,
-    },
+    CreateProcedure { name: String, body: String },
     /// DROP PROCEDURE <name>
-    DropProcedure {
-        name: String,
-    },
+    DropProcedure { name: String },
     /// CALL <procedure_name>()
-    CallProcedure {
-        name: String,
-    },
+    CallProcedure { name: String },
     /// CREATE DOWNSAMPLING ON <source> INTERVAL <interval> AS <name> COLUMNS <cols>
     CreateDownsampling {
         source_table: String,
@@ -1087,14 +1054,9 @@ pub enum QueryPlan {
         limit: Option<u64>,
     },
     /// CREATE VIEW <name> AS <select_sql>
-    CreateView {
-        name: String,
-        sql: String,
-    },
+    CreateView { name: String, sql: String },
     /// DROP VIEW <name>
-    DropView {
-        name: String,
-    },
+    DropView { name: String },
     /// CREATE TRIGGER <name> AFTER INSERT ON <table> FOR EACH ROW EXECUTE PROCEDURE <proc>()
     CreateTrigger {
         name: String,
@@ -1102,10 +1064,7 @@ pub enum QueryPlan {
         procedure: String,
     },
     /// DROP TRIGGER <name> ON <table>
-    DropTrigger {
-        name: String,
-        table: String,
-    },
+    DropTrigger { name: String, table: String },
     /// COMMENT ON TABLE <table> IS '<comment>'
     CommentOn {
         object_type: CommentObjectType,
@@ -1218,8 +1177,14 @@ mod tests {
     fn aggregate_kind_from_name() {
         assert_eq!(AggregateKind::from_name("SUM"), Some(AggregateKind::Sum));
         assert_eq!(AggregateKind::from_name("avg"), Some(AggregateKind::Avg));
-        assert_eq!(AggregateKind::from_name("COUNT"), Some(AggregateKind::Count));
-        assert_eq!(AggregateKind::from_name("first"), Some(AggregateKind::First));
+        assert_eq!(
+            AggregateKind::from_name("COUNT"),
+            Some(AggregateKind::Count)
+        );
+        assert_eq!(
+            AggregateKind::from_name("first"),
+            Some(AggregateKind::First)
+        );
         assert_eq!(AggregateKind::from_name("last"), Some(AggregateKind::Last));
         assert_eq!(AggregateKind::from_name("unknown"), None);
     }

@@ -102,7 +102,12 @@ fn query_count(db_root: &Path, sql: &str) -> usize {
 /// Extract a single scalar value from a 1-row, 1-column result.
 fn query_scalar(db_root: &Path, sql: &str) -> Value {
     let (cols, rows) = query_rows(db_root, sql);
-    assert_eq!(rows.len(), 1, "expected 1 row, got {} for `{sql}`", rows.len());
+    assert_eq!(
+        rows.len(),
+        1,
+        "expected 1 row, got {} for `{sql}`",
+        rows.len()
+    );
     assert!(!cols.is_empty(), "expected at least 1 column for `{sql}`");
     rows[0][0].clone()
 }
@@ -209,7 +214,9 @@ fn select_where_eq() {
     assert!(!rows.is_empty(), "should have BTC/USD rows");
     // All rows should have BTC/USD.
     for row in &rows {
-        let sym = row.iter().find(|v| matches!(v, Value::Str(s) if s == "BTC/USD"));
+        let sym = row
+            .iter()
+            .find(|v| matches!(v, Value::Str(s) if s == "BTC/USD"));
         assert!(sym.is_some(), "expected BTC/USD in row, got: {row:?}");
     }
 }
@@ -322,7 +329,11 @@ fn sample_by_hour() {
     // 3 days * 24 hours = potentially up to 72 buckets, but data only spans
     // ~5.6 hours per day (34 rows * 10min = 340min). We just check we get
     // multiple buckets with valid averages.
-    assert!(rows.len() > 1, "expected multiple time buckets, got {}", rows.len());
+    assert!(
+        rows.len() > 1,
+        "expected multiple time buckets, got {}",
+        rows.len()
+    );
     for row in &rows {
         match &row[0] {
             Value::F64(v) => assert!(*v > 0.0),
@@ -487,7 +498,10 @@ fn drop_table() {
     let ts = 1710460800_000_000_000i64;
     run_sql(
         &db,
-        &format!("INSERT INTO temp_data (timestamp, val) VALUES ({}, 1.0)", ts),
+        &format!(
+            "INSERT INTO temp_data (timestamp, val) VALUES ({}, 1.0)",
+            ts
+        ),
     );
     assert_eq!(query_count(&db, "SELECT * FROM temp_data"), 1);
 
@@ -555,9 +569,13 @@ fn setup_join_db() -> (TempDir, PathBuf) {
     let base_ts = 1710460800_000_000_000i64;
 
     // Insert trades.
-    for (i, (sym, price)) in [("BTC/USD", 60000.0), ("ETH/USD", 3000.0), ("SOL/USD", 100.0)]
-        .iter()
-        .enumerate()
+    for (i, (sym, price)) in [
+        ("BTC/USD", 60000.0),
+        ("ETH/USD", 3000.0),
+        ("SOL/USD", 100.0),
+    ]
+    .iter()
+    .enumerate()
     {
         run_sql(
             &db,
@@ -754,10 +772,7 @@ fn large_result() {
     let dir = TempDir::new().unwrap();
     let db = dir.path().to_path_buf();
 
-    run_sql(
-        &db,
-        "CREATE TABLE big (timestamp TIMESTAMP, val DOUBLE)",
-    );
+    run_sql(&db, "CREATE TABLE big (timestamp TIMESTAMP, val DOUBLE)");
 
     // Insert 10000 rows in batches.
     let base_ts = 1710460800_000_000_000i64;
@@ -821,10 +836,7 @@ fn order_by_across_partitions() {
 #[test]
 fn group_by_across_partitions() {
     let (_dir, db) = setup_test_db();
-    let (_, rows) = query_rows(
-        &db,
-        "SELECT symbol, count(*) FROM trades GROUP BY symbol",
-    );
+    let (_, rows) = query_rows(&db, "SELECT symbol, count(*) FROM trades GROUP BY symbol");
     assert_eq!(rows.len(), 3, "expected 3 groups across all partitions");
     let total: i64 = rows
         .iter()

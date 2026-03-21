@@ -2,7 +2,7 @@ use exchange_common::error::{ExchangeDbError, Result};
 use std::path::{Path, PathBuf};
 
 use super::event::WalEvent;
-use super::segment::{WalSegment, SEGMENT_HEADER_SIZE};
+use super::segment::{SEGMENT_HEADER_SIZE, WalSegment};
 
 /// Reads events from WAL segments, supporting iteration across multiple
 /// segments in order.

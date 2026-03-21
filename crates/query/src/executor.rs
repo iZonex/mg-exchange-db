@@ -3,39 +3,70 @@
 //! Supports arithmetic expressions in SELECT and WHERE, INSERT INTO ... SELECT,
 //! and TRUNCATE TABLE.
 
-fn evaluate_plan_expr(expr: &PlanExpr, values: &[(usize, Value)], meta: &exchange_core::table::TableMeta) -> Value {
+fn evaluate_plan_expr(
+    expr: &PlanExpr,
+    values: &[(usize, Value)],
+    meta: &exchange_core::table::TableMeta,
+) -> Value {
     match expr {
         PlanExpr::Column(name) => {
             if let Some(idx) = meta.columns.iter().position(|c| c.name == *name) {
-                values.iter().find(|(i, _)| *i == idx).map(|(_, v)| v.clone()).unwrap_or(Value::Null)
-            } else { Value::Null }
+                values
+                    .iter()
+                    .find(|(i, _)| *i == idx)
+                    .map(|(_, v)| v.clone())
+                    .unwrap_or(Value::Null)
+            } else {
+                Value::Null
+            }
         }
         PlanExpr::Literal(v) => v.clone(),
-        PlanExpr::BinaryOp { left, op, right } => apply_binary_op(&evaluate_plan_expr(left, values, meta), *op, &evaluate_plan_expr(right, values, meta)),
-        PlanExpr::UnaryOp { op, expr } => apply_unary_op(*op, &evaluate_plan_expr(expr, values, meta)),
+        PlanExpr::BinaryOp { left, op, right } => apply_binary_op(
+            &evaluate_plan_expr(left, values, meta),
+            *op,
+            &evaluate_plan_expr(right, values, meta),
+        ),
+        PlanExpr::UnaryOp { op, expr } => {
+            apply_unary_op(*op, &evaluate_plan_expr(expr, values, meta))
+        }
         PlanExpr::Function { name, args } => {
-            let func_args: Vec<Value> = args.iter().map(|a| evaluate_plan_expr(a, values, meta)).collect();
+            let func_args: Vec<Value> = args
+                .iter()
+                .map(|a| evaluate_plan_expr(a, values, meta))
+                .collect();
             crate::scalar::evaluate_scalar(name, &func_args).unwrap_or(Value::Null)
         }
     }
 }
 
-pub(crate) fn evaluate_plan_expr_by_name(expr: &PlanExpr, row: &[Value], col_names: &[String]) -> Value {
+pub(crate) fn evaluate_plan_expr_by_name(
+    expr: &PlanExpr,
+    row: &[Value],
+    col_names: &[String],
+) -> Value {
     match expr {
         PlanExpr::Column(name) => {
             // Exact match first, then suffix match for qualified column names (e.g., "t.price").
-            let idx = col_names.iter().position(|n| n == name)
-                .or_else(|| {
-                    let suffix = format!(".{name}");
-                    col_names.iter().position(|n| n.ends_with(&suffix))
-                });
+            let idx = col_names.iter().position(|n| n == name).or_else(|| {
+                let suffix = format!(".{name}");
+                col_names.iter().position(|n| n.ends_with(&suffix))
+            });
             idx.and_then(|i| row.get(i).cloned()).unwrap_or(Value::Null)
         }
         PlanExpr::Literal(v) => v.clone(),
-        PlanExpr::BinaryOp { left, op, right } => apply_binary_op(&evaluate_plan_expr_by_name(left, row, col_names), *op, &evaluate_plan_expr_by_name(right, row, col_names)),
-        PlanExpr::UnaryOp { op, expr } => apply_unary_op(*op, &evaluate_plan_expr_by_name(expr, row, col_names)),
+        PlanExpr::BinaryOp { left, op, right } => apply_binary_op(
+            &evaluate_plan_expr_by_name(left, row, col_names),
+            *op,
+            &evaluate_plan_expr_by_name(right, row, col_names),
+        ),
+        PlanExpr::UnaryOp { op, expr } => {
+            apply_unary_op(*op, &evaluate_plan_expr_by_name(expr, row, col_names))
+        }
         PlanExpr::Function { name, args } => {
-            let func_args: Vec<Value> = args.iter().map(|a| evaluate_plan_expr_by_name(a, row, col_names)).collect();
+            let func_args: Vec<Value> = args
+                .iter()
+                .map(|a| evaluate_plan_expr_by_name(a, row, col_names))
+                .collect();
             crate::scalar::evaluate_scalar(name, &func_args).unwrap_or(Value::Null)
         }
     }
@@ -43,27 +74,137 @@ pub(crate) fn evaluate_plan_expr_by_name(expr: &PlanExpr, row: &[Value], col_nam
 
 pub(crate) fn apply_binary_op(lv: &Value, op: BinaryOp, rv: &Value) -> Value {
     match op {
-        BinaryOp::Add => match (lv, rv) { (Value::I64(a), Value::I64(b)) => Value::I64(a.wrapping_add(*b)), (Value::F64(a), Value::F64(b)) => Value::F64(a + b), (Value::I64(a), Value::F64(b)) => Value::F64(*a as f64 + b), (Value::F64(a), Value::I64(b)) => Value::F64(a + *b as f64), _ => Value::Null },
-        BinaryOp::Sub => match (lv, rv) { (Value::I64(a), Value::I64(b)) => Value::I64(a.wrapping_sub(*b)), (Value::F64(a), Value::F64(b)) => Value::F64(a - b), (Value::I64(a), Value::F64(b)) => Value::F64(*a as f64 - b), (Value::F64(a), Value::I64(b)) => Value::F64(a - *b as f64), _ => Value::Null },
-        BinaryOp::Mul => match (lv, rv) { (Value::I64(a), Value::I64(b)) => Value::I64(a.wrapping_mul(*b)), (Value::F64(a), Value::F64(b)) => Value::F64(a * b), (Value::I64(a), Value::F64(b)) => Value::F64(*a as f64 * b), (Value::F64(a), Value::I64(b)) => Value::F64(a * *b as f64), _ => Value::Null },
-        BinaryOp::Div => match (lv, rv) { (Value::I64(a), Value::I64(b)) if *b != 0 => Value::I64(a / b), (Value::F64(a), Value::F64(b)) if *b != 0.0 => Value::F64(a / b), (Value::I64(a), Value::F64(b)) if *b != 0.0 => Value::F64(*a as f64 / b), (Value::F64(a), Value::I64(b)) if *b != 0 => Value::F64(a / *b as f64), _ => Value::Null },
-        BinaryOp::Mod => match (lv, rv) { (Value::I64(a), Value::I64(b)) if *b != 0 => Value::I64(a % b), (Value::F64(a), Value::F64(b)) if *b != 0.0 => Value::F64(a % b), _ => Value::Null },
-        BinaryOp::Concat => { let ls = match lv { Value::Str(s) => s.clone(), Value::I64(n) => n.to_string(), Value::F64(n) => n.to_string(), Value::Null => return Value::Null, other => format!("{other}") }; let rs = match rv { Value::Str(s) => s.clone(), Value::I64(n) => n.to_string(), Value::F64(n) => n.to_string(), Value::Null => return Value::Null, other => format!("{other}") }; Value::Str(format!("{ls}{rs}")) },
-        BinaryOp::Gt => if lv.cmp_coerce(rv) == Some(std::cmp::Ordering::Greater) { Value::I64(1) } else { Value::I64(0) },
-        BinaryOp::Lt => if lv.cmp_coerce(rv) == Some(std::cmp::Ordering::Less) { Value::I64(1) } else { Value::I64(0) },
-        BinaryOp::Gte => if matches!(lv.cmp_coerce(rv), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)) { Value::I64(1) } else { Value::I64(0) },
-        BinaryOp::Lte => if matches!(lv.cmp_coerce(rv), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)) { Value::I64(1) } else { Value::I64(0) },
-        BinaryOp::Eq => if lv.eq_coerce(rv) { Value::I64(1) } else { Value::I64(0) },
-        BinaryOp::NotEq => if !lv.eq_coerce(rv) { Value::I64(1) } else { Value::I64(0) },
-        BinaryOp::And => { let lb = matches!(lv, Value::I64(v) if *v != 0); let rb = matches!(rv, Value::I64(v) if *v != 0); if lb && rb { Value::I64(1) } else { Value::I64(0) } },
-        BinaryOp::Or => { let lb = matches!(lv, Value::I64(v) if *v != 0); let rb = matches!(rv, Value::I64(v) if *v != 0); if lb || rb { Value::I64(1) } else { Value::I64(0) } },
+        BinaryOp::Add => match (lv, rv) {
+            (Value::I64(a), Value::I64(b)) => Value::I64(a.wrapping_add(*b)),
+            (Value::F64(a), Value::F64(b)) => Value::F64(a + b),
+            (Value::I64(a), Value::F64(b)) => Value::F64(*a as f64 + b),
+            (Value::F64(a), Value::I64(b)) => Value::F64(a + *b as f64),
+            _ => Value::Null,
+        },
+        BinaryOp::Sub => match (lv, rv) {
+            (Value::I64(a), Value::I64(b)) => Value::I64(a.wrapping_sub(*b)),
+            (Value::F64(a), Value::F64(b)) => Value::F64(a - b),
+            (Value::I64(a), Value::F64(b)) => Value::F64(*a as f64 - b),
+            (Value::F64(a), Value::I64(b)) => Value::F64(a - *b as f64),
+            _ => Value::Null,
+        },
+        BinaryOp::Mul => match (lv, rv) {
+            (Value::I64(a), Value::I64(b)) => Value::I64(a.wrapping_mul(*b)),
+            (Value::F64(a), Value::F64(b)) => Value::F64(a * b),
+            (Value::I64(a), Value::F64(b)) => Value::F64(*a as f64 * b),
+            (Value::F64(a), Value::I64(b)) => Value::F64(a * *b as f64),
+            _ => Value::Null,
+        },
+        BinaryOp::Div => match (lv, rv) {
+            (Value::I64(a), Value::I64(b)) if *b != 0 => Value::I64(a / b),
+            (Value::F64(a), Value::F64(b)) if *b != 0.0 => Value::F64(a / b),
+            (Value::I64(a), Value::F64(b)) if *b != 0.0 => Value::F64(*a as f64 / b),
+            (Value::F64(a), Value::I64(b)) if *b != 0 => Value::F64(a / *b as f64),
+            _ => Value::Null,
+        },
+        BinaryOp::Mod => match (lv, rv) {
+            (Value::I64(a), Value::I64(b)) if *b != 0 => Value::I64(a % b),
+            (Value::F64(a), Value::F64(b)) if *b != 0.0 => Value::F64(a % b),
+            _ => Value::Null,
+        },
+        BinaryOp::Concat => {
+            let ls = match lv {
+                Value::Str(s) => s.clone(),
+                Value::I64(n) => n.to_string(),
+                Value::F64(n) => n.to_string(),
+                Value::Null => return Value::Null,
+                other => format!("{other}"),
+            };
+            let rs = match rv {
+                Value::Str(s) => s.clone(),
+                Value::I64(n) => n.to_string(),
+                Value::F64(n) => n.to_string(),
+                Value::Null => return Value::Null,
+                other => format!("{other}"),
+            };
+            Value::Str(format!("{ls}{rs}"))
+        }
+        BinaryOp::Gt => {
+            if lv.cmp_coerce(rv) == Some(std::cmp::Ordering::Greater) {
+                Value::I64(1)
+            } else {
+                Value::I64(0)
+            }
+        }
+        BinaryOp::Lt => {
+            if lv.cmp_coerce(rv) == Some(std::cmp::Ordering::Less) {
+                Value::I64(1)
+            } else {
+                Value::I64(0)
+            }
+        }
+        BinaryOp::Gte => {
+            if matches!(
+                lv.cmp_coerce(rv),
+                Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+            ) {
+                Value::I64(1)
+            } else {
+                Value::I64(0)
+            }
+        }
+        BinaryOp::Lte => {
+            if matches!(
+                lv.cmp_coerce(rv),
+                Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+            ) {
+                Value::I64(1)
+            } else {
+                Value::I64(0)
+            }
+        }
+        BinaryOp::Eq => {
+            if lv.eq_coerce(rv) {
+                Value::I64(1)
+            } else {
+                Value::I64(0)
+            }
+        }
+        BinaryOp::NotEq => {
+            if !lv.eq_coerce(rv) {
+                Value::I64(1)
+            } else {
+                Value::I64(0)
+            }
+        }
+        BinaryOp::And => {
+            let lb = matches!(lv, Value::I64(v) if *v != 0);
+            let rb = matches!(rv, Value::I64(v) if *v != 0);
+            if lb && rb {
+                Value::I64(1)
+            } else {
+                Value::I64(0)
+            }
+        }
+        BinaryOp::Or => {
+            let lb = matches!(lv, Value::I64(v) if *v != 0);
+            let rb = matches!(rv, Value::I64(v) if *v != 0);
+            if lb || rb {
+                Value::I64(1)
+            } else {
+                Value::I64(0)
+            }
+        }
     }
 }
 
 pub(crate) fn apply_unary_op(op: UnaryOp, val: &Value) -> Value {
     match op {
-        UnaryOp::Neg => match val { Value::I64(n) => Value::I64(-n), Value::F64(n) => Value::F64(-n), _ => Value::Null },
-        UnaryOp::Not => match val { Value::I64(0) => Value::I64(1), Value::I64(_) => Value::I64(0), _ => Value::Null },
+        UnaryOp::Neg => match val {
+            Value::I64(n) => Value::I64(-n),
+            Value::F64(n) => Value::F64(-n),
+            _ => Value::Null,
+        },
+        UnaryOp::Not => match val {
+            Value::I64(0) => Value::I64(1),
+            Value::I64(_) => Value::I64(0),
+            _ => Value::Null,
+        },
     }
 }
 
@@ -71,12 +212,12 @@ pub(crate) fn apply_unary_op(op: UnaryOp, val: &Value) -> Value {
 fn evaluate_plan_expr_standalone(expr: &PlanExpr) -> Value {
     match expr {
         PlanExpr::Literal(v) => v.clone(),
-        PlanExpr::BinaryOp { left, op, right } => {
-            apply_binary_op(&evaluate_plan_expr_standalone(left), *op, &evaluate_plan_expr_standalone(right))
-        }
-        PlanExpr::UnaryOp { op, expr } => {
-            apply_unary_op(*op, &evaluate_plan_expr_standalone(expr))
-        }
+        PlanExpr::BinaryOp { left, op, right } => apply_binary_op(
+            &evaluate_plan_expr_standalone(left),
+            *op,
+            &evaluate_plan_expr_standalone(right),
+        ),
+        PlanExpr::UnaryOp { op, expr } => apply_unary_op(*op, &evaluate_plan_expr_standalone(expr)),
         PlanExpr::Function { name, args } => {
             let func_args: Vec<Value> = args.iter().map(evaluate_plan_expr_standalone).collect();
             crate::scalar::evaluate_scalar(name, &func_args).unwrap_or(Value::Null)
@@ -106,7 +247,10 @@ use std::path::{Path, PathBuf};
 ///
 /// Resource limits (concurrent queries) are enforced via the context's
 /// resource manager, if configured.
-pub fn execute_with_context(ctx: &crate::context::ExecutionContext, plan: &QueryPlan) -> Result<QueryResult> {
+pub fn execute_with_context(
+    ctx: &crate::context::ExecutionContext,
+    plan: &QueryPlan,
+) -> Result<QueryResult> {
     // ── RBAC checks ──────────────────────────────────────────────
     check_plan_permissions(ctx, plan)?;
 
@@ -129,30 +273,36 @@ pub fn execute_with_context(ctx: &crate::context::ExecutionContext, plan: &Query
         execute(&ctx.db_root, plan)
     };
     let t_inner = t0.elapsed();
-    tracing::debug!(engine_us = t_inner.as_micros(), cursor = ctx.use_cursor_engine, wal = ctx.use_wal, "inner execute");
+    tracing::debug!(
+        engine_us = t_inner.as_micros(),
+        cursor = ctx.use_cursor_engine,
+        wal = ctx.use_wal,
+        "inner execute"
+    );
 
     // ── MVCC commit for write operations ─────────────────────────
     // After a successful write, record the new row counts in the MVCC
     // manager so subsequent snapshots reflect the committed data.
     if let Ok(ref qr) = result
-        && let Some(ref mvcc) = ctx.mvcc {
-            let affected = match qr {
-                QueryResult::Ok { affected_rows } => *affected_rows,
-                _ => 0,
-            };
-            if affected > 0 {
-                let table_name = extract_write_table(plan);
-                if let Some(tbl) = table_name {
-                    // We record the affected count as a delta; the MVCC layer
-                    // uses cumulative counts, but callers that wire this into
-                    // production should pass the *total* row count after the
-                    // write.  Here we use affected_rows as a reasonable proxy
-                    // that bumps the version and makes the write visible.
-                    let current = mvcc.current_version();
-                    mvcc.commit_write(&[(&tbl, current + affected)]);
-                }
+        && let Some(ref mvcc) = ctx.mvcc
+    {
+        let affected = match qr {
+            QueryResult::Ok { affected_rows } => *affected_rows,
+            _ => 0,
+        };
+        if affected > 0 {
+            let table_name = extract_write_table(plan);
+            if let Some(tbl) = table_name {
+                // We record the affected count as a delta; the MVCC layer
+                // uses cumulative counts, but callers that wire this into
+                // production should pass the *total* row count after the
+                // write.  Here we use affected_rows as a reasonable proxy
+                // that bumps the version and makes the write visible.
+                let current = mvcc.current_version();
+                mvcc.commit_write(&[(&tbl, current + affected)]);
             }
         }
+    }
 
     // ── Audit logging ────────────────────────────────────────────
     if let Some(ref audit) = ctx.audit_log {
@@ -206,7 +356,10 @@ fn extract_write_table(plan: &QueryPlan) -> Option<String> {
         QueryPlan::Insert { table, .. }
         | QueryPlan::Update { table, .. }
         | QueryPlan::Delete { table, .. }
-        | QueryPlan::InsertSelect { target_table: table, .. }
+        | QueryPlan::InsertSelect {
+            target_table: table,
+            ..
+        }
         | QueryPlan::InsertOnConflict { table, .. } => Some(table.clone()),
         QueryPlan::CreateTableAs { name, .. } => Some(name.clone()),
         _ => None,
@@ -221,7 +374,9 @@ fn audit_action_for_plan(plan: &QueryPlan) -> (exchange_core::audit::AuditAction
         QueryPlan::Join { left_table, .. } => (AuditAction::Query, Some(left_table.clone())),
         QueryPlan::AsofJoin { left_table, .. } => (AuditAction::Query, Some(left_table.clone())),
         QueryPlan::Insert { table, .. } => (AuditAction::Insert, Some(table.clone())),
-        QueryPlan::InsertSelect { target_table, .. } => (AuditAction::Insert, Some(target_table.clone())),
+        QueryPlan::InsertSelect { target_table, .. } => {
+            (AuditAction::Insert, Some(target_table.clone()))
+        }
         QueryPlan::InsertOnConflict { table, .. } => (AuditAction::Insert, Some(table.clone())),
         QueryPlan::Update { table, .. } => (AuditAction::Update, Some(table.clone())),
         QueryPlan::Delete { table, .. } => (AuditAction::Delete, Some(table.clone())),
@@ -246,7 +401,10 @@ fn audit_action_for_plan(plan: &QueryPlan) -> (exchange_core::audit::AuditAction
 /// Supports SELECT, DELETE, UPDATE, and JOIN plans. For joins, the RLS
 /// filter is applied to the left table's filter (the right table filter
 /// would require a separate pass in a full implementation).
-fn inject_rls_filter(ctx: &crate::context::ExecutionContext, plan: &QueryPlan) -> Option<QueryPlan> {
+fn inject_rls_filter(
+    ctx: &crate::context::ExecutionContext,
+    plan: &QueryPlan,
+) -> Option<QueryPlan> {
     match plan {
         QueryPlan::Select { table, filter, .. } => {
             let rls_filter = ctx.get_rls_filter(table)?;
@@ -255,7 +413,10 @@ fn inject_rls_filter(ctx: &crate::context::ExecutionContext, plan: &QueryPlan) -
                 None => rls_filter,
             };
             let mut new_plan = plan.clone();
-            if let QueryPlan::Select { filter: ref mut f, .. } = new_plan {
+            if let QueryPlan::Select {
+                filter: ref mut f, ..
+            } = new_plan
+            {
                 *f = Some(combined);
             }
             Some(new_plan)
@@ -271,7 +432,11 @@ fn inject_rls_filter(ctx: &crate::context::ExecutionContext, plan: &QueryPlan) -
                 filter: Some(combined),
             })
         }
-        QueryPlan::Update { table, assignments, filter } => {
+        QueryPlan::Update {
+            table,
+            assignments,
+            filter,
+        } => {
             let rls_filter = ctx.get_rls_filter(table)?;
             let combined = match filter {
                 Some(existing) => Filter::And(vec![existing.clone(), rls_filter]),
@@ -283,14 +448,19 @@ fn inject_rls_filter(ctx: &crate::context::ExecutionContext, plan: &QueryPlan) -
                 filter: Some(combined),
             })
         }
-        QueryPlan::Join { left_table, filter, .. } => {
+        QueryPlan::Join {
+            left_table, filter, ..
+        } => {
             let rls_filter = ctx.get_rls_filter(left_table)?;
             let combined = match filter {
                 Some(existing) => Filter::And(vec![existing.clone(), rls_filter]),
                 None => rls_filter,
             };
             let mut new_plan = plan.clone();
-            if let QueryPlan::Join { filter: ref mut f, .. } = new_plan {
+            if let QueryPlan::Join {
+                filter: ref mut f, ..
+            } = new_plan
+            {
                 *f = Some(combined);
             }
             Some(new_plan)
@@ -304,11 +474,19 @@ fn check_plan_permissions(ctx: &crate::context::ExecutionContext, plan: &QueryPl
     match plan {
         // ── Read operations ──────────────────────────────────────
         QueryPlan::Select { table, .. } => ctx.check_read(table),
-        QueryPlan::Join { left_table, right_table, .. } => {
+        QueryPlan::Join {
+            left_table,
+            right_table,
+            ..
+        } => {
             ctx.check_read(left_table)?;
             ctx.check_read(right_table)
         }
-        QueryPlan::AsofJoin { left_table, right_table, .. } => {
+        QueryPlan::AsofJoin {
+            left_table,
+            right_table,
+            ..
+        } => {
             ctx.check_read(left_table)?;
             ctx.check_read(right_table)
         }
@@ -354,16 +532,23 @@ fn check_plan_permissions(ctx: &crate::context::ExecutionContext, plan: &QueryPl
         // ── No-op / compatibility operations ─────────────────────
         QueryPlan::Begin | QueryPlan::Commit | QueryPlan::Rollback => Ok(()),
         QueryPlan::Set { .. } | QueryPlan::Show { .. } => Ok(()),
-        QueryPlan::ShowTables | QueryPlan::ShowColumns { .. } | QueryPlan::ShowCreateTable { .. } => Ok(()),
+        QueryPlan::ShowTables
+        | QueryPlan::ShowColumns { .. }
+        | QueryPlan::ShowCreateTable { .. } => Ok(()),
         QueryPlan::LongSequence { .. } => Ok(()),
         QueryPlan::GenerateSeries { .. } => Ok(()),
         QueryPlan::ReadParquet { .. } => Ok(()),
         QueryPlan::InsertSelect { target_table, .. } => ctx.check_write(target_table),
         QueryPlan::TruncateTable { .. } => ctx.check_ddl(),
         QueryPlan::MultiJoin { .. } => Ok(()),
-        QueryPlan::Pivot { .. } | QueryPlan::Merge { .. } | QueryPlan::InsertOnConflict { .. }
-        | QueryPlan::Values { .. } | QueryPlan::LateralJoin { .. } => Ok(()),
-        QueryPlan::CreateIndex { .. } | QueryPlan::DropIndex { .. } | QueryPlan::RenameTable { .. } => ctx.check_ddl(),
+        QueryPlan::Pivot { .. }
+        | QueryPlan::Merge { .. }
+        | QueryPlan::InsertOnConflict { .. }
+        | QueryPlan::Values { .. }
+        | QueryPlan::LateralJoin { .. } => Ok(()),
+        QueryPlan::CreateIndex { .. }
+        | QueryPlan::DropIndex { .. }
+        | QueryPlan::RenameTable { .. } => ctx.check_ddl(),
         QueryPlan::CreateSequence { .. } | QueryPlan::DropSequence { .. } => ctx.check_ddl(),
         QueryPlan::SequenceOp { .. } => Ok(()),
         QueryPlan::CreateProcedure { .. } | QueryPlan::DropProcedure { .. } => ctx.check_ddl(),
@@ -400,7 +585,13 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
                     return Ok(QueryResult::Ok { affected_rows: 0 });
                 }
             }
-            execute_create_table(db_root, name, columns, partition_by.as_deref(), timestamp_col.as_deref())
+            execute_create_table(
+                db_root,
+                name,
+                columns,
+                partition_by.as_deref(),
+                timestamp_col.as_deref(),
+            )
         }
         QueryPlan::Insert {
             table,
@@ -418,13 +609,33 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
         }
         QueryPlan::Select { .. } => {
             // Check if the table is actually a view and redirect.
-            if let QueryPlan::Select { table, columns, filter, order_by, limit, offset, .. } = plan
-                && let Some(view_plan) = resolve_view(db_root, table, columns, filter.as_ref(), order_by, *limit, *offset) {
-                    return execute(db_root, &view_plan);
-                }
+            if let QueryPlan::Select {
+                table,
+                columns,
+                filter,
+                order_by,
+                limit,
+                offset,
+                ..
+            } = plan
+                && let Some(view_plan) = resolve_view(
+                    db_root,
+                    table,
+                    columns,
+                    filter.as_ref(),
+                    order_by,
+                    *limit,
+                    *offset,
+                )
+            {
+                return execute(db_root, &view_plan);
+            }
             // Skip optimizer for simple queries (no filter = no partition pruning needed,
             // no ORDER BY = no sort optimization needed). This saves ~100µs per query.
-            let can_skip_optimizer = if let QueryPlan::Select { filter, order_by, .. } = plan {
+            let can_skip_optimizer = if let QueryPlan::Select {
+                filter, order_by, ..
+            } = plan
+            {
                 filter.is_none() && order_by.is_empty()
             } else {
                 false
@@ -433,14 +644,21 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
             let (opt_plan, pruned, limit_pd) = if can_skip_optimizer {
                 // Build a trivial limit pushdown directly.
                 let lp = if let QueryPlan::Select { limit: Some(l), .. } = plan {
-                    Some(crate::optimizer::LimitPushdown { limit: *l, reverse_scan: false })
+                    Some(crate::optimizer::LimitPushdown {
+                        limit: *l,
+                        reverse_scan: false,
+                    })
                 } else {
                     None
                 };
                 (plan, None, lp)
             } else {
                 optimized = crate::optimizer::optimize(plan.clone(), db_root)?;
-                (&optimized.plan, optimized.pruned_partitions.as_deref(), optimized.limit_pushdown)
+                (
+                    &optimized.plan,
+                    optimized.pruned_partitions.as_deref(),
+                    optimized.limit_pushdown,
+                )
             };
             match opt_plan {
                 QueryPlan::Select {
@@ -489,9 +707,41 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
             filter,
             order_by,
             limit,
-        } => crate::join::execute_join(db_root, left_table, right_table, left_alias.as_deref(), right_alias.as_deref(), columns, *join_type, on_columns, filter.as_ref(), order_by, *limit),
-        QueryPlan::MultiJoin { left, right_table, right_alias, columns, join_type, on_columns, filter, order_by, limit,
-        } => crate::join::execute_multi_join(db_root, left, right_table, right_alias.as_deref(), columns, *join_type, on_columns, filter.as_ref(), order_by, *limit),
+        } => crate::join::execute_join(
+            db_root,
+            left_table,
+            right_table,
+            left_alias.as_deref(),
+            right_alias.as_deref(),
+            columns,
+            *join_type,
+            on_columns,
+            filter.as_ref(),
+            order_by,
+            *limit,
+        ),
+        QueryPlan::MultiJoin {
+            left,
+            right_table,
+            right_alias,
+            columns,
+            join_type,
+            on_columns,
+            filter,
+            order_by,
+            limit,
+        } => crate::join::execute_multi_join(
+            db_root,
+            left,
+            right_table,
+            right_alias.as_deref(),
+            columns,
+            *join_type,
+            on_columns,
+            filter.as_ref(),
+            order_by,
+            *limit,
+        ),
         QueryPlan::AsofJoin {
             left_table,
             right_table,
@@ -501,16 +751,25 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
             filter,
             order_by,
             limit,
-        } => execute_asof_join(db_root, left_table, right_table, left_columns, right_columns, on_columns, filter.as_ref(), order_by, *limit),
+        } => execute_asof_join(
+            db_root,
+            left_table,
+            right_table,
+            left_columns,
+            right_columns,
+            on_columns,
+            filter.as_ref(),
+            order_by,
+            *limit,
+        ),
         QueryPlan::AddColumn {
             table,
             column_name,
             column_type,
         } => execute_add_column(db_root, table, column_name, column_type),
-        QueryPlan::DropColumn {
-            table,
-            column_name,
-        } => execute_drop_column(db_root, table, column_name),
+        QueryPlan::DropColumn { table, column_name } => {
+            execute_drop_column(db_root, table, column_name)
+        }
         QueryPlan::RenameColumn {
             table,
             old_name,
@@ -536,81 +795,92 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
             assignments,
             filter,
         } => execute_update(db_root, table, assignments, filter.as_ref()),
-        QueryPlan::SetOperation { op, left, right, all, limit } => {
-            execute_set_operation(db_root, *op, left, right, *all, *limit, &HashMap::new())
-        }
-        QueryPlan::WithCte { ctes, body } => {
-            execute_with_cte(db_root, ctes, body)
-        }
-        QueryPlan::DerivedScan { subquery, alias: _, columns, filter, order_by, limit, group_by, having, distinct } => {
-            execute_derived_scan(db_root, subquery, columns, filter.as_ref(), order_by, *limit, group_by, having.as_ref(), *distinct, &HashMap::new())
-        }
-        QueryPlan::CopyTo { table, path, options } => {
-            execute_copy_to(db_root, table, path, options)
-        }
-        QueryPlan::CopyFrom { table, path, options } => {
-            execute_copy_from(db_root, table, path, options)
-        }
-        QueryPlan::Explain { query } => {
-            execute_explain(db_root, query)
-        }
-        QueryPlan::ExplainAnalyze { query } => {
-            execute_explain_analyze(db_root, query)
-        }
-        QueryPlan::Vacuum { table } => {
-            execute_vacuum(db_root, table)
-        }
+        QueryPlan::SetOperation {
+            op,
+            left,
+            right,
+            all,
+            limit,
+        } => execute_set_operation(db_root, *op, left, right, *all, *limit, &HashMap::new()),
+        QueryPlan::WithCte { ctes, body } => execute_with_cte(db_root, ctes, body),
+        QueryPlan::DerivedScan {
+            subquery,
+            alias: _,
+            columns,
+            filter,
+            order_by,
+            limit,
+            group_by,
+            having,
+            distinct,
+        } => execute_derived_scan(
+            db_root,
+            subquery,
+            columns,
+            filter.as_ref(),
+            order_by,
+            *limit,
+            group_by,
+            having.as_ref(),
+            *distinct,
+            &HashMap::new(),
+        ),
+        QueryPlan::CopyTo {
+            table,
+            path,
+            options,
+        } => execute_copy_to(db_root, table, path, options),
+        QueryPlan::CopyFrom {
+            table,
+            path,
+            options,
+        } => execute_copy_from(db_root, table, path, options),
+        QueryPlan::Explain { query } => execute_explain(db_root, query),
+        QueryPlan::ExplainAnalyze { query } => execute_explain_analyze(db_root, query),
+        QueryPlan::Vacuum { table } => execute_vacuum(db_root, table),
         QueryPlan::CreateMatView { name, source_sql } => {
             execute_create_mat_view(db_root, name, source_sql)
         }
-        QueryPlan::RefreshMatView { name } => {
-            execute_refresh_mat_view(db_root, name)
-        }
-        QueryPlan::DropMatView { name } => {
-            execute_drop_mat_view(db_root, name)
-        }
+        QueryPlan::RefreshMatView { name } => execute_refresh_mat_view(db_root, name),
+        QueryPlan::DropMatView { name } => execute_drop_mat_view(db_root, name),
         QueryPlan::CreateUser { username, password } => {
             execute_create_user(db_root, username, password)
         }
-        QueryPlan::DropUser { username } => {
-            execute_drop_user(db_root, username)
-        }
-        QueryPlan::CreateRole { name } => {
-            execute_create_role(db_root, name)
-        }
-        QueryPlan::DropRole { name } => {
-            execute_drop_role(db_root, name)
-        }
-        QueryPlan::Grant { permission, target } => {
-            execute_grant(db_root, permission, target)
-        }
-        QueryPlan::Revoke { permission, target } => {
-            execute_revoke(db_root, permission, target)
-        }
+        QueryPlan::DropUser { username } => execute_drop_user(db_root, username),
+        QueryPlan::CreateRole { name } => execute_create_role(db_root, name),
+        QueryPlan::DropRole { name } => execute_drop_role(db_root, name),
+        QueryPlan::Grant { permission, target } => execute_grant(db_root, permission, target),
+        QueryPlan::Revoke { permission, target } => execute_revoke(db_root, permission, target),
         QueryPlan::ShowTables => execute_show_tables(db_root),
         QueryPlan::ShowColumns { table } => execute_show_columns(db_root, table),
         QueryPlan::ShowCreateTable { table } => execute_show_create_table(db_root, table),
         QueryPlan::LongSequence { count, columns } => execute_long_sequence(*count, columns),
-        QueryPlan::GenerateSeries { start, stop, step, columns, is_timestamp } => {
-            execute_generate_series(*start, *stop, *step, columns, *is_timestamp)
-        }
+        QueryPlan::GenerateSeries {
+            start,
+            stop,
+            step,
+            columns,
+            is_timestamp,
+        } => execute_generate_series(*start, *stop, *step, columns, *is_timestamp),
         QueryPlan::ReadParquet { path, columns } => execute_read_parquet(path, columns),
         QueryPlan::Begin | QueryPlan::Commit | QueryPlan::Rollback => {
             Ok(QueryResult::Ok { affected_rows: 0 })
         }
-        QueryPlan::Set { .. } => {
-            Ok(QueryResult::Ok { affected_rows: 0 })
-        }
+        QueryPlan::Set { .. } => Ok(QueryResult::Ok { affected_rows: 0 }),
         QueryPlan::Show { name } => execute_show_variable(name),
-        QueryPlan::InsertSelect { target_table, columns: _, source } => {
+        QueryPlan::InsertSelect {
+            target_table,
+            columns: _,
+            source,
+        } => {
             let source_result = execute(db_root, source)?;
             match source_result {
                 QueryResult::Rows { rows, .. } => {
                     execute_insert(db_root, target_table, &rows, false, false)
                 }
-                QueryResult::Ok { .. } => {
-                    Err(ExchangeDbError::Query("INSERT ... SELECT source returned no rows".into()))
-                }
+                QueryResult::Ok { .. } => Err(ExchangeDbError::Query(
+                    "INSERT ... SELECT source returned no rows".into(),
+                )),
             }
         }
         QueryPlan::TruncateTable { table } => {
@@ -638,78 +908,90 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
         QueryPlan::AttachPartition { table, partition } => {
             execute_attach_partition(db_root, table, partition)
         }
-        QueryPlan::SquashPartitions { table, partition1, partition2 } => {
-            execute_squash_partitions(db_root, table, partition1, partition2)
-        }
-        QueryPlan::Pivot { source, aggregate, agg_column, pivot_col, values } => {
-            execute_pivot(db_root, source, *aggregate, agg_column, pivot_col, values)
-        }
-        QueryPlan::Merge { target_table, source_table, on_column, when_clauses } => {
-            execute_merge(db_root, target_table, source_table, on_column, when_clauses)
-        }
-        QueryPlan::InsertOnConflict { table, columns, values, on_conflict } => {
-            execute_insert_on_conflict(db_root, table, columns, values, on_conflict)
-        }
-        QueryPlan::Values { column_names, rows } => {
-            Ok(QueryResult::Rows {
-                columns: column_names.clone(),
-                rows: rows.clone(),
-            })
-        }
-        QueryPlan::LateralJoin { .. } => {
-            Err(ExchangeDbError::Query("LATERAL JOIN not yet implemented".into()))
-        }
-        QueryPlan::CreateIndex { name, table, columns } => {
-            execute_create_index(db_root, name, table, columns)
-        }
-        QueryPlan::DropIndex { name } => {
-            execute_drop_index(db_root, name)
-        }
+        QueryPlan::SquashPartitions {
+            table,
+            partition1,
+            partition2,
+        } => execute_squash_partitions(db_root, table, partition1, partition2),
+        QueryPlan::Pivot {
+            source,
+            aggregate,
+            agg_column,
+            pivot_col,
+            values,
+        } => execute_pivot(db_root, source, *aggregate, agg_column, pivot_col, values),
+        QueryPlan::Merge {
+            target_table,
+            source_table,
+            on_column,
+            when_clauses,
+        } => execute_merge(db_root, target_table, source_table, on_column, when_clauses),
+        QueryPlan::InsertOnConflict {
+            table,
+            columns,
+            values,
+            on_conflict,
+        } => execute_insert_on_conflict(db_root, table, columns, values, on_conflict),
+        QueryPlan::Values { column_names, rows } => Ok(QueryResult::Rows {
+            columns: column_names.clone(),
+            rows: rows.clone(),
+        }),
+        QueryPlan::LateralJoin { .. } => Err(ExchangeDbError::Query(
+            "LATERAL JOIN not yet implemented".into(),
+        )),
+        QueryPlan::CreateIndex {
+            name,
+            table,
+            columns,
+        } => execute_create_index(db_root, name, table, columns),
+        QueryPlan::DropIndex { name } => execute_drop_index(db_root, name),
         QueryPlan::RenameTable { old_name, new_name } => {
             execute_rename_table(db_root, old_name, new_name)
         }
-        QueryPlan::CreateSequence { name, start, increment } => {
-            crate::sequence::create_sequence(db_root, name, *start, *increment)
-        }
-        QueryPlan::DropSequence { name } => {
-            crate::sequence::drop_sequence(db_root, name)
-        }
-        QueryPlan::SequenceOp { op } => {
-            crate::sequence::execute_sequence_op(db_root, op)
-        }
-        QueryPlan::CreateProcedure { name, body } => {
-            execute_create_procedure(db_root, name, body)
-        }
-        QueryPlan::DropProcedure { name } => {
-            execute_drop_procedure(db_root, name)
-        }
-        QueryPlan::CallProcedure { name } => {
-            execute_call_procedure(db_root, name)
-        }
-        QueryPlan::CreateDownsampling { source_table, target_name, interval_secs, columns } => {
+        QueryPlan::CreateSequence {
+            name,
+            start,
+            increment,
+        } => crate::sequence::create_sequence(db_root, name, *start, *increment),
+        QueryPlan::DropSequence { name } => crate::sequence::drop_sequence(db_root, name),
+        QueryPlan::SequenceOp { op } => crate::sequence::execute_sequence_op(db_root, op),
+        QueryPlan::CreateProcedure { name, body } => execute_create_procedure(db_root, name, body),
+        QueryPlan::DropProcedure { name } => execute_drop_procedure(db_root, name),
+        QueryPlan::CallProcedure { name } => execute_call_procedure(db_root, name),
+        QueryPlan::CreateDownsampling {
+            source_table,
+            target_name,
+            interval_secs,
+            columns,
+        } => {
             execute_create_downsampling(db_root, source_table, target_name, *interval_secs, columns)
         }
-        QueryPlan::CreateView { name, sql } => {
-            execute_create_view(db_root, name, sql)
-        }
-        QueryPlan::DropView { name } => {
-            execute_drop_view(db_root, name)
-        }
-        QueryPlan::CreateTrigger { name, table, procedure } => {
-            execute_create_trigger(db_root, name, table, procedure)
-        }
-        QueryPlan::DropTrigger { name, table } => {
-            execute_drop_trigger(db_root, name, table)
-        }
-        QueryPlan::CommentOn { object_type, object_name, table_name, comment } => {
-            execute_comment_on(db_root, object_type, object_name, table_name.as_deref(), comment)
-        }
-        QueryPlan::CreateTableAs { name, source, partition_by } => {
-            execute_create_table_as(db_root, name, source, partition_by.as_deref())
-        }
-        QueryPlan::ReadCsv { path, columns } => {
-            execute_read_csv(path, columns)
-        }
+        QueryPlan::CreateView { name, sql } => execute_create_view(db_root, name, sql),
+        QueryPlan::DropView { name } => execute_drop_view(db_root, name),
+        QueryPlan::CreateTrigger {
+            name,
+            table,
+            procedure,
+        } => execute_create_trigger(db_root, name, table, procedure),
+        QueryPlan::DropTrigger { name, table } => execute_drop_trigger(db_root, name, table),
+        QueryPlan::CommentOn {
+            object_type,
+            object_name,
+            table_name,
+            comment,
+        } => execute_comment_on(
+            db_root,
+            object_type,
+            object_name,
+            table_name.as_deref(),
+            comment,
+        ),
+        QueryPlan::CreateTableAs {
+            name,
+            source,
+            partition_by,
+        } => execute_create_table_as(db_root, name, source, partition_by.as_deref()),
+        QueryPlan::ReadCsv { path, columns } => execute_read_csv(path, columns),
     }
 }
 
@@ -745,9 +1027,10 @@ fn execute_show_tables(db_root: &Path) -> Result<QueryResult> {
             if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
                 let meta_path = entry.path().join("_meta");
                 if meta_path.exists()
-                    && let Some(name) = entry.file_name().to_str() {
-                        names.push(name.to_string());
-                    }
+                    && let Some(name) = entry.file_name().to_str()
+                {
+                    names.push(name.to_string());
+                }
             }
         }
     }
@@ -763,20 +1046,32 @@ fn execute_show_tables(db_root: &Path) -> Result<QueryResult> {
 fn execute_show_columns(db_root: &Path, table: &str) -> Result<QueryResult> {
     let meta = TableMeta::load(&db_root.join(table).join("_meta"))?;
     let comments = load_comments(db_root);
-    let rows: Vec<Vec<Value>> = meta.columns.iter().enumerate().map(|(i, c)| {
-        let key = format!("{}.{}", table, c.name);
-        let comment = comments.columns.get(&key)
-            .map(|s| Value::Str(s.clone()))
-            .unwrap_or(Value::Null);
-        vec![
-            Value::Str(c.name.clone()),
-            Value::Str(format!("{:?}", c.col_type)),
-            Value::I64(i as i64 + 1),
-            comment,
-        ]
-    }).collect();
+    let rows: Vec<Vec<Value>> = meta
+        .columns
+        .iter()
+        .enumerate()
+        .map(|(i, c)| {
+            let key = format!("{}.{}", table, c.name);
+            let comment = comments
+                .columns
+                .get(&key)
+                .map(|s| Value::Str(s.clone()))
+                .unwrap_or(Value::Null);
+            vec![
+                Value::Str(c.name.clone()),
+                Value::Str(format!("{:?}", c.col_type)),
+                Value::I64(i as i64 + 1),
+                comment,
+            ]
+        })
+        .collect();
     Ok(QueryResult::Rows {
-        columns: vec!["column_name".to_string(), "data_type".to_string(), "ordinal_position".to_string(), "comment".to_string()],
+        columns: vec![
+            "column_name".to_string(),
+            "data_type".to_string(),
+            "ordinal_position".to_string(),
+            "comment".to_string(),
+        ],
         rows,
     })
 }
@@ -784,9 +1079,11 @@ fn execute_show_columns(db_root: &Path, table: &str) -> Result<QueryResult> {
 /// Execute SHOW CREATE TABLE <table>.
 fn execute_show_create_table(db_root: &Path, table: &str) -> Result<QueryResult> {
     let meta = TableMeta::load(&db_root.join(table).join("_meta"))?;
-    let cols: Vec<String> = meta.columns.iter().map(|c| {
-        format!("  {} {:?}", c.name, c.col_type)
-    }).collect();
+    let cols: Vec<String> = meta
+        .columns
+        .iter()
+        .map(|c| format!("  {} {:?}", c.name, c.col_type))
+        .collect();
     let ddl = format!("CREATE TABLE {} (\n{}\n)", table, cols.join(",\n"));
     Ok(QueryResult::Rows {
         columns: vec!["create_table".to_string()],
@@ -807,10 +1104,17 @@ fn execute_long_sequence(count: u64, columns: &[SelectColumn]) -> Result<QueryRe
             SelectColumn::Name(n) => col_names.push(n.clone()),
             SelectColumn::Wildcard => col_names.push("x".to_string()),
             SelectColumn::ScalarFunction { name, .. } => col_names.push(name.clone()),
-            SelectColumn::Aggregate { function, column, alias, .. } => {
-                col_names.push(alias.clone().unwrap_or_else(|| {
-                    format!("{:?}({})", function, column).to_lowercase()
-                }));
+            SelectColumn::Aggregate {
+                function,
+                column,
+                alias,
+                ..
+            } => {
+                col_names.push(
+                    alias
+                        .clone()
+                        .unwrap_or_else(|| format!("{:?}({})", function, column).to_lowercase()),
+                );
             }
             _ => col_names.push("?".to_string()),
         }
@@ -867,7 +1171,9 @@ fn execute_generate_series(
     is_timestamp: bool,
 ) -> Result<QueryResult> {
     if step == 0 {
-        return Err(ExchangeDbError::Query("generate_series step cannot be 0".into()));
+        return Err(ExchangeDbError::Query(
+            "generate_series step cannot be 0".into(),
+        ));
     }
 
     let mut col_names = Vec::new();
@@ -876,10 +1182,17 @@ fn execute_generate_series(
             SelectColumn::Name(n) => col_names.push(n.clone()),
             SelectColumn::Wildcard => col_names.push("generate_series".to_string()),
             SelectColumn::ScalarFunction { name, .. } => col_names.push(name.clone()),
-            SelectColumn::Aggregate { function, column, alias, .. } => {
-                col_names.push(alias.clone().unwrap_or_else(|| {
-                    format!("{:?}({})", function, column).to_lowercase()
-                }));
+            SelectColumn::Aggregate {
+                function,
+                column,
+                alias,
+                ..
+            } => {
+                col_names.push(
+                    alias
+                        .clone()
+                        .unwrap_or_else(|| format!("{:?}({})", function, column).to_lowercase()),
+                );
             }
             _ => col_names.push("?".to_string()),
         }
@@ -950,8 +1263,8 @@ fn execute_read_parquet(path: &Path, columns: &[SelectColumn]) -> Result<QueryRe
     let pq_meta = reader.metadata();
 
     // Determine which columns to select.
-    let is_wildcard = columns.is_empty()
-        || columns.iter().any(|c| matches!(c, SelectColumn::Wildcard));
+    let is_wildcard =
+        columns.is_empty() || columns.iter().any(|c| matches!(c, SelectColumn::Wildcard));
 
     let col_names: Vec<String> = if is_wildcard {
         pq_meta.columns.iter().map(|c| c.name.clone()).collect()
@@ -1007,7 +1320,10 @@ fn execute_create_table_as(
     // Execute the source query to get the data.
     let source_result = execute(db_root, source)?;
     match source_result {
-        QueryResult::Rows { columns: col_names, rows } => {
+        QueryResult::Rows {
+            columns: col_names,
+            rows,
+        } => {
             // Infer column types from the first row of data (or default to VARCHAR).
             let col_defs: Vec<PlanColumnDef> = col_names
                 .iter()
@@ -1042,13 +1358,16 @@ fn execute_create_table_as(
             let mut final_col_defs = col_defs;
             let needs_synthetic_ts = !has_timestamp;
             if needs_synthetic_ts {
-                final_col_defs.insert(0, PlanColumnDef {
-                    name: "_ctas_timestamp".to_string(),
-                    type_name: "TIMESTAMP".to_string(),
-                    check: None,
-                    unique: false,
-                    references: None,
-                });
+                final_col_defs.insert(
+                    0,
+                    PlanColumnDef {
+                        name: "_ctas_timestamp".to_string(),
+                        type_name: "TIMESTAMP".to_string(),
+                        check: None,
+                        unique: false,
+                        references: None,
+                    },
+                );
             }
 
             let timestamp_col = final_col_defs
@@ -1069,11 +1388,15 @@ fn execute_create_table_as(
             let row_count = rows.len() as u64;
             if !rows.is_empty() {
                 let insert_rows: Vec<Vec<Value>> = if needs_synthetic_ts {
-                    rows.iter().enumerate().map(|(i, row)| {
-                        let mut new_row = vec![Value::Timestamp(Timestamp::now().as_nanos() + i as i64)];
-                        new_row.extend(row.iter().cloned());
-                        new_row
-                    }).collect()
+                    rows.iter()
+                        .enumerate()
+                        .map(|(i, row)| {
+                            let mut new_row =
+                                vec![Value::Timestamp(Timestamp::now().as_nanos() + i as i64)];
+                            new_row.extend(row.iter().cloned());
+                            new_row
+                        })
+                        .collect()
                 } else {
                     rows
                 };
@@ -1113,8 +1436,8 @@ fn execute_read_csv(path: &Path, columns: &[SelectColumn]) -> Result<QueryResult
         .collect();
 
     // Determine which columns to return.
-    let is_wildcard = columns.is_empty()
-        || columns.iter().any(|c| matches!(c, SelectColumn::Wildcard));
+    let is_wildcard =
+        columns.is_empty() || columns.iter().any(|c| matches!(c, SelectColumn::Wildcard));
 
     let selected_indices: Vec<usize> = if is_wildcard {
         (0..all_col_names.len()).collect()
@@ -1145,7 +1468,10 @@ fn execute_read_csv(path: &Path, columns: &[SelectColumn]) -> Result<QueryResult
         let row: Vec<Value> = selected_indices
             .iter()
             .map(|&i| {
-                let field = fields.get(i).map(|s| s.trim().trim_matches('"')).unwrap_or("");
+                let field = fields
+                    .get(i)
+                    .map(|s| s.trim().trim_matches('"'))
+                    .unwrap_or("");
                 if field.is_empty() || field.eq_ignore_ascii_case("null") {
                     Value::Null
                 } else if let Ok(n) = field.parse::<i64>() {
@@ -1194,7 +1520,8 @@ pub fn execute_with_wal_and_repl(
             validate_check_constraints(db_root, table, &reordered)?;
             validate_unique_constraints(db_root, table, &reordered)?;
             validate_foreign_key_constraints(db_root, table, &reordered)?;
-            let result = execute_insert_with_repl(db_root, table, &reordered, *upsert, true, repl_mgr)?;
+            let result =
+                execute_insert_with_repl(db_root, table, &reordered, *upsert, true, repl_mgr)?;
             fire_triggers_after_insert(db_root, table);
             Ok(result)
         }
@@ -1249,7 +1576,9 @@ fn type_name_to_column_type(name: &str) -> Result<ColumnType> {
         "VARARG" => Ok(ColumnType::VarArg),
         "PARAMETER" => Ok(ColumnType::Parameter),
         "VARCHAR_SLICE" | "VARCHARSLICE" => Ok(ColumnType::VarcharSlice),
-        other => Err(ExchangeDbError::Query(format!("unknown column type: {other}"))),
+        other => Err(ExchangeDbError::Query(format!(
+            "unknown column type: {other}"
+        ))),
     }
 }
 
@@ -1275,7 +1604,9 @@ fn execute_create_table(
     timestamp_col: Option<&str>,
 ) -> Result<QueryResult> {
     if columns.is_empty() {
-        return Err(ExchangeDbError::Query("CREATE TABLE requires at least one column".into()));
+        return Err(ExchangeDbError::Query(
+            "CREATE TABLE requires at least one column".into(),
+        ));
     }
 
     let mut builder = TableBuilder::new(name);
@@ -1296,12 +1627,15 @@ fn execute_create_table(
     builder.build(db_root)?;
 
     // Save CHECK constraints if any columns have them.
-    let checks: Vec<CheckConstraint> = columns.iter().filter_map(|c| {
-        c.check.as_ref().map(|_expr| CheckConstraint {
-            column: c.name.clone(),
-            expr_sql: plan_expr_to_sql(_expr),
+    let checks: Vec<CheckConstraint> = columns
+        .iter()
+        .filter_map(|c| {
+            c.check.as_ref().map(|_expr| CheckConstraint {
+                column: c.name.clone(),
+                expr_sql: plan_expr_to_sql(_expr),
+            })
         })
-    }).collect();
+        .collect();
     if !checks.is_empty() {
         let constraints_path = db_root.join(name).join("_checks.json");
         let data = serde_json::to_string_pretty(&checks).unwrap();
@@ -1309,9 +1643,13 @@ fn execute_create_table(
     }
 
     // Save UNIQUE constraints if any columns have them.
-    let uniques: Vec<UniqueConstraint> = columns.iter().filter(|c| c.unique).map(|c| {
-        UniqueConstraint { columns: vec![c.name.clone()] }
-    }).collect();
+    let uniques: Vec<UniqueConstraint> = columns
+        .iter()
+        .filter(|c| c.unique)
+        .map(|c| UniqueConstraint {
+            columns: vec![c.name.clone()],
+        })
+        .collect();
     if !uniques.is_empty() {
         let path = db_root.join(name).join("_unique.json");
         let data = serde_json::to_string_pretty(&uniques).unwrap();
@@ -1319,13 +1657,18 @@ fn execute_create_table(
     }
 
     // Save FOREIGN KEY constraints if any columns have them.
-    let fks: Vec<ForeignKeyConstraint> = columns.iter().filter_map(|c| {
-        c.references.as_ref().map(|(ref_table, ref_col)| ForeignKeyConstraint {
-            column: c.name.clone(),
-            ref_table: ref_table.clone(),
-            ref_column: ref_col.clone(),
+    let fks: Vec<ForeignKeyConstraint> = columns
+        .iter()
+        .filter_map(|c| {
+            c.references
+                .as_ref()
+                .map(|(ref_table, ref_col)| ForeignKeyConstraint {
+                    column: c.name.clone(),
+                    ref_table: ref_table.clone(),
+                    ref_column: ref_col.clone(),
+                })
         })
-    }).collect();
+        .collect();
     if !fks.is_empty() {
         let path = db_root.join(name).join("_fkeys.json");
         let data = serde_json::to_string_pretty(&fks).unwrap();
@@ -1345,16 +1688,33 @@ fn plan_expr_to_sql(expr: &PlanExpr) -> String {
         PlanExpr::Literal(Value::Timestamp(ns)) => ns.to_string(),
         PlanExpr::BinaryOp { left, op, right } => {
             let op_str = match op {
-                BinaryOp::Add => "+", BinaryOp::Sub => "-", BinaryOp::Mul => "*",
-                BinaryOp::Div => "/", BinaryOp::Mod => "%", BinaryOp::Gt => ">",
-                BinaryOp::Lt => "<", BinaryOp::Gte => ">=", BinaryOp::Lte => "<=",
-                BinaryOp::Eq => "=", BinaryOp::NotEq => "!=", BinaryOp::And => "AND",
-                BinaryOp::Or => "OR", BinaryOp::Concat => "||",
+                BinaryOp::Add => "+",
+                BinaryOp::Sub => "-",
+                BinaryOp::Mul => "*",
+                BinaryOp::Div => "/",
+                BinaryOp::Mod => "%",
+                BinaryOp::Gt => ">",
+                BinaryOp::Lt => "<",
+                BinaryOp::Gte => ">=",
+                BinaryOp::Lte => "<=",
+                BinaryOp::Eq => "=",
+                BinaryOp::NotEq => "!=",
+                BinaryOp::And => "AND",
+                BinaryOp::Or => "OR",
+                BinaryOp::Concat => "||",
             };
-            format!("({} {} {})", plan_expr_to_sql(left), op_str, plan_expr_to_sql(right))
+            format!(
+                "({} {} {})",
+                plan_expr_to_sql(left),
+                op_str,
+                plan_expr_to_sql(right)
+            )
         }
         PlanExpr::UnaryOp { op, expr } => {
-            let op_str = match op { UnaryOp::Neg => "-", UnaryOp::Not => "NOT " };
+            let op_str = match op {
+                UnaryOp::Neg => "-",
+                UnaryOp::Not => "NOT ",
+            };
             format!("{}{}", op_str, plan_expr_to_sql(expr))
         }
         PlanExpr::Function { name, args } => {
@@ -1393,7 +1753,8 @@ fn reorder_insert_values(
     for col in columns {
         if !schema_names.iter().any(|s| s.eq_ignore_ascii_case(col)) {
             return Err(ExchangeDbError::Query(format!(
-                "column '{}' does not exist in table '{}'", col, table
+                "column '{}' does not exist in table '{}'",
+                col, table
             )));
         }
     }
@@ -1422,7 +1783,10 @@ fn reorder_insert_values(
 
     // Check if columns are already in schema order and complete.
     let is_identity = columns.len() == schema_names.len()
-        && col_to_schema_idx.iter().enumerate().all(|(i, &idx)| idx == i);
+        && col_to_schema_idx
+            .iter()
+            .enumerate()
+            .all(|(i, &idx)| idx == i);
     if is_identity {
         return Ok(values.to_vec());
     }
@@ -1440,7 +1804,13 @@ fn reorder_insert_values(
     Ok(result)
 }
 
-fn execute_insert(db_root: &Path, table: &str, values: &[Vec<Value>], upsert: bool, use_wal: bool) -> Result<QueryResult> {
+fn execute_insert(
+    db_root: &Path,
+    table: &str,
+    values: &[Vec<Value>],
+    upsert: bool,
+    use_wal: bool,
+) -> Result<QueryResult> {
     let table_dir = db_root.join(table);
     if !table_dir.exists() {
         return Err(ExchangeDbError::TableNotFound(table.to_string()));
@@ -1458,7 +1828,8 @@ fn execute_insert(db_root: &Path, table: &str, values: &[Vec<Value>], upsert: bo
         let ts_idx = meta.timestamp_column;
 
         // Phase 1: validate and collect all rows first (no side effects).
-        let mut prepared_rows: Vec<(Timestamp, Vec<OwnedColumnValue>)> = Vec::with_capacity(values.len());
+        let mut prepared_rows: Vec<(Timestamp, Vec<OwnedColumnValue>)> =
+            Vec::with_capacity(values.len());
         for row in values {
             let ts = if ts_idx < row.len() {
                 value_to_timestamp(&row[ts_idx])?
@@ -1510,7 +1881,10 @@ fn execute_insert(db_root: &Path, table: &str, values: &[Vec<Value>], upsert: bo
             } else {
                 Timestamp::now()
             };
-            prepared.push(PreparedRow { ts, col_values: row.clone() });
+            prepared.push(PreparedRow {
+                ts,
+                col_values: row.clone(),
+            });
         }
 
         // Phase 2: write all rows atomically.
@@ -1527,7 +1901,8 @@ fn execute_insert(db_root: &Path, table: &str, values: &[Vec<Value>], upsert: bo
             }
 
             for prep in &prepared {
-                let col_values: Vec<ColumnValue<'_>> = prep.col_values
+                let col_values: Vec<ColumnValue<'_>> = prep
+                    .col_values
                     .iter()
                     .enumerate()
                     .filter(|(i, _)| *i != ts_idx)
@@ -1547,7 +1922,11 @@ fn execute_insert(db_root: &Path, table: &str, values: &[Vec<Value>], upsert: bo
             let table_dir = db_root.join(table);
             let partitions = exchange_core::table::list_partitions(&table_dir)?;
             for partition_path in &partitions {
-                let rows = exchange_core::table::read_partition_rows_tiered(partition_path, &meta, &table_dir)?;
+                let rows = exchange_core::table::read_partition_rows_tiered(
+                    partition_path,
+                    &meta,
+                    &table_dir,
+                )?;
                 if rows.is_empty() {
                     continue;
                 }
@@ -1568,7 +1947,9 @@ fn execute_insert(db_root: &Path, table: &str, values: &[Vec<Value>], upsert: bo
 
     // Invalidate mmap cache so subsequent reads see the new data.
     exchange_core::mmap::invalidate_mmap_cache(&table_dir);
-    if let Some(reg) = crate::table_registry::global() { reg.invalidate(table); }
+    if let Some(reg) = crate::table_registry::global() {
+        reg.invalidate(table);
+    }
 
     Ok(QueryResult::Ok {
         affected_rows: count,
@@ -1728,11 +2109,7 @@ fn execute_add_column(
     Ok(QueryResult::Ok { affected_rows: 0 })
 }
 
-fn execute_drop_column(
-    db_root: &Path,
-    table: &str,
-    column_name: &str,
-) -> Result<QueryResult> {
+fn execute_drop_column(db_root: &Path, table: &str, column_name: &str) -> Result<QueryResult> {
     let table_dir = db_root.join(table);
     if !table_dir.exists() {
         return Err(ExchangeDbError::TableNotFound(table.to_string()));
@@ -1818,11 +2195,7 @@ fn execute_set_column_type(
     Ok(QueryResult::Ok { affected_rows: 0 })
 }
 
-fn execute_delete(
-    db_root: &Path,
-    table: &str,
-    filter: Option<&Filter>,
-) -> Result<QueryResult> {
+fn execute_delete(db_root: &Path, table: &str, filter: Option<&Filter>) -> Result<QueryResult> {
     let table_dir = db_root.join(table);
     if !table_dir.exists() {
         return Err(ExchangeDbError::TableNotFound(table.to_string()));
@@ -1834,7 +2207,8 @@ fn execute_delete(
     let mut deleted_count = 0u64;
 
     for partition_path in &partitions {
-        let rows = exchange_core::table::read_partition_rows_tiered(partition_path, &meta, &table_dir)?;
+        let rows =
+            exchange_core::table::read_partition_rows_tiered(partition_path, &meta, &table_dir)?;
         if rows.is_empty() {
             continue;
         }
@@ -1868,7 +2242,9 @@ fn execute_delete(
 
     // Invalidate caches after data modification.
     exchange_core::mmap::invalidate_mmap_cache(&table_dir);
-    if let Some(reg) = crate::table_registry::global() { reg.invalidate(table); }
+    if let Some(reg) = crate::table_registry::global() {
+        reg.invalidate(table);
+    }
 
     Ok(QueryResult::Ok {
         affected_rows: deleted_count,
@@ -1907,7 +2283,8 @@ fn execute_update(
     let mut updated_count = 0u64;
 
     for partition_path in &partitions {
-        let rows = exchange_core::table::read_partition_rows_tiered(partition_path, &meta, &table_dir)?;
+        let rows =
+            exchange_core::table::read_partition_rows_tiered(partition_path, &meta, &table_dir)?;
         if rows.is_empty() {
             continue;
         }
@@ -1954,7 +2331,9 @@ fn execute_update(
 
     // Invalidate caches after data modification.
     exchange_core::mmap::invalidate_mmap_cache(&table_dir);
-    if let Some(reg) = crate::table_registry::global() { reg.invalidate(table); }
+    if let Some(reg) = crate::table_registry::global() {
+        reg.invalidate(table);
+    }
 
     Ok(QueryResult::Ok {
         affected_rows: updated_count,
@@ -1967,9 +2346,7 @@ fn column_value_to_plan_value(cv: &ColumnValue<'_>, _meta: &TableMeta, _col_idx:
         ColumnValue::I64(v) => Value::I64(*v),
         ColumnValue::F64(v) if v.is_nan() => Value::Null,
         ColumnValue::F64(v) => Value::F64(*v),
-        ColumnValue::I32(v) => {
-            Value::I64(*v as i64)
-        }
+        ColumnValue::I32(v) => Value::I64(*v as i64),
         ColumnValue::Timestamp(t) => Value::Timestamp(t.as_nanos()),
         ColumnValue::Str(s) => Value::Str(s.to_string()),
         ColumnValue::Bytes(_) => Value::Null,
@@ -1978,25 +2355,25 @@ fn column_value_to_plan_value(cv: &ColumnValue<'_>, _meta: &TableMeta, _col_idx:
 }
 
 /// Convert a plan Value to a static ColumnValue for mutation.
-fn plan_value_to_static_column_value(v: &Value, meta: &TableMeta, col_idx: usize) -> ColumnValue<'static> {
+fn plan_value_to_static_column_value(
+    v: &Value,
+    meta: &TableMeta,
+    col_idx: usize,
+) -> ColumnValue<'static> {
     let col_type: ColumnType = meta.columns[col_idx].col_type.into();
     match v {
-        Value::I64(n) => {
-            match col_type {
-                ColumnType::Timestamp => ColumnValue::Timestamp(Timestamp(*n)),
-                ColumnType::I32 | ColumnType::Symbol => ColumnValue::I32(*n as i32),
-                ColumnType::F64 => ColumnValue::F64(*n as f64),
-                ColumnType::F32 => ColumnValue::F64(*n as f64),
-                _ => ColumnValue::I64(*n),
-            }
-        }
-        Value::F64(n) => {
-            match col_type {
-                ColumnType::I64 => ColumnValue::I64(*n as i64),
-                ColumnType::I32 | ColumnType::Symbol => ColumnValue::I32(*n as i32),
-                _ => ColumnValue::F64(*n),
-            }
-        }
+        Value::I64(n) => match col_type {
+            ColumnType::Timestamp => ColumnValue::Timestamp(Timestamp(*n)),
+            ColumnType::I32 | ColumnType::Symbol => ColumnValue::I32(*n as i32),
+            ColumnType::F64 => ColumnValue::F64(*n as f64),
+            ColumnType::F32 => ColumnValue::F64(*n as f64),
+            _ => ColumnValue::I64(*n),
+        },
+        Value::F64(n) => match col_type {
+            ColumnType::I64 => ColumnValue::I64(*n as i64),
+            ColumnType::I32 | ColumnType::Symbol => ColumnValue::I32(*n as i32),
+            _ => ColumnValue::F64(*n),
+        },
         Value::Timestamp(ns) => ColumnValue::Timestamp(Timestamp(*ns)),
         Value::Str(s) => ColumnValue::Str(Box::leak(s.clone().into_boxed_str())),
         Value::Null => ColumnValue::Null,
@@ -2047,11 +2424,15 @@ fn execute_select(
                 }
                 SelectColumn::ScalarFunction { name, args } => {
                     col_names.push(name.clone());
-                    let func_args: Vec<Value> = args.iter().map(|a| match a {
-                        SelectColumnArg::Column(c) => Value::Str(c.clone()),
-                        SelectColumnArg::Literal(v) => v.clone(),
-                    }).collect();
-                    let val = crate::scalar::evaluate_scalar(name, &func_args).unwrap_or(Value::Null);
+                    let func_args: Vec<Value> = args
+                        .iter()
+                        .map(|a| match a {
+                            SelectColumnArg::Column(c) => Value::Str(c.clone()),
+                            SelectColumnArg::Literal(v) => v.clone(),
+                        })
+                        .collect();
+                    let val =
+                        crate::scalar::evaluate_scalar(name, &func_args).unwrap_or(Value::Null);
                     row.push(val);
                 }
                 SelectColumn::Name(name) => {
@@ -2064,7 +2445,10 @@ fn execute_select(
                 }
             }
         }
-        return Ok(QueryResult::Rows { columns: col_names, rows: vec![row] });
+        return Ok(QueryResult::Rows {
+            columns: col_names,
+            rows: vec![row],
+        });
     }
 
     let table_dir = db_root.join(table);
@@ -2091,8 +2475,18 @@ fn execute_select(
     // For simple aggregate queries (SELECT sum(x), count(*), ... FROM t)
     // without WHERE, GROUP BY, or SAMPLE BY, skip row materialisation
     // and operate directly on the column files via SIMD.
-    let has_aggregates_early = columns.iter().any(|c| matches!(c, SelectColumn::Aggregate { .. }));
-    let has_agg_filter = columns.iter().any(|c| matches!(c, SelectColumn::Aggregate { filter: Some(_), .. }));
+    let has_aggregates_early = columns
+        .iter()
+        .any(|c| matches!(c, SelectColumn::Aggregate { .. }));
+    let has_agg_filter = columns.iter().any(|c| {
+        matches!(
+            c,
+            SelectColumn::Aggregate {
+                filter: Some(_),
+                ..
+            }
+        )
+    });
     if has_aggregates_early
         && !has_agg_filter
         && filter.is_none()
@@ -2109,13 +2503,22 @@ fn execute_select(
 
         let mut columnar_ok = true;
         for col in columns {
-            if let SelectColumn::Aggregate { function, column, alias, .. } = col {
-                let agg_col_name = alias.clone().unwrap_or_else(|| {
-                    format!("{:?}({})", function, column).to_lowercase()
-                });
+            if let SelectColumn::Aggregate {
+                function,
+                column,
+                alias,
+                ..
+            } = col
+            {
+                let agg_col_name = alias
+                    .clone()
+                    .unwrap_or_else(|| format!("{:?}({})", function, column).to_lowercase());
                 col_names.push(agg_col_name);
 
-                let col_def = meta.columns.iter().find(|c| c.name == *column || column == "*");
+                let col_def = meta
+                    .columns
+                    .iter()
+                    .find(|c| c.name == *column || column == "*");
                 let col_type: ColumnType = if let Some(cd) = col_def {
                     cd.col_type.into()
                 } else if column == "*" {
@@ -2184,7 +2587,10 @@ fn execute_select(
     // For aggregate FILTER clauses, ensure the columns referenced in the
     // filter are included in the scan.
     for col in columns {
-        if let SelectColumn::Aggregate { filter: Some(flt), .. } = col {
+        if let SelectColumn::Aggregate {
+            filter: Some(flt), ..
+        } = col
+        {
             let filter_cols = collect_filter_column_names(flt);
             for fc in filter_cols {
                 let already = scan_columns.iter().any(|c| match c {
@@ -2283,9 +2689,17 @@ fn execute_select(
     }
 
     // Check if we have scalar functions (CaseWhen/Expression) that need evaluation.
-    let has_scalar_fns = columns.iter().any(|c| matches!(c, SelectColumn::ScalarFunction { .. } | SelectColumn::CaseWhen { .. } | SelectColumn::Expression { .. }));
+    let has_scalar_fns = columns.iter().any(|c| {
+        matches!(
+            c,
+            SelectColumn::ScalarFunction { .. }
+                | SelectColumn::CaseWhen { .. }
+                | SelectColumn::Expression { .. }
+        )
+    });
     // When we have scalar functions AND DISTINCT, defer DISTINCT until after evaluation.
-    let deferred_distinct = distinct && has_scalar_fns && !has_aggregates && group_by.is_empty() && sample_by.is_none();
+    let deferred_distinct =
+        distinct && has_scalar_fns && !has_aggregates && group_by.is_empty() && sample_by.is_none();
 
     // DISTINCT (applied before ORDER BY so ORDER BY sorts the distinct rows)
     if distinct && !deferred_distinct {
@@ -2346,8 +2760,14 @@ fn execute_select(
 
     if !window_fns.is_empty() {
         return execute_window_projection(
-            &mut all_rows, columns, &selected_cols, &window_fns,
-            order_by, limit, offset, distinct,
+            &mut all_rows,
+            columns,
+            &selected_cols,
+            &window_fns,
+            order_by,
+            limit,
+            offset,
+            distinct,
         );
     }
 
@@ -2396,39 +2816,86 @@ fn execute_window_projection(
     let mut win_idx = 0;
     for col in columns {
         match col {
-            SelectColumn::WindowFunction(_) => { col_names.push(extra_window_col_names[win_idx].clone()); output_indices.push(num_base + win_idx); win_idx += 1; }
-            SelectColumn::Wildcard => { for (i, (_, n)) in selected_cols.iter().enumerate() { col_names.push(n.clone()); output_indices.push(i); } }
-            SelectColumn::Name(n) => { col_names.push(n.clone()); if let Some(pos) = selected_cols.iter().position(|(_, cn)| cn == n) { output_indices.push(pos); } }
-            SelectColumn::Aggregate { function, column, alias, .. } => {
-                let cl = alias.clone().unwrap_or_else(|| { let fn_name = format!("{function:?}").to_ascii_lowercase(); format!("{fn_name}({column})") });
-                col_names.push(cl); if let Some(pos) = selected_cols.iter().position(|(_, cn)| cn == column) { output_indices.push(pos); }
+            SelectColumn::WindowFunction(_) => {
+                col_names.push(extra_window_col_names[win_idx].clone());
+                output_indices.push(num_base + win_idx);
+                win_idx += 1;
             }
-            SelectColumn::ScalarFunction { name, .. } => { col_names.push(name.clone()); }
-            SelectColumn::CaseWhen { alias, .. } => { col_names.push(alias.clone().unwrap_or_else(|| "case".to_string())); }
-            SelectColumn::Expression { alias, .. } => { col_names.push(alias.clone().unwrap_or_else(|| "expr".to_string())); }
-            SelectColumn::ScalarSubquery { alias, .. } => { col_names.push(alias.clone().unwrap_or_else(|| "subquery".to_string())); }
+            SelectColumn::Wildcard => {
+                for (i, (_, n)) in selected_cols.iter().enumerate() {
+                    col_names.push(n.clone());
+                    output_indices.push(i);
+                }
+            }
+            SelectColumn::Name(n) => {
+                col_names.push(n.clone());
+                if let Some(pos) = selected_cols.iter().position(|(_, cn)| cn == n) {
+                    output_indices.push(pos);
+                }
+            }
+            SelectColumn::Aggregate {
+                function,
+                column,
+                alias,
+                ..
+            } => {
+                let cl = alias.clone().unwrap_or_else(|| {
+                    let fn_name = format!("{function:?}").to_ascii_lowercase();
+                    format!("{fn_name}({column})")
+                });
+                col_names.push(cl);
+                if let Some(pos) = selected_cols.iter().position(|(_, cn)| cn == column) {
+                    output_indices.push(pos);
+                }
+            }
+            SelectColumn::ScalarFunction { name, .. } => {
+                col_names.push(name.clone());
+            }
+            SelectColumn::CaseWhen { alias, .. } => {
+                col_names.push(alias.clone().unwrap_or_else(|| "case".to_string()));
+            }
+            SelectColumn::Expression { alias, .. } => {
+                col_names.push(alias.clone().unwrap_or_else(|| "expr".to_string()));
+            }
+            SelectColumn::ScalarSubquery { alias, .. } => {
+                col_names.push(alias.clone().unwrap_or_else(|| "subquery".to_string()));
+            }
         }
     }
 
     // Project rows to output columns.
-    let mut projected: Vec<Vec<Value>> = all_rows.iter().map(|row| output_indices.iter().map(|&i| row[i].clone()).collect()).collect();
+    let mut projected: Vec<Vec<Value>> = all_rows
+        .iter()
+        .map(|row| output_indices.iter().map(|&i| row[i].clone()).collect())
+        .collect();
 
     // Apply explicit ORDER BY on projected columns (after projection so aliases are available).
     if !order_by.is_empty() {
-        let proj_resolved: Vec<(usize, String)> = col_names.iter().enumerate().map(|(i, n)| (i, n.clone())).collect();
+        let proj_resolved: Vec<(usize, String)> = col_names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (i, n.clone()))
+            .collect();
         apply_order_by(&mut projected, &proj_resolved, order_by);
     }
 
     // OFFSET then LIMIT.
     if let Some(off) = offset {
         let off = off as usize;
-        if off >= projected.len() { projected.clear(); } else { projected.drain(..off); }
+        if off >= projected.len() {
+            projected.clear();
+        } else {
+            projected.drain(..off);
+        }
     }
     if let Some(lim) = limit {
         projected.truncate(lim as usize);
     }
 
-    Ok(QueryResult::Rows { columns: col_names, rows: projected })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows: projected,
+    })
 }
 
 /// Like `execute_select` but accepts optimizer hints for pruned partitions
@@ -2460,11 +2927,16 @@ fn scan_from_open_table(
         for row_idx in 0..scan_count {
             // Read all values for filter evaluation if needed.
             if let Some(f) = filter {
-                let filter_values: Vec<(usize, Value)> = part.columns
+                let filter_values: Vec<(usize, Value)> = part
+                    .columns
                     .iter()
                     .enumerate()
                     .map(|(i, (_, col))| {
-                        let meta_idx = meta.columns.iter().position(|c| c.name == part.columns[i].0).unwrap_or(i);
+                        let meta_idx = meta
+                            .columns
+                            .iter()
+                            .position(|c| c.name == part.columns[i].0)
+                            .unwrap_or(i);
                         (meta_idx, read_open_column_value(col, row_idx as u64))
                     })
                     .collect();
@@ -2476,7 +2948,9 @@ fn scan_from_open_table(
             let mut row = Vec::with_capacity(selected_cols.len());
             for pos in &col_positions {
                 match pos {
-                    Some(p) => row.push(read_open_column_value(&part.columns[*p].1, row_idx as u64)),
+                    Some(p) => {
+                        row.push(read_open_column_value(&part.columns[*p].1, row_idx as u64))
+                    }
                     None => row.push(Value::Null),
                 }
             }
@@ -2536,9 +3010,10 @@ fn scan_from_disk(
         exchange_core::table::list_partitions(table_dir)?
     };
     if let Some(lp) = limit_pushdown
-        && lp.reverse_scan {
-            partitions_list.reverse();
-        }
+        && lp.reverse_scan
+    {
+        partitions_list.reverse();
+    }
     crate::parallel::parallel_scan_partitions_pruned_tiered(
         &partitions_list,
         meta,
@@ -2592,11 +3067,15 @@ fn execute_select_with_hints(
                 }
                 SelectColumn::ScalarFunction { name, args } => {
                     col_names.push(name.clone());
-                    let func_args: Vec<Value> = args.iter().map(|a| match a {
-                        SelectColumnArg::Column(c) => Value::Str(c.clone()),
-                        SelectColumnArg::Literal(v) => v.clone(),
-                    }).collect();
-                    let val = crate::scalar::evaluate_scalar(name, &func_args).unwrap_or(Value::Null);
+                    let func_args: Vec<Value> = args
+                        .iter()
+                        .map(|a| match a {
+                            SelectColumnArg::Column(c) => Value::Str(c.clone()),
+                            SelectColumnArg::Literal(v) => v.clone(),
+                        })
+                        .collect();
+                    let val =
+                        crate::scalar::evaluate_scalar(name, &func_args).unwrap_or(Value::Null);
                     row.push(val);
                 }
                 SelectColumn::Name(name) => {
@@ -2609,7 +3088,10 @@ fn execute_select_with_hints(
                 }
             }
         }
-        return Ok(QueryResult::Rows { columns: col_names, rows: vec![row] });
+        return Ok(QueryResult::Rows {
+            columns: col_names,
+            rows: vec![row],
+        });
     }
 
     let table_dir = db_root.join(table);
@@ -2636,7 +3118,15 @@ fn execute_select_with_hints(
     // When the SELECT has a GROUP BY with only simple aggregates and
     // no complex expressions/joins/SAMPLE BY/LATEST ON, we can bypass
     // row materialisation and process columns directly.
-    let has_agg_filter_hints = columns.iter().any(|c| matches!(c, SelectColumn::Aggregate { filter: Some(_), .. }));
+    let has_agg_filter_hints = columns.iter().any(|c| {
+        matches!(
+            c,
+            SelectColumn::Aggregate {
+                filter: Some(_),
+                ..
+            }
+        )
+    });
     if !group_by.is_empty()
         && sample_by.is_none()
         && latest_on.is_none()
@@ -2648,7 +3138,9 @@ fn execute_select_with_hints(
         let aggregates: Vec<(AggregateKind, String)> = columns
             .iter()
             .filter_map(|c| match c {
-                SelectColumn::Aggregate { function, column, .. } => Some((*function, column.clone())),
+                SelectColumn::Aggregate {
+                    function, column, ..
+                } => Some((*function, column.clone())),
                 _ => None,
             })
             .collect();
@@ -2723,7 +3215,10 @@ fn execute_select_with_hints(
 
     // For aggregate FILTER clauses, ensure filter columns are in the scan.
     for col in columns {
-        if let SelectColumn::Aggregate { filter: Some(flt), .. } = col {
+        if let SelectColumn::Aggregate {
+            filter: Some(flt), ..
+        } = col
+        {
             let filter_cols = collect_filter_column_names(flt);
             for fc in filter_cols {
                 let already = scan_columns.iter().any(|c| match c {
@@ -2740,16 +3235,22 @@ fn execute_select_with_hints(
 
     // For ORDER BY, ensure order-by columns are included in the scan.
     // Skip columns that are window function aliases (they don't exist in the table schema).
-    let window_aliases: Vec<String> = columns.iter().filter_map(|c| match c {
-        SelectColumn::WindowFunction(wf) => wf.alias.clone().or_else(|| Some(wf.to_string())),
-        _ => None,
-    }).collect();
+    let window_aliases: Vec<String> = columns
+        .iter()
+        .filter_map(|c| match c {
+            SelectColumn::WindowFunction(wf) => wf.alias.clone().or_else(|| Some(wf.to_string())),
+            _ => None,
+        })
+        .collect();
     // Collect expression/case-when aliases that ORDER BY might reference.
-    let expr_aliases: Vec<String> = columns.iter().filter_map(|c| match c {
-        SelectColumn::Expression { alias: Some(a), .. } => Some(a.clone()),
-        SelectColumn::CaseWhen { alias: Some(a), .. } => Some(a.clone()),
-        _ => None,
-    }).collect();
+    let expr_aliases: Vec<String> = columns
+        .iter()
+        .filter_map(|c| match c {
+            SelectColumn::Expression { alias: Some(a), .. } => Some(a.clone()),
+            SelectColumn::CaseWhen { alias: Some(a), .. } => Some(a.clone()),
+            _ => None,
+        })
+        .collect();
     let mut extra_order_cols = Vec::new();
     for ob in order_by {
         if window_aliases.iter().any(|a| a == &ob.column) {
@@ -2758,7 +3259,12 @@ fn execute_select_with_hints(
         let already_present = scan_columns.iter().any(|c| match c {
             SelectColumn::Name(n) => n == &ob.column,
             SelectColumn::Wildcard => true,
-            SelectColumn::Aggregate { function, column, alias, .. } => {
+            SelectColumn::Aggregate {
+                function,
+                column,
+                alias,
+                ..
+            } => {
                 if column == &ob.column || alias.as_deref() == Some(&ob.column) {
                     true
                 } else {
@@ -2771,20 +3277,19 @@ fn execute_select_with_hints(
             SelectColumn::Expression { alias, expr, .. } => {
                 alias.as_deref() == Some(&ob.column) || format!("{expr:?}") == ob.column
             }
-            SelectColumn::CaseWhen { alias, .. } => {
-                alias.as_deref() == Some(&ob.column)
-            }
-            SelectColumn::ScalarSubquery { alias, .. } => {
-                alias.as_deref() == Some(&ob.column)
-            }
+            SelectColumn::CaseWhen { alias, .. } => alias.as_deref() == Some(&ob.column),
+            SelectColumn::ScalarSubquery { alias, .. } => alias.as_deref() == Some(&ob.column),
             _ => false,
         });
         if !already_present {
             // Check if the ORDER BY column is an expression-based string (not a simple identifier).
             // If it contains operators or spaces, it's an expression that should match a SELECT
             // alias rather than a table column. Skip adding as a scan column.
-            let is_expression = ob.column.contains(' ') || ob.column.contains('*')
-                || ob.column.contains('+') || ob.column.contains('-') || ob.column.contains('/');
+            let is_expression = ob.column.contains(' ')
+                || ob.column.contains('*')
+                || ob.column.contains('+')
+                || ob.column.contains('-')
+                || ob.column.contains('/');
             // Also skip if it matches an expression/case-when alias.
             let is_alias = expr_aliases.iter().any(|a| a == &ob.column);
             if !is_expression && !is_alias {
@@ -2840,10 +3345,24 @@ fn execute_select_with_hints(
                 &meta,
             )?
         } else {
-            scan_from_disk(&table_dir, &meta, &selected_cols, filter, pruned_partitions, limit_pushdown)?
+            scan_from_disk(
+                &table_dir,
+                &meta,
+                &selected_cols,
+                filter,
+                pruned_partitions,
+                limit_pushdown,
+            )?
         }
     } else {
-        scan_from_disk(&table_dir, &meta, &selected_cols, filter, pruned_partitions, limit_pushdown)?
+        scan_from_disk(
+            &table_dir,
+            &meta,
+            &selected_cols,
+            filter,
+            pruned_partitions,
+            limit_pushdown,
+        )?
     };
 
     // If LATEST ON is requested, keep only the most recent row per partition.
@@ -2888,15 +3407,36 @@ fn execute_select_with_hints(
                 all_rows = apply_group_by(columns, &selected_cols, &all_rows, group_by, having)?;
             }
             GroupByMode::GroupingSets(sets) => {
-                all_rows = apply_grouping_sets(columns, &selected_cols, &all_rows, group_by, sets, having)?;
+                all_rows = apply_grouping_sets(
+                    columns,
+                    &selected_cols,
+                    &all_rows,
+                    group_by,
+                    sets,
+                    having,
+                )?;
             }
             GroupByMode::Rollup(cols) => {
                 let sets = expand_rollup(cols);
-                all_rows = apply_grouping_sets(columns, &selected_cols, &all_rows, group_by, &sets, having)?;
+                all_rows = apply_grouping_sets(
+                    columns,
+                    &selected_cols,
+                    &all_rows,
+                    group_by,
+                    &sets,
+                    having,
+                )?;
             }
             GroupByMode::Cube(cols) => {
                 let sets = expand_cube(cols);
-                all_rows = apply_grouping_sets(columns, &selected_cols, &all_rows, group_by, &sets, having)?;
+                all_rows = apply_grouping_sets(
+                    columns,
+                    &selected_cols,
+                    &all_rows,
+                    group_by,
+                    &sets,
+                    having,
+                )?;
             }
         }
     } else if has_aggregates && sample_by.is_none() {
@@ -2904,8 +3444,19 @@ fn execute_select_with_hints(
     }
 
     // Check if we have scalar functions (CaseWhen/Expression) that need evaluation.
-    let has_scalar_fns2 = columns.iter().any(|c| matches!(c, SelectColumn::ScalarFunction { .. } | SelectColumn::CaseWhen { .. } | SelectColumn::Expression { .. }));
-    let deferred_distinct2 = distinct && has_scalar_fns2 && !has_aggregates && group_by.is_empty() && sample_by.is_none();
+    let has_scalar_fns2 = columns.iter().any(|c| {
+        matches!(
+            c,
+            SelectColumn::ScalarFunction { .. }
+                | SelectColumn::CaseWhen { .. }
+                | SelectColumn::Expression { .. }
+        )
+    });
+    let deferred_distinct2 = distinct
+        && has_scalar_fns2
+        && !has_aggregates
+        && group_by.is_empty()
+        && sample_by.is_none();
 
     // DISTINCT (applied before ORDER BY so ORDER BY sorts the distinct rows)
     if distinct && !deferred_distinct2 {
@@ -2935,14 +3486,16 @@ fn execute_select_with_hints(
 
     // DISTINCT ON: after ORDER BY, keep only the first row per distinct-on key.
     if !distinct_on.is_empty() {
-        let col_indices: Vec<usize> = distinct_on.iter().filter_map(|name| {
-            selected_cols.iter().position(|(_, n)| n == name)
-        }).collect();
+        let col_indices: Vec<usize> = distinct_on
+            .iter()
+            .filter_map(|name| selected_cols.iter().position(|(_, n)| n == name))
+            .collect();
         if !col_indices.is_empty() {
             let mut seen = HashSet::new();
             let mut filtered = Vec::new();
             for row in all_rows {
-                let key: Vec<ValueKey> = col_indices.iter()
+                let key: Vec<ValueKey> = col_indices
+                    .iter()
                     .map(|&i| ValueKey(row.get(i).cloned().unwrap_or(Value::Null)))
                     .collect();
                 if seen.insert(key) {
@@ -2964,8 +3517,14 @@ fn execute_select_with_hints(
 
     if !window_fns.is_empty() {
         return execute_window_projection(
-            &mut all_rows, columns, &selected_cols, &window_fns,
-            order_by, limit, offset, distinct,
+            &mut all_rows,
+            columns,
+            &selected_cols,
+            &window_fns,
+            order_by,
+            limit,
+            offset,
+            distinct,
         );
     }
 
@@ -3045,7 +3604,11 @@ fn execute_asof_join(
         .iter()
         .position(|(idx, _)| *idx == left_ts_col)
         .unwrap_or(0);
-    left_rows.sort_by(|a, b| a[left_ts_pos].partial_cmp(&b[left_ts_pos]).unwrap_or(std::cmp::Ordering::Equal));
+    left_rows.sort_by(|a, b| {
+        a[left_ts_pos]
+            .partial_cmp(&b[left_ts_pos])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // For the right side, read all columns.
     let right_all_cols: Vec<SelectColumn> = vec![SelectColumn::Wildcard];
@@ -3058,7 +3621,11 @@ fn execute_asof_join(
         .iter()
         .position(|(idx, _)| *idx == right_ts_col)
         .unwrap_or(0);
-    right_rows.sort_by(|a, b| a[right_ts_pos].partial_cmp(&b[right_ts_pos]).unwrap_or(std::cmp::Ordering::Equal));
+    right_rows.sort_by(|a, b| {
+        a[right_ts_pos]
+            .partial_cmp(&b[right_ts_pos])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Resolve ON columns to indices in the resolved columns.
     let on_col_pairs: Vec<(usize, usize)> = on_columns
@@ -3075,7 +3642,10 @@ fn execute_asof_join(
     let right_output_cols: Vec<usize> = if right_columns.is_empty() {
         // No right columns explicitly selected; don't output any.
         Vec::new()
-    } else if right_columns.iter().any(|c| matches!(c, SelectColumn::Wildcard)) {
+    } else if right_columns
+        .iter()
+        .any(|c| matches!(c, SelectColumn::Wildcard))
+    {
         // All right columns except those used for joining and timestamp.
         let on_right_indices: Vec<usize> = on_col_pairs.iter().map(|(_, ri)| *ri).collect();
         (0..right_resolved.len())
@@ -3110,8 +3680,12 @@ fn execute_asof_join(
     // Project output to only the requested columns (from left_columns and right_columns).
     // If left_columns contains Wildcard, include all left columns; otherwise select by name.
     // Similarly for right_columns.
-    let left_has_wildcard = left_columns.iter().any(|c| matches!(c, SelectColumn::Wildcard));
-    let left_has_aggregates = left_columns.iter().any(|c| matches!(c, SelectColumn::Aggregate { .. }));
+    let left_has_wildcard = left_columns
+        .iter()
+        .any(|c| matches!(c, SelectColumn::Wildcard));
+    let left_has_aggregates = left_columns
+        .iter()
+        .any(|c| matches!(c, SelectColumn::Aggregate { .. }));
 
     // If there are aggregates, wrap in a virtual query execution.
     if left_has_aggregates {
@@ -3144,14 +3718,17 @@ fn execute_asof_join(
         // Include only the explicitly requested left columns.
         for lc in left_columns {
             if let SelectColumn::Name(name) = lc
-                && let Some(i) = left_resolved.iter().position(|(_, n)| n == name) {
-                    output_indices.push(i);
-                    col_names.push(name.clone());
-                }
+                && let Some(i) = left_resolved.iter().position(|(_, n)| n == name)
+            {
+                output_indices.push(i);
+                col_names.push(name.clone());
+            }
         }
     }
 
-    let right_has_wildcard = right_columns.iter().any(|c| matches!(c, SelectColumn::Wildcard));
+    let right_has_wildcard = right_columns
+        .iter()
+        .any(|c| matches!(c, SelectColumn::Wildcard));
     if right_has_wildcard {
         for (i, &col_idx) in right_output_cols.iter().enumerate() {
             output_indices.push(left_count + i);
@@ -3160,21 +3737,34 @@ fn execute_asof_join(
     } else {
         for rc in right_columns {
             if let SelectColumn::Name(name) = rc
-                && let Some(i) = right_output_cols.iter().position(|&idx| right_resolved[idx].1 == *name) {
-                    output_indices.push(left_count + i);
-                    col_names.push(name.clone());
-                }
+                && let Some(i) = right_output_cols
+                    .iter()
+                    .position(|&idx| right_resolved[idx].1 == *name)
+            {
+                output_indices.push(left_count + i);
+                col_names.push(name.clone());
+            }
         }
     }
 
     // Apply projection.
-    let mut result_rows: Vec<Vec<Value>> = result_rows.into_iter().map(|row| {
-        output_indices.iter().map(|&i| row.get(i).cloned().unwrap_or(Value::Null)).collect()
-    }).collect();
+    let mut result_rows: Vec<Vec<Value>> = result_rows
+        .into_iter()
+        .map(|row| {
+            output_indices
+                .iter()
+                .map(|&i| row.get(i).cloned().unwrap_or(Value::Null))
+                .collect()
+        })
+        .collect();
 
     // ORDER BY
     if !order_by.is_empty() {
-        let combined_cols: Vec<(usize, String)> = col_names.iter().enumerate().map(|(i, n)| (i, n.clone())).collect();
+        let combined_cols: Vec<(usize, String)> = col_names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (i, n.clone()))
+            .collect();
         apply_order_by(&mut result_rows, &combined_cols, order_by);
     }
 
@@ -3190,7 +3780,10 @@ fn execute_asof_join(
 }
 
 /// Resolve SelectColumns to indices in the table metadata.
-pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Result<Vec<(usize, String)>> {
+pub(crate) fn resolve_columns(
+    meta: &TableMeta,
+    columns: &[SelectColumn],
+) -> Result<Vec<(usize, String)>> {
     let mut result = Vec::new();
     for col in columns {
         match col {
@@ -3209,7 +3802,9 @@ pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Res
                     })?;
                 result.push((idx, name.clone()));
             }
-            SelectColumn::Aggregate { column, arg_expr, .. } => {
+            SelectColumn::Aggregate {
+                column, arg_expr, ..
+            } => {
                 if column == "*" {
                     // count(*) doesn't need a specific column; use first column.
                     result.push((0, meta.columns[0].name.clone()));
@@ -3229,9 +3824,10 @@ pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Res
                     for ref_col in refs {
                         let already = result.iter().any(|(_, n)| n == &ref_col);
                         if !already
-                            && let Some(idx) = meta.columns.iter().position(|c| c.name == ref_col) {
-                                result.push((idx, ref_col));
-                            }
+                            && let Some(idx) = meta.columns.iter().position(|c| c.name == ref_col)
+                        {
+                            result.push((idx, ref_col));
+                        }
                     }
                 }
             }
@@ -3285,16 +3881,18 @@ pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Res
                             .iter()
                             .position(|c| c.name == *col_name)
                             .ok_or_else(|| {
-                                ExchangeDbError::ColumnNotFound(
-                                    col_name.clone(),
-                                    meta.name.clone(),
-                                )
+                                ExchangeDbError::ColumnNotFound(col_name.clone(), meta.name.clone())
                             })?;
                         result.push((idx, col_name.clone()));
                     }
                 }
             }
-            SelectColumn::CaseWhen { conditions, expr_conditions, expr_else, .. } => {
+            SelectColumn::CaseWhen {
+                conditions,
+                expr_conditions,
+                expr_else,
+                ..
+            } => {
                 // Resolve columns referenced in CASE WHEN conditions.
                 for (filter, _) in conditions {
                     collect_filter_column_refs(filter, meta, &mut result)?;
@@ -3306,9 +3904,11 @@ pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Res
                         for col_name in refs {
                             let already = result.iter().any(|(_, n)| n == &col_name);
                             if !already
-                                && let Some(idx) = meta.columns.iter().position(|c| c.name == col_name) {
-                                    result.push((idx, col_name));
-                                }
+                                && let Some(idx) =
+                                    meta.columns.iter().position(|c| c.name == col_name)
+                            {
+                                result.push((idx, col_name));
+                            }
                         }
                     }
                 }
@@ -3317,9 +3917,10 @@ pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Res
                     for col_name in refs {
                         let already = result.iter().any(|(_, n)| n == &col_name);
                         if !already
-                            && let Some(idx) = meta.columns.iter().position(|c| c.name == col_name) {
-                                result.push((idx, col_name));
-                            }
+                            && let Some(idx) = meta.columns.iter().position(|c| c.name == col_name)
+                        {
+                            result.push((idx, col_name));
+                        }
                     }
                 }
             }
@@ -3330,9 +3931,10 @@ pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Res
                 for col_name in &cols {
                     let already = result.iter().any(|(_, n)| n == col_name);
                     if !already
-                        && let Some(idx) = meta.columns.iter().position(|c| c.name == *col_name) {
-                            result.push((idx, col_name.clone()));
-                        }
+                        && let Some(idx) = meta.columns.iter().position(|c| c.name == *col_name)
+                    {
+                        result.push((idx, col_name.clone()));
+                    }
                 }
                 // If the expression is constant (no column refs), ensure at least
                 // one column is scanned so rows are materialized.
@@ -3353,26 +3955,35 @@ pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Res
 }
 
 /// Helper to resolve column names referenced in a Filter to indices in table metadata.
-fn collect_filter_column_refs(filter: &Filter, meta: &TableMeta, result: &mut Vec<(usize, String)>) -> Result<()> {
+fn collect_filter_column_refs(
+    filter: &Filter,
+    meta: &TableMeta,
+    result: &mut Vec<(usize, String)>,
+) -> Result<()> {
     match filter {
-        Filter::Eq(col, _) | Filter::Gt(col, _) | Filter::Lt(col, _)
-        | Filter::Gte(col, _) | Filter::Lte(col, _)
-        | Filter::IsNull(col) | Filter::IsNotNull(col)
-        | Filter::Like(col, _) | Filter::NotLike(col, _) | Filter::ILike(col, _) => {
+        Filter::Eq(col, _)
+        | Filter::Gt(col, _)
+        | Filter::Lt(col, _)
+        | Filter::Gte(col, _)
+        | Filter::Lte(col, _)
+        | Filter::IsNull(col)
+        | Filter::IsNotNull(col)
+        | Filter::Like(col, _)
+        | Filter::NotLike(col, _)
+        | Filter::ILike(col, _) => {
             let already = result.iter().any(|(_, n)| n == col);
-            if !already
-                && let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
-                    result.push((idx, col.clone()));
-                }
+            if !already && let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
+                result.push((idx, col.clone()));
+            }
         }
         Filter::Between(col, _, _)
         | Filter::BetweenSymmetric(col, _, _)
-        | Filter::In(col, _) | Filter::NotIn(col, _) => {
+        | Filter::In(col, _)
+        | Filter::NotIn(col, _) => {
             let already = result.iter().any(|(_, n)| n == col);
-            if !already
-                && let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
-                    result.push((idx, col.clone()));
-                }
+            if !already && let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
+                result.push((idx, col.clone()));
+            }
         }
         Filter::And(parts) | Filter::Or(parts) => {
             for p in parts {
@@ -3384,10 +3995,9 @@ fn collect_filter_column_refs(filter: &Filter, meta: &TableMeta, result: &mut Ve
         }
         Filter::NotEq(col, _) => {
             let already = result.iter().any(|(_, n)| n == col);
-            if !already
-                && let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
-                    result.push((idx, col.clone()));
-                }
+            if !already && let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
+                result.push((idx, col.clone()));
+            }
         }
         Filter::Expression { left, right, .. } => {
             // Collect columns from both sides of the expression.
@@ -3396,10 +4006,10 @@ fn collect_filter_column_refs(filter: &Filter, meta: &TableMeta, result: &mut Ve
             right.collect_columns(&mut cols);
             for col_name in cols {
                 let already = result.iter().any(|(_, n)| n == &col_name);
-                if !already
-                    && let Some(idx) = meta.columns.iter().position(|c| c.name == col_name) {
-                        result.push((idx, col_name));
-                    }
+                if !already && let Some(idx) = meta.columns.iter().position(|c| c.name == col_name)
+                {
+                    result.push((idx, col_name));
+                }
             }
         }
         _ => {}
@@ -3409,7 +4019,10 @@ fn collect_filter_column_refs(filter: &Filter, meta: &TableMeta, result: &mut Ve
 
 fn result_column_names(select_cols: &[SelectColumn], resolved: &[(usize, String)]) -> Vec<String> {
     // If any select column is a Wildcard, just use all resolved column names directly.
-    if select_cols.iter().any(|c| matches!(c, SelectColumn::Wildcard)) {
+    if select_cols
+        .iter()
+        .any(|c| matches!(c, SelectColumn::Wildcard))
+    {
         return resolved.iter().map(|(_, n)| n.clone()).collect();
     }
 
@@ -3418,7 +4031,12 @@ fn result_column_names(select_cols: &[SelectColumn], resolved: &[(usize, String)
         .map(|col| match col {
             SelectColumn::Wildcard => unreachable!(),
             SelectColumn::Name(n) => n.clone(),
-            SelectColumn::Aggregate { function, column, alias, .. } => {
+            SelectColumn::Aggregate {
+                function,
+                column,
+                alias,
+                ..
+            } => {
                 if let Some(a) = alias {
                     a.clone()
                 } else {
@@ -3436,9 +4054,7 @@ fn result_column_names(select_cols: &[SelectColumn], resolved: &[(usize, String)
                     .collect();
                 format!("{name}({})", arg_strs.join(", "))
             }
-            SelectColumn::WindowFunction(wf) => {
-                wf.alias.clone().unwrap_or_else(|| wf.name.clone())
-            }
+            SelectColumn::WindowFunction(wf) => wf.alias.clone().unwrap_or_else(|| wf.name.clone()),
             SelectColumn::CaseWhen { alias, .. } => {
                 alias.clone().unwrap_or_else(|| "case".to_string())
             }
@@ -3542,9 +4158,10 @@ fn scan_table(
 
             // Apply filter.
             if let Some(f) = filter
-                && !evaluate_filter(f, &all_values, meta) {
-                    continue;
-                }
+                && !evaluate_filter(f, &all_values, meta)
+            {
+                continue;
+            }
 
             // Extract only selected columns in order.
             let row: Vec<Value> = selected_cols
@@ -3576,12 +4193,20 @@ fn read_value(reader: &ColumnReader, row: u64) -> Value {
             ColumnType::I64 => Value::I64(r.read_i64(row)),
             ColumnType::F64 => {
                 let v = r.read_f64(row);
-                if v.is_nan() { Value::Null } else { Value::F64(v) }
+                if v.is_nan() {
+                    Value::Null
+                } else {
+                    Value::F64(v)
+                }
             }
             ColumnType::I32 | ColumnType::Symbol => Value::I64(r.read_i32(row) as i64),
             ColumnType::Timestamp => Value::Timestamp(r.read_i64(row)),
-            ColumnType::F32 => Value::F64(f32::from_le_bytes(r.read_raw(row).try_into().unwrap()) as f64),
-            ColumnType::I16 => Value::I64(i16::from_le_bytes(r.read_raw(row).try_into().unwrap()) as i64),
+            ColumnType::F32 => {
+                Value::F64(f32::from_le_bytes(r.read_raw(row).try_into().unwrap()) as f64)
+            }
+            ColumnType::I16 => {
+                Value::I64(i16::from_le_bytes(r.read_raw(row).try_into().unwrap()) as i64)
+            }
             ColumnType::I8 => Value::I64(r.read_raw(row)[0] as i8 as i64),
             ColumnType::Boolean => Value::I64(if r.read_raw(row)[0] != 0 { 1 } else { 0 }),
             ColumnType::Uuid => {
@@ -3593,7 +4218,11 @@ fn read_value(reader: &ColumnReader, row: u64) -> Value {
         },
         ColumnReader::Var(r, _ct) => {
             let s = r.read_str(row);
-            if s == "\0" { Value::Null } else { Value::Str(s.to_string()) }
+            if s == "\0" {
+                Value::Null
+            } else {
+                Value::Str(s.to_string())
+            }
         }
     }
 }
@@ -3669,35 +4298,70 @@ fn evaluate_filter(filter: &Filter, values: &[(usize, Value)], meta: &TableMeta)
         }
         Filter::Gt(col, expected) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater)).unwrap_or(false)
+            val.as_ref()
+                .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater))
+                .unwrap_or(false)
         }
         Filter::Lt(col, expected) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less)).unwrap_or(false)
+            val.as_ref()
+                .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less))
+                .unwrap_or(false)
         }
         Filter::Gte(col, expected) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))).unwrap_or(false)
+            val.as_ref()
+                .map(|v| {
+                    matches!(
+                        v.cmp_coerce(expected),
+                        Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                    )
+                })
+                .unwrap_or(false)
         }
         Filter::Lte(col, expected) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal))).unwrap_or(false)
+            val.as_ref()
+                .map(|v| {
+                    matches!(
+                        v.cmp_coerce(expected),
+                        Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                    )
+                })
+                .unwrap_or(false)
         }
         Filter::Between(col, low, high) => {
             let val = get_filter_value(col, values, meta);
             val.as_ref()
-                .map(|v| matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                      && matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)))
+                .map(|v| {
+                    matches!(
+                        v.cmp_coerce(low),
+                        Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                    ) && matches!(
+                        v.cmp_coerce(high),
+                        Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                    )
+                })
                 .unwrap_or(false)
         }
         Filter::BetweenSymmetric(col, low, high) => {
             let val = get_filter_value(col, values, meta);
             val.as_ref()
                 .map(|v| {
-                    let fwd = matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                        && matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
-                    let rev = matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                        && matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
+                    let fwd = matches!(
+                        v.cmp_coerce(low),
+                        Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                    ) && matches!(
+                        v.cmp_coerce(high),
+                        Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                    );
+                    let rev = matches!(
+                        v.cmp_coerce(high),
+                        Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                    ) && matches!(
+                        v.cmp_coerce(low),
+                        Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                    );
                     fwd || rev
                 })
                 .unwrap_or(false)
@@ -3714,41 +4378,51 @@ fn evaluate_filter(filter: &Filter, values: &[(usize, Value)], meta: &TableMeta)
         }
         Filter::In(col, list) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| list.iter().any(|item| v.eq_coerce(item))).unwrap_or(false)
+            val.as_ref()
+                .map(|v| list.iter().any(|item| v.eq_coerce(item)))
+                .unwrap_or(false)
         }
         Filter::NotIn(col, list) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| !list.iter().any(|item| v.eq_coerce(item))).unwrap_or(true)
+            val.as_ref()
+                .map(|v| !list.iter().any(|item| v.eq_coerce(item)))
+                .unwrap_or(true)
         }
         Filter::Like(col, pattern) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| {
-                if let Value::Str(s) = v {
-                    like_match(s, pattern, false)
-                } else {
-                    false
-                }
-            }).unwrap_or(false)
+            val.as_ref()
+                .map(|v| {
+                    if let Value::Str(s) = v {
+                        like_match(s, pattern, false)
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
         }
         Filter::NotLike(col, pattern) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| {
-                if let Value::Str(s) = v {
-                    !like_match(s, pattern, false)
-                } else {
-                    true
-                }
-            }).unwrap_or(true)
+            val.as_ref()
+                .map(|v| {
+                    if let Value::Str(s) = v {
+                        !like_match(s, pattern, false)
+                    } else {
+                        true
+                    }
+                })
+                .unwrap_or(true)
         }
         Filter::ILike(col, pattern) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| {
-                if let Value::Str(s) = v {
-                    like_match(s, pattern, true)
-                } else {
-                    false
-                }
-            }).unwrap_or(false)
+            val.as_ref()
+                .map(|v| {
+                    if let Value::Str(s) = v {
+                        like_match(s, pattern, true)
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
         }
         Filter::Subquery { .. } | Filter::InSubquery { .. } | Filter::Exists { .. } => {
             // Subquery filters should have been resolved before reaching here.
@@ -3763,8 +4437,14 @@ fn evaluate_filter(filter: &Filter, values: &[(usize, Value)], meta: &TableMeta)
                 CompareOp::NotEq => !lv.eq_coerce(&rv),
                 CompareOp::Gt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Greater),
                 CompareOp::Lt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Less),
-                CompareOp::Gte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)),
-                CompareOp::Lte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)),
+                CompareOp::Gte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ),
+                CompareOp::Lte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                ),
             }
         }
         // ALL/ANY subquery filters not yet evaluated in scan-level filter.
@@ -3776,8 +4456,16 @@ fn evaluate_filter(filter: &Filter, values: &[(usize, Value)], meta: &TableMeta)
 /// `%` matches any sequence of characters, `_` matches any single character.
 /// If `case_insensitive` is true, comparison is done case-insensitively.
 pub(crate) fn like_match(s: &str, pattern: &str, case_insensitive: bool) -> bool {
-    let s = if case_insensitive { s.to_ascii_lowercase() } else { s.to_string() };
-    let pattern = if case_insensitive { pattern.to_ascii_lowercase() } else { pattern.to_string() };
+    let s = if case_insensitive {
+        s.to_ascii_lowercase()
+    } else {
+        s.to_string()
+    };
+    let pattern = if case_insensitive {
+        pattern.to_ascii_lowercase()
+    } else {
+        pattern.to_string()
+    };
     like_match_impl(s.as_bytes(), pattern.as_bytes())
 }
 
@@ -3845,7 +4533,10 @@ fn like_match_impl(s: &[u8], p: &[u8]) -> bool {
 
 fn get_filter_value(col: &str, values: &[(usize, Value)], meta: &TableMeta) -> Option<Value> {
     let idx = meta.columns.iter().position(|c| c.name == col)?;
-    values.iter().find(|(i, _)| *i == idx).map(|(_, v)| v.clone())
+    values
+        .iter()
+        .find(|(i, _)| *i == idx)
+        .map(|(_, v)| v.clone())
 }
 
 /// Apply ORDER BY, LIMIT, and DISTINCT to a vectorized group-by result.
@@ -3857,8 +4548,11 @@ fn apply_post_groupby(
 ) {
     if let QueryResult::Rows { rows, columns } = result {
         if !order_by.is_empty() {
-            let fake_resolved: Vec<(usize, String)> =
-                columns.iter().enumerate().map(|(i, n)| (i, n.clone())).collect();
+            let fake_resolved: Vec<(usize, String)> = columns
+                .iter()
+                .enumerate()
+                .map(|(i, n)| (i, n.clone()))
+                .collect();
             apply_order_by(rows, &fake_resolved, order_by);
         }
         if let Some(lim) = limit {
@@ -3870,12 +4564,18 @@ fn apply_post_groupby(
     }
 }
 
-pub(crate) fn apply_order_by(rows: &mut [Vec<Value>], selected_cols: &[(usize, String)], order_by: &[OrderBy]) {
+pub(crate) fn apply_order_by(
+    rows: &mut [Vec<Value>],
+    selected_cols: &[(usize, String)],
+    order_by: &[OrderBy],
+) {
     rows.sort_by(|a, b| {
         for ob in order_by {
             let col_pos = selected_cols.iter().position(|(_, n)| n == &ob.column);
             if let Some(pos) = col_pos {
-                let cmp = a[pos].partial_cmp(&b[pos]).unwrap_or(std::cmp::Ordering::Equal);
+                let cmp = a[pos]
+                    .partial_cmp(&b[pos])
+                    .unwrap_or(std::cmp::Ordering::Equal);
                 let cmp = if ob.descending { cmp.reverse() } else { cmp };
                 if cmp != std::cmp::Ordering::Equal {
                     return cmp;
@@ -3890,7 +4590,12 @@ pub(crate) fn apply_order_by(rows: &mut [Vec<Value>], selected_cols: &[(usize, S
 /// size K instead of sorting all N rows. O(N log K) instead of O(N log N).
 ///
 /// Returns the top K rows in the correct output order.
-fn apply_topk(rows: &[Vec<Value>], selected_cols: &[(usize, String)], order_by: &[OrderBy], k: usize) -> Vec<Vec<Value>> {
+fn apply_topk(
+    rows: &[Vec<Value>],
+    selected_cols: &[(usize, String)],
+    order_by: &[OrderBy],
+    k: usize,
+) -> Vec<Vec<Value>> {
     use std::cmp::Ordering as O;
     use std::collections::BinaryHeap;
 
@@ -3898,7 +4603,9 @@ fn apply_topk(rows: &[Vec<Value>], selected_cols: &[(usize, String)], order_by: 
     let col_positions: Vec<(usize, bool)> = order_by
         .iter()
         .filter_map(|ob| {
-            selected_cols.iter().position(|(_, n)| n == &ob.column)
+            selected_cols
+                .iter()
+                .position(|(_, n)| n == &ob.column)
                 .map(|pos| (pos, ob.descending))
         })
         .collect();
@@ -3914,7 +4621,9 @@ fn apply_topk(rows: &[Vec<Value>], selected_cols: &[(usize, String)], order_by: 
     impl HeapEntry {
         fn cmp_key(&self, other: &Self) -> O {
             for &(pos, desc) in &self.col_positions {
-                let cmp = self.row[pos].partial_cmp(&other.row[pos]).unwrap_or(O::Equal);
+                let cmp = self.row[pos]
+                    .partial_cmp(&other.row[pos])
+                    .unwrap_or(O::Equal);
                 // For ASC: keep smallest, evict largest -> natural max-heap order
                 // For DESC: keep largest, evict smallest -> reverse
                 let cmp = if desc { cmp.reverse() } else { cmp };
@@ -3926,10 +4635,22 @@ fn apply_topk(rows: &[Vec<Value>], selected_cols: &[(usize, String)], order_by: 
         }
     }
 
-    impl PartialEq for HeapEntry { fn eq(&self, other: &Self) -> bool { self.cmp_key(other) == O::Equal } }
+    impl PartialEq for HeapEntry {
+        fn eq(&self, other: &Self) -> bool {
+            self.cmp_key(other) == O::Equal
+        }
+    }
     impl Eq for HeapEntry {}
-    impl PartialOrd for HeapEntry { fn partial_cmp(&self, other: &Self) -> Option<O> { Some(self.cmp(other)) } }
-    impl Ord for HeapEntry { fn cmp(&self, other: &Self) -> O { self.cmp_key(other) } }
+    impl PartialOrd for HeapEntry {
+        fn partial_cmp(&self, other: &Self) -> Option<O> {
+            Some(self.cmp(other))
+        }
+    }
+    impl Ord for HeapEntry {
+        fn cmp(&self, other: &Self) -> O {
+            self.cmp_key(other)
+        }
+    }
 
     let mut heap: BinaryHeap<HeapEntry> = BinaryHeap::with_capacity(k + 1);
 
@@ -3967,11 +4688,24 @@ fn collect_plan_expr_column_names(expr: &PlanExpr) -> Vec<String> {
 
 fn collect_plan_expr_cols_recursive(expr: &PlanExpr, out: &mut Vec<String>) {
     match expr {
-        PlanExpr::Column(name) => { if !out.contains(name) { out.push(name.clone()); } }
+        PlanExpr::Column(name) => {
+            if !out.contains(name) {
+                out.push(name.clone());
+            }
+        }
         PlanExpr::Literal(_) => {}
-        PlanExpr::BinaryOp { left, right, .. } => { collect_plan_expr_cols_recursive(left, out); collect_plan_expr_cols_recursive(right, out); }
-        PlanExpr::UnaryOp { expr, .. } => { collect_plan_expr_cols_recursive(expr, out); }
-        PlanExpr::Function { args, .. } => { for a in args { collect_plan_expr_cols_recursive(a, out); } }
+        PlanExpr::BinaryOp { left, right, .. } => {
+            collect_plan_expr_cols_recursive(left, out);
+            collect_plan_expr_cols_recursive(right, out);
+        }
+        PlanExpr::UnaryOp { expr, .. } => {
+            collect_plan_expr_cols_recursive(expr, out);
+        }
+        PlanExpr::Function { args, .. } => {
+            for a in args {
+                collect_plan_expr_cols_recursive(a, out);
+            }
+        }
     }
 }
 
@@ -4004,20 +4738,28 @@ fn evaluate_expr_with_aggregates(
         PlanExpr::Function { name, args } => {
             if let Some(kind) = AggregateKind::from_name(name) {
                 // This is an aggregate function — look up the result.
-                let key = format!("{:?}({})", kind, args.iter().map(|a| format!("{a:?}")).collect::<Vec<_>>().join(","));
+                let key = format!(
+                    "{:?}({})",
+                    kind,
+                    args.iter()
+                        .map(|a| format!("{a:?}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                );
                 return agg_results.get(&key).cloned().unwrap_or(Value::Null);
             }
             // Scalar function: evaluate arguments recursively.
-            let func_args: Vec<Value> = args.iter()
+            let func_args: Vec<Value> = args
+                .iter()
                 .map(|a| evaluate_expr_with_aggregates(a, agg_results, row, col_names))
                 .collect();
             crate::scalar::evaluate_scalar(name, &func_args).unwrap_or(Value::Null)
         }
-        PlanExpr::Column(name) => {
-            col_names.iter().position(|n| n == name)
-                .and_then(|i| row.get(i).cloned())
-                .unwrap_or(Value::Null)
-        }
+        PlanExpr::Column(name) => col_names
+            .iter()
+            .position(|n| n == name)
+            .and_then(|i| row.get(i).cloned())
+            .unwrap_or(Value::Null),
         PlanExpr::Literal(v) => v.clone(),
         PlanExpr::BinaryOp { left, op, right } => {
             let lv = evaluate_expr_with_aggregates(left, agg_results, row, col_names);
@@ -4044,8 +4786,17 @@ fn collect_aggregates_from_expr(
                     Some(PlanExpr::Column(c)) => c.clone(),
                     _ => "*".to_string(),
                 };
-                let key = format!("{:?}({})", kind, args.iter().map(|a| format!("{a:?}")).collect::<Vec<_>>().join(","));
-                agg_map.entry(key).or_insert_with(|| (kind, col_name, functions::create_aggregate(kind)));
+                let key = format!(
+                    "{:?}({})",
+                    kind,
+                    args.iter()
+                        .map(|a| format!("{a:?}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                );
+                agg_map
+                    .entry(key)
+                    .or_insert_with(|| (kind, col_name, functions::create_aggregate(kind)));
             } else {
                 for a in args {
                     collect_aggregates_from_expr(a, agg_map);
@@ -4074,14 +4825,23 @@ fn apply_aggregates(
 
     if has_expr_aggs {
         // Collect all aggregate functions from both direct Aggregates and Expressions.
-        let mut agg_map: HashMap<String, (AggregateKind, String, Box<dyn AggregateFunction>)> = HashMap::new();
+        let mut agg_map: HashMap<String, (AggregateKind, String, Box<dyn AggregateFunction>)> =
+            HashMap::new();
 
         // Direct aggregate columns.
         for col in select_cols {
             match col {
-                SelectColumn::Aggregate { function, column, .. } => {
+                SelectColumn::Aggregate {
+                    function, column, ..
+                } => {
                     let key = format!("{:?}(Column({:?}))", function, column);
-                    agg_map.entry(key).or_insert_with(|| (*function, column.clone(), functions::create_aggregate(*function)));
+                    agg_map.entry(key).or_insert_with(|| {
+                        (
+                            *function,
+                            column.clone(),
+                            functions::create_aggregate(*function),
+                        )
+                    });
                 }
                 SelectColumn::Expression { expr, .. } => {
                     collect_aggregates_from_expr(expr, &mut agg_map);
@@ -4091,8 +4851,14 @@ fn apply_aggregates(
         }
 
         // Map column names to positions for feeding values.
-        let col_positions: HashMap<String, usize> = resolved.iter()
-            .map(|(_, name)| (name.clone(), resolved.iter().position(|(_, n)| n == name).unwrap()))
+        let col_positions: HashMap<String, usize> = resolved
+            .iter()
+            .map(|(_, name)| {
+                (
+                    name.clone(),
+                    resolved.iter().position(|(_, n)| n == name).unwrap(),
+                )
+            })
             .collect();
 
         // Feed all rows to the aggregate functions.
@@ -4101,14 +4867,16 @@ fn apply_aggregates(
                 if col_name == "*" {
                     func.add(&Value::I64(1));
                 } else if let Some(&pos) = col_positions.get(col_name.as_str())
-                    && pos < row.len() {
-                        func.add(&row[pos]);
-                    }
+                    && pos < row.len()
+                {
+                    func.add(&row[pos]);
+                }
             }
         }
 
         // Collect results.
-        let agg_results: HashMap<String, Value> = agg_map.iter()
+        let agg_results: HashMap<String, Value> = agg_map
+            .iter()
             .map(|(key, (_, _, func))| (key.clone(), func.result()))
             .collect();
 
@@ -4116,9 +4884,13 @@ fn apply_aggregates(
         let col_names: Vec<String> = resolved.iter().map(|(_, n)| n.clone()).collect();
         let empty_row: Vec<Value> = vec![Value::Null; col_names.len()];
 
-        let result_row: Vec<Value> = select_cols.iter().enumerate().map(|(i, col)| {
-            match col {
-                SelectColumn::Aggregate { function, column, .. } => {
+        let result_row: Vec<Value> = select_cols
+            .iter()
+            .enumerate()
+            .map(|(i, col)| match col {
+                SelectColumn::Aggregate {
+                    function, column, ..
+                } => {
                     let key = format!("{:?}(Column({:?}))", function, column);
                     agg_results.get(&key).cloned().unwrap_or(Value::Null)
                 }
@@ -4127,11 +4899,17 @@ fn apply_aggregates(
                 }
                 _ => {
                     if let Some(first_row) = rows.first() {
-                        if i < first_row.len() { first_row[i].clone() } else { Value::Null }
-                    } else { Value::Null }
+                        if i < first_row.len() {
+                            first_row[i].clone()
+                        } else {
+                            Value::Null
+                        }
+                    } else {
+                        Value::Null
+                    }
                 }
-            }
-        }).collect();
+            })
+            .collect();
 
         return Ok(vec![result_row]);
     }
@@ -4140,7 +4918,9 @@ fn apply_aggregates(
     let mut agg_funcs: Vec<Option<Box<dyn AggregateFunction>>> = select_cols
         .iter()
         .map(|c| match c {
-            SelectColumn::Aggregate { function, .. } => Some(functions::create_aggregate(*function)),
+            SelectColumn::Aggregate { function, .. } => {
+                Some(functions::create_aggregate(*function))
+            }
             _ => None,
         })
         .collect();
@@ -4150,19 +4930,28 @@ fn apply_aggregates(
         for (i, func) in agg_funcs.iter_mut().enumerate() {
             if let Some(f) = func {
                 // Check FILTER (WHERE ...) clause if present.
-                if let SelectColumn::Aggregate { filter: Some(flt), .. } = &select_cols[i]
-                    && !evaluate_filter_virtual(flt, row, &col_names_for_filter) {
-                        continue;
-                    }
+                if let SelectColumn::Aggregate {
+                    filter: Some(flt), ..
+                } = &select_cols[i]
+                    && !evaluate_filter_virtual(flt, row, &col_names_for_filter)
+                {
+                    continue;
+                }
                 // Use arg_expr if present.
-                if let SelectColumn::Aggregate { arg_expr: Some(expr), .. } = &select_cols[i] {
+                if let SelectColumn::Aggregate {
+                    arg_expr: Some(expr),
+                    ..
+                } = &select_cols[i]
+                {
                     let val = evaluate_plan_expr_by_name(expr, row, &col_names_for_filter);
                     f.add(&val);
                 } else if let SelectColumn::Aggregate { column, .. } = &select_cols[i] {
                     if column == "*" {
                         f.add(&Value::I64(1));
                     } else if let Some(pos) = resolved.iter().position(|(_, n)| n == column) {
-                        if pos < row.len() { f.add(&row[pos]); }
+                        if pos < row.len() {
+                            f.add(&row[pos]);
+                        }
                     } else if i < row.len() {
                         f.add(&row[i]);
                     }
@@ -4202,100 +4991,194 @@ fn apply_sample_by(
     let interval_ns = sample_by.interval.as_nanos() as i64;
     let ts_col_idx = meta.timestamp_column;
     let ts_resolved_pos = resolved.iter().position(|(idx, _)| *idx == ts_col_idx);
-    if ts_resolved_pos.is_none() && rows.is_empty() { return Ok(Vec::new()); }
+    if ts_resolved_pos.is_none() && rows.is_empty() {
+        return Ok(Vec::new());
+    }
 
-    let first_ts = rows.first().and_then(|row| {
-        ts_resolved_pos.and_then(|pos| match &row[pos] {
-            Value::Timestamp(ns) | Value::I64(ns) => Some(*ns), _ => None,
+    let first_ts = rows
+        .first()
+        .and_then(|row| {
+            ts_resolved_pos.and_then(|pos| match &row[pos] {
+                Value::Timestamp(ns) | Value::I64(ns) => Some(*ns),
+                _ => None,
+            })
         })
-    }).unwrap_or(0);
-    let align_offset = if sample_by.align == AlignMode::Calendar { 0i64 } else { first_ts % interval_ns };
-    let bucket_fn = |ts_ns: i64| -> i64 { ((ts_ns - align_offset) / interval_ns) * interval_ns + align_offset };
+        .unwrap_or(0);
+    let align_offset = if sample_by.align == AlignMode::Calendar {
+        0i64
+    } else {
+        first_ts % interval_ns
+    };
+    let bucket_fn =
+        |ts_ns: i64| -> i64 { ((ts_ns - align_offset) / interval_ns) * interval_ns + align_offset };
 
     let mut bucket_map: Vec<(i64, Vec<Vec<Value>>)> = Vec::new();
     for row in &rows {
-        let ts_ns = ts_resolved_pos.and_then(|pos| match &row[pos] {
-            Value::Timestamp(ns) | Value::I64(ns) => Some(*ns), _ => None,
-        }).unwrap_or(0);
+        let ts_ns = ts_resolved_pos
+            .and_then(|pos| match &row[pos] {
+                Value::Timestamp(ns) | Value::I64(ns) => Some(*ns),
+                _ => None,
+            })
+            .unwrap_or(0);
         let bucket = bucket_fn(ts_ns);
         if let Some(last) = bucket_map.last_mut()
-            && last.0 == bucket { last.1.push(row.clone()); continue; }
+            && last.0 == bucket
+        {
+            last.1.push(row.clone());
+            continue;
+        }
         bucket_map.push((bucket, vec![row.clone()]));
     }
 
     let aggregate_bucket = |bucket_ts: i64, bucket_rows: &[Vec<Value>]| -> Vec<Value> {
-        let mut agg_funcs: Vec<Option<Box<dyn AggregateFunction>>> = select_cols.iter()
-            .map(|c| match c { SelectColumn::Aggregate { function, .. } => Some(functions::create_aggregate(*function)), _ => None }).collect();
-        for row in bucket_rows { for (i, func) in agg_funcs.iter_mut().enumerate() { if let Some(f) = func && i < row.len() { f.add(&row[i]); } } }
-        select_cols.iter().enumerate().map(|(i, col)| match col {
-            SelectColumn::Aggregate { .. } => agg_funcs[i].as_ref().map(|f| f.result()).unwrap_or(Value::Null),
-            SelectColumn::Name(name) => {
-                if let Some(pos) = resolved.iter().position(|(_, n)| n == name) {
-                    if resolved[pos].0 == ts_col_idx { Value::Timestamp(bucket_ts) }
-                    else { bucket_rows.first().and_then(|r| r.get(pos).cloned()).unwrap_or(Value::Null) }
-                } else { Value::Null }
+        let mut agg_funcs: Vec<Option<Box<dyn AggregateFunction>>> = select_cols
+            .iter()
+            .map(|c| match c {
+                SelectColumn::Aggregate { function, .. } => {
+                    Some(functions::create_aggregate(*function))
+                }
+                _ => None,
+            })
+            .collect();
+        for row in bucket_rows {
+            for (i, func) in agg_funcs.iter_mut().enumerate() {
+                if let Some(f) = func
+                    && i < row.len()
+                {
+                    f.add(&row[i]);
+                }
             }
-            _ => Value::Null,
-        }).collect()
+        }
+        select_cols
+            .iter()
+            .enumerate()
+            .map(|(i, col)| match col {
+                SelectColumn::Aggregate { .. } => agg_funcs[i]
+                    .as_ref()
+                    .map(|f| f.result())
+                    .unwrap_or(Value::Null),
+                SelectColumn::Name(name) => {
+                    if let Some(pos) = resolved.iter().position(|(_, n)| n == name) {
+                        if resolved[pos].0 == ts_col_idx {
+                            Value::Timestamp(bucket_ts)
+                        } else {
+                            bucket_rows
+                                .first()
+                                .and_then(|r| r.get(pos).cloned())
+                                .unwrap_or(Value::Null)
+                        }
+                    } else {
+                        Value::Null
+                    }
+                }
+                _ => Value::Null,
+            })
+            .collect()
     };
     let empty_row = |bucket_ts: i64| -> Vec<Value> {
-        select_cols.iter().map(|col| match col {
-            SelectColumn::Name(name) => {
-                if let Some(pos) = resolved.iter().position(|(_, n)| n == name) {
-                    if resolved[pos].0 == ts_col_idx { Value::Timestamp(bucket_ts) } else { Value::Null }
-                } else { Value::Null }
-            }
-            _ => Value::Null,
-        }).collect()
+        select_cols
+            .iter()
+            .map(|col| match col {
+                SelectColumn::Name(name) => {
+                    if let Some(pos) = resolved.iter().position(|(_, n)| n == name) {
+                        if resolved[pos].0 == ts_col_idx {
+                            Value::Timestamp(bucket_ts)
+                        } else {
+                            Value::Null
+                        }
+                    } else {
+                        Value::Null
+                    }
+                }
+                _ => Value::Null,
+            })
+            .collect()
     };
 
     if matches!(sample_by.fill, FillMode::None) {
-        return Ok(bucket_map.iter().map(|(bts, brows)| aggregate_bucket(*bts, brows)).collect());
+        return Ok(bucket_map
+            .iter()
+            .map(|(bts, brows)| aggregate_bucket(*bts, brows))
+            .collect());
     }
-    if bucket_map.is_empty() { return Ok(Vec::new()); }
+    if bucket_map.is_empty() {
+        return Ok(Vec::new());
+    }
 
     let min_bucket = bucket_map.first().unwrap().0;
     let max_bucket = bucket_map.last().unwrap().0;
     let mut known: std::collections::BTreeMap<i64, Vec<Value>> = std::collections::BTreeMap::new();
-    for (bts, brows) in &bucket_map { known.insert(*bts, aggregate_bucket(*bts, brows)); }
+    for (bts, brows) in &bucket_map {
+        known.insert(*bts, aggregate_bucket(*bts, brows));
+    }
     let mut all_buckets = Vec::new();
-    { let mut t = min_bucket; while t <= max_bucket { all_buckets.push(t); t += interval_ns; } }
+    {
+        let mut t = min_bucket;
+        while t <= max_bucket {
+            all_buckets.push(t);
+            t += interval_ns;
+        }
+    }
     let mut result = Vec::with_capacity(all_buckets.len());
 
     match &sample_by.fill {
-        FillMode::Null => { for &bts in &all_buckets { result.push(known.get(&bts).cloned().unwrap_or_else(|| empty_row(bts))); } }
+        FillMode::Null => {
+            for &bts in &all_buckets {
+                result.push(known.get(&bts).cloned().unwrap_or_else(|| empty_row(bts)));
+            }
+        }
         FillMode::Prev => {
             let mut last_known: Option<Vec<Value>> = None;
             for &bts in &all_buckets {
-                if let Some(row) = known.get(&bts) { last_known = Some(row.clone()); result.push(row.clone()); }
-                else if let Some(prev) = &last_known {
+                if let Some(row) = known.get(&bts) {
+                    last_known = Some(row.clone());
+                    result.push(row.clone());
+                } else if let Some(prev) = &last_known {
                     let mut filled = prev.clone();
                     for (i, col) in select_cols.iter().enumerate() {
                         if let SelectColumn::Name(name) = col
                             && let Some(pos) = resolved.iter().position(|(_, n)| n == name)
-                                && resolved[pos].0 == ts_col_idx { filled[i] = Value::Timestamp(bts); }
+                            && resolved[pos].0 == ts_col_idx
+                        {
+                            filled[i] = Value::Timestamp(bts);
+                        }
                     }
                     result.push(filled);
-                } else { result.push(empty_row(bts)); }
+                } else {
+                    result.push(empty_row(bts));
+                }
             }
         }
         FillMode::Value(fill_val) => {
             for &bts in &all_buckets {
-                if let Some(row) = known.get(&bts) { result.push(row.clone()); }
-                else {
+                if let Some(row) = known.get(&bts) {
+                    result.push(row.clone());
+                } else {
                     let mut filled = empty_row(bts);
                     for (i, col) in select_cols.iter().enumerate() {
-                        if matches!(col, SelectColumn::Aggregate { .. }) { filled[i] = fill_val.clone(); }
+                        if matches!(col, SelectColumn::Aggregate { .. }) {
+                            filled[i] = fill_val.clone();
+                        }
                     }
                     result.push(filled);
                 }
             }
         }
         FillMode::Linear => {
-            let known_indices: Vec<usize> = all_buckets.iter().enumerate().filter(|(_, bts)| known.contains_key(bts)).map(|(idx, _)| idx).collect();
-            let mut pre_result: Vec<Option<Vec<Value>>> = all_buckets.iter().map(|bts| known.get(bts).cloned()).collect();
+            let known_indices: Vec<usize> = all_buckets
+                .iter()
+                .enumerate()
+                .filter(|(_, bts)| known.contains_key(bts))
+                .map(|(idx, _)| idx)
+                .collect();
+            let mut pre_result: Vec<Option<Vec<Value>>> = all_buckets
+                .iter()
+                .map(|bts| known.get(bts).cloned())
+                .collect();
             for idx in 0..all_buckets.len() {
-                if pre_result[idx].is_some() { continue; }
+                if pre_result[idx].is_some() {
+                    continue;
+                }
                 let bts = all_buckets[idx];
                 let prev_ki = known_indices.iter().rev().find(|&&ki| ki < idx);
                 let next_ki = known_indices.iter().find(|&&ki| ki > idx);
@@ -4305,12 +5188,16 @@ fn apply_sample_by(
                     let next_row = pre_result[ni].as_ref().unwrap();
                     let frac = (idx - pi) as f64 / (ni - pi) as f64;
                     for (i, col) in select_cols.iter().enumerate() {
-                        if matches!(col, SelectColumn::Aggregate { .. }) { row[i] = sample_by_interpolate(&prev_row[i], &next_row[i], frac); }
+                        if matches!(col, SelectColumn::Aggregate { .. }) {
+                            row[i] = sample_by_interpolate(&prev_row[i], &next_row[i], frac);
+                        }
                     }
                 } else if let Some(&pi) = prev_ki {
                     let prev_row = pre_result[pi].as_ref().unwrap();
                     for (i, col) in select_cols.iter().enumerate() {
-                        if matches!(col, SelectColumn::Aggregate { .. }) { row[i] = prev_row[i].clone(); }
+                        if matches!(col, SelectColumn::Aggregate { .. }) {
+                            row[i] = prev_row[i].clone();
+                        }
                     }
                 }
                 pre_result[idx] = Some(row);
@@ -4325,7 +5212,9 @@ fn apply_sample_by(
 fn sample_by_interpolate(a: &Value, b: &Value, frac: f64) -> Value {
     match (a, b) {
         (Value::F64(va), Value::F64(vb)) => Value::F64(va + (vb - va) * frac),
-        (Value::I64(va), Value::I64(vb)) => Value::I64((*va as f64 + (*vb - *va) as f64 * frac) as i64),
+        (Value::I64(va), Value::I64(vb)) => {
+            Value::I64((*va as f64 + (*vb - *va) as f64 * frac) as i64)
+        }
         (Value::I64(va), Value::F64(vb)) => Value::F64(*va as f64 + (vb - *va as f64) * frac),
         (Value::F64(va), Value::I64(vb)) => Value::F64(va + (*vb as f64 - va) * frac),
         _ => a.clone(),
@@ -4339,10 +5228,17 @@ fn evaluate_case_when_select_col(
     resolved: &[(usize, String)],
 ) -> Value {
     match col {
-        SelectColumn::CaseWhen { conditions, else_value, expr_conditions, expr_else, .. } => {
+        SelectColumn::CaseWhen {
+            conditions,
+            else_value,
+            expr_conditions,
+            expr_else,
+            ..
+        } => {
             let col_names: Vec<String> = resolved.iter().map(|(_, n)| n.clone()).collect();
             if let Some(econds) = expr_conditions {
-                let mut result = expr_else.as_ref()
+                let mut result = expr_else
+                    .as_ref()
                     .map(|e| evaluate_plan_expr_by_name(e, row, &col_names))
                     .or_else(|| else_value.clone())
                     .unwrap_or(Value::Null);
@@ -4411,7 +5307,9 @@ fn apply_group_by(
                     _ => {}
                 }
             }
-            Err(ExchangeDbError::Query(format!("GROUP BY column not found: {gb_col}")))
+            Err(ExchangeDbError::Query(format!(
+                "GROUP BY column not found: {gb_col}"
+            )))
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -4419,17 +5317,15 @@ fn apply_group_by(
     let compute_key_value = |src: &GroupBySource, row: &[Value]| -> Value {
         match src {
             GroupBySource::Resolved(pos) => row[*pos].clone(),
-            GroupBySource::SelectCol(idx) => {
-                match &select_cols[*idx] {
-                    SelectColumn::CaseWhen { .. } => {
-                        evaluate_case_when_select_col(&select_cols[*idx], row, resolved)
-                    }
-                    SelectColumn::Expression { expr, .. } => {
-                        evaluate_plan_expr_by_name(expr, row, &col_names_for_eval)
-                    }
-                    _ => Value::Null,
+            GroupBySource::SelectCol(idx) => match &select_cols[*idx] {
+                SelectColumn::CaseWhen { .. } => {
+                    evaluate_case_when_select_col(&select_cols[*idx], row, resolved)
                 }
-            }
+                SelectColumn::Expression { expr, .. } => {
+                    evaluate_plan_expr_by_name(expr, row, &col_names_for_eval)
+                }
+                _ => Value::Null,
+            },
         }
     };
 
@@ -4439,12 +5335,18 @@ fn apply_group_by(
     let mut groups: Vec<(Vec<Value>, Vec<Vec<Value>>)> = Vec::new();
 
     for row in rows {
-        let key: Vec<ValueKey> = gb_sources.iter().map(|src| ValueKey(compute_key_value(src, row))).collect();
+        let key: Vec<ValueKey> = gb_sources
+            .iter()
+            .map(|src| ValueKey(compute_key_value(src, row)))
+            .collect();
 
         if let Some(&idx) = group_map.get(&key) {
             groups[idx].1.push(row.clone());
         } else {
-            let key_values: Vec<Value> = gb_sources.iter().map(|src| compute_key_value(src, row)).collect();
+            let key_values: Vec<Value> = gb_sources
+                .iter()
+                .map(|src| compute_key_value(src, row))
+                .collect();
             let idx = groups.len();
             group_map.insert(key, idx);
             groups.push((key_values, vec![row.clone()]));
@@ -4458,7 +5360,9 @@ fn apply_group_by(
         let mut agg_funcs: Vec<Option<Box<dyn AggregateFunction>>> = select_cols
             .iter()
             .map(|c| match c {
-                SelectColumn::Aggregate { function, .. } => Some(functions::create_aggregate(*function)),
+                SelectColumn::Aggregate { function, .. } => {
+                    Some(functions::create_aggregate(*function))
+                }
                 _ => None,
             })
             .collect();
@@ -4469,15 +5373,21 @@ fn apply_group_by(
             for (i, func) in agg_funcs.iter_mut().enumerate() {
                 if let Some(f) = func {
                     let (col_name, agg_filter, arg_expr) = match &select_cols[i] {
-                        SelectColumn::Aggregate { column, filter, arg_expr, .. } => (column, filter.as_deref(), arg_expr.as_ref()),
+                        SelectColumn::Aggregate {
+                            column,
+                            filter,
+                            arg_expr,
+                            ..
+                        } => (column, filter.as_deref(), arg_expr.as_ref()),
                         _ => continue,
                     };
 
                     // Check FILTER (WHERE ...) clause if present.
                     if let Some(flt) = agg_filter
-                        && !evaluate_filter_virtual(flt, row, &col_names_for_filter) {
-                            continue;
-                        }
+                        && !evaluate_filter_virtual(flt, row, &col_names_for_filter)
+                    {
+                        continue;
+                    }
 
                     if let Some(expr) = arg_expr {
                         // Evaluate expression and feed result to aggregate.
@@ -4486,9 +5396,10 @@ fn apply_group_by(
                     } else if col_name == "*" {
                         f.add(&Value::I64(1));
                     } else if let Some(pos) = resolved.iter().position(|(_, n)| n == col_name)
-                        && pos < row.len() {
-                            f.add(&row[pos]);
-                        }
+                        && pos < row.len()
+                    {
+                        f.add(&row[pos]);
+                    }
                 }
             }
         }
@@ -4512,7 +5423,8 @@ fn apply_group_by(
                         key_values[gb_idx].clone()
                     } else if let Some(pos) = resolved.iter().position(|(_, n)| n == name) {
                         // Non-grouped, non-aggregated column: return first value.
-                        group_rows.first()
+                        group_rows
+                            .first()
                             .and_then(|r| r.get(pos))
                             .cloned()
                             .unwrap_or(Value::Null)
@@ -4524,32 +5436,44 @@ fn apply_group_by(
                 SelectColumn::Expression { expr, alias, .. } => {
                     // Check if this expression is a group-by key (by alias).
                     if let Some(a) = alias
-                        && let Some(gb_idx) = group_by.iter().position(|gb| gb == a) {
-                            return key_values[gb_idx].clone();
-                        }
+                        && let Some(gb_idx) = group_by.iter().position(|gb| gb == a)
+                    {
+                        return key_values[gb_idx].clone();
+                    }
                     // Evaluate the expression against the first row of the group.
                     let col_names: Vec<String> = resolved.iter().map(|(_, n)| n.clone()).collect();
-                    evaluate_plan_expr_by_name(expr, group_rows.first().unwrap_or(&vec![]), &col_names)
+                    evaluate_plan_expr_by_name(
+                        expr,
+                        group_rows.first().unwrap_or(&vec![]),
+                        &col_names,
+                    )
                 }
                 SelectColumn::CaseWhen { alias, .. } => {
                     // Check if this CASE WHEN is a group-by key (by alias).
                     if let Some(a) = alias
-                        && let Some(gb_idx) = group_by.iter().position(|gb| gb == a) {
-                            return key_values[gb_idx].clone();
-                        }
+                        && let Some(gb_idx) = group_by.iter().position(|gb| gb == a)
+                    {
+                        return key_values[gb_idx].clone();
+                    }
                     // Evaluate CASE WHEN against the first row of the group.
-                    evaluate_case_when_select_col(col, group_rows.first().unwrap_or(&vec![]), resolved)
+                    evaluate_case_when_select_col(
+                        col,
+                        group_rows.first().unwrap_or(&vec![]),
+                        resolved,
+                    )
                 }
-                SelectColumn::ScalarFunction { .. } | SelectColumn::WindowFunction(_)
+                SelectColumn::ScalarFunction { .. }
+                | SelectColumn::WindowFunction(_)
                 | SelectColumn::ScalarSubquery { .. } => Value::Null,
             })
             .collect();
 
         // Apply HAVING filter if present.
         if let Some(having_filter) = having
-            && !evaluate_having(having_filter, select_cols, &result_row) {
-                continue;
-            }
+            && !evaluate_having(having_filter, select_cols, &result_row)
+        {
+            continue;
+        }
 
         result.push(result_row);
     }
@@ -4561,9 +5485,17 @@ fn apply_group_by(
 fn collect_filter_column_names(filter: &Filter) -> Vec<String> {
     let mut cols = Vec::new();
     match filter {
-        Filter::Eq(c, _) | Filter::NotEq(c, _) | Filter::Gt(c, _) | Filter::Lt(c, _)
-        | Filter::Gte(c, _) | Filter::Lte(c, _) | Filter::IsNull(c) | Filter::IsNotNull(c)
-        | Filter::Like(c, _) | Filter::NotLike(c, _) | Filter::ILike(c, _) => {
+        Filter::Eq(c, _)
+        | Filter::NotEq(c, _)
+        | Filter::Gt(c, _)
+        | Filter::Lt(c, _)
+        | Filter::Gte(c, _)
+        | Filter::Lte(c, _)
+        | Filter::IsNull(c)
+        | Filter::IsNotNull(c)
+        | Filter::Like(c, _)
+        | Filter::NotLike(c, _)
+        | Filter::ILike(c, _) => {
             cols.push(c.clone());
         }
         Filter::Between(c, _, _) | Filter::BetweenSymmetric(c, _, _) => {
@@ -4630,10 +5562,24 @@ fn apply_grouping_sets(
     for set in sets {
         if set.is_empty() {
             // Empty grouping set: aggregate all rows into a single row.
-            let set_rows = apply_group_by_with_nulls(select_cols, resolved, rows, &[], all_group_cols, having)?;
+            let set_rows = apply_group_by_with_nulls(
+                select_cols,
+                resolved,
+                rows,
+                &[],
+                all_group_cols,
+                having,
+            )?;
             combined_result.extend(set_rows);
         } else {
-            let set_rows = apply_group_by_with_nulls(select_cols, resolved, rows, set, all_group_cols, having)?;
+            let set_rows = apply_group_by_with_nulls(
+                select_cols,
+                resolved,
+                rows,
+                set,
+                all_group_cols,
+                having,
+            )?;
             combined_result.extend(set_rows);
         }
     }
@@ -4657,9 +5603,10 @@ fn apply_group_by_with_nulls(
         if let Some(row) = result_row.first_mut() {
             for (i, col) in select_cols.iter().enumerate() {
                 if let SelectColumn::Name(name) = col
-                    && all_group_cols.contains(name) {
-                        row[i] = Value::Null;
-                    }
+                    && all_group_cols.contains(name)
+                {
+                    row[i] = Value::Null;
+                }
             }
         }
         return Ok(result_row);
@@ -4671,9 +5618,11 @@ fn apply_group_by_with_nulls(
     for row in &mut grouped {
         for (i, col) in select_cols.iter().enumerate() {
             if let SelectColumn::Name(name) = col
-                && all_group_cols.contains(name) && !active_group_cols.contains(name) {
-                    row[i] = Value::Null;
-                }
+                && all_group_cols.contains(name)
+                && !active_group_cols.contains(name)
+            {
+                row[i] = Value::Null;
+            }
         }
     }
 
@@ -4684,32 +5633,40 @@ fn apply_group_by_with_nulls(
 /// are aggregate function expressions like "count(*)" or "sum(volume)".
 fn evaluate_having(filter: &Filter, select_cols: &[SelectColumn], result_row: &[Value]) -> bool {
     match filter {
-        Filter::Eq(col, expected) => {
-            get_having_value(col, select_cols, result_row)
-                .map(|v| v.eq_coerce(expected)).unwrap_or(false)
-        }
-        Filter::NotEq(col, expected) => {
-            get_having_value(col, select_cols, result_row)
-                .map(|v| !v.eq_coerce(expected)).unwrap_or(false)
-        }
-        Filter::Gt(col, expected) => {
-            get_having_value(col, select_cols, result_row)
-                .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater)).unwrap_or(false)
-        }
-        Filter::Lt(col, expected) => {
-            get_having_value(col, select_cols, result_row)
-                .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less)).unwrap_or(false)
-        }
-        Filter::Gte(col, expected) => {
-            get_having_value(col, select_cols, result_row)
-                .map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))).unwrap_or(false)
-        }
-        Filter::Lte(col, expected) => {
-            get_having_value(col, select_cols, result_row)
-                .map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal))).unwrap_or(false)
-        }
-        Filter::And(parts) => parts.iter().all(|p| evaluate_having(p, select_cols, result_row)),
-        Filter::Or(parts) => parts.iter().any(|p| evaluate_having(p, select_cols, result_row)),
+        Filter::Eq(col, expected) => get_having_value(col, select_cols, result_row)
+            .map(|v| v.eq_coerce(expected))
+            .unwrap_or(false),
+        Filter::NotEq(col, expected) => get_having_value(col, select_cols, result_row)
+            .map(|v| !v.eq_coerce(expected))
+            .unwrap_or(false),
+        Filter::Gt(col, expected) => get_having_value(col, select_cols, result_row)
+            .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater))
+            .unwrap_or(false),
+        Filter::Lt(col, expected) => get_having_value(col, select_cols, result_row)
+            .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less))
+            .unwrap_or(false),
+        Filter::Gte(col, expected) => get_having_value(col, select_cols, result_row)
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(expected),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::Lte(col, expected) => get_having_value(col, select_cols, result_row)
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(expected),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::And(parts) => parts
+            .iter()
+            .all(|p| evaluate_having(p, select_cols, result_row)),
+        Filter::Or(parts) => parts
+            .iter()
+            .any(|p| evaluate_having(p, select_cols, result_row)),
         Filter::Not(inner) => !evaluate_having(inner, select_cols, result_row),
         Filter::Expression { left, op, right } => {
             let lv = evaluate_having_plan_expr(left, select_cols, result_row);
@@ -4719,8 +5676,14 @@ fn evaluate_having(filter: &Filter, select_cols: &[SelectColumn], result_row: &[
                 CompareOp::NotEq => !lv.eq_coerce(&rv),
                 CompareOp::Gt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Greater),
                 CompareOp::Lt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Less),
-                CompareOp::Gte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)),
-                CompareOp::Lte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)),
+                CompareOp::Gte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ),
+                CompareOp::Lte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                ),
             }
         }
         _ => true, // For unhandled filters, don't exclude the row
@@ -4729,7 +5692,11 @@ fn evaluate_having(filter: &Filter, select_cols: &[SelectColumn], result_row: &[
 
 /// Evaluate a PlanExpr in the context of a HAVING clause, where Column references
 /// are aggregate function names or aliases that map to positions in the result row.
-fn evaluate_having_plan_expr(expr: &PlanExpr, select_cols: &[SelectColumn], result_row: &[Value]) -> Value {
+fn evaluate_having_plan_expr(
+    expr: &PlanExpr,
+    select_cols: &[SelectColumn],
+    result_row: &[Value],
+) -> Value {
     match expr {
         PlanExpr::Column(name) => {
             get_having_value(name, select_cols, result_row).unwrap_or(Value::Null)
@@ -4751,11 +5718,21 @@ fn evaluate_having_plan_expr(expr: &PlanExpr, select_cols: &[SelectColumn], resu
 /// Get the value for a HAVING column reference. The column name may be an
 /// aggregate expression like "count(*)" which maps to the corresponding
 /// position in the result row.
-fn get_having_value(col: &str, select_cols: &[SelectColumn], result_row: &[Value]) -> Option<Value> {
+fn get_having_value(
+    col: &str,
+    select_cols: &[SelectColumn],
+    result_row: &[Value],
+) -> Option<Value> {
     // First try to match against result column names (aggregate expressions).
     for (i, sc) in select_cols.iter().enumerate() {
         match sc {
-            SelectColumn::Aggregate { function, column, alias, arg_expr, .. } => {
+            SelectColumn::Aggregate {
+                function,
+                column,
+                alias,
+                arg_expr,
+                ..
+            } => {
                 let func_name = format!("{function:?}").to_ascii_lowercase();
                 let func_expr = format!("{func_name}({column})");
                 // Match either the alias or the function expression form.
@@ -4823,10 +5800,7 @@ fn apply_scalar_functions(
                 SelectColumn::Name(name) => {
                     // Find position in resolved columns.
                     let pos = resolved.iter().position(|(_, n)| n == name);
-                    new_row.push(
-                        pos.and_then(|p| row.get(p).cloned())
-                            .unwrap_or(Value::Null),
-                    );
+                    new_row.push(pos.and_then(|p| row.get(p).cloned()).unwrap_or(Value::Null));
                 }
                 SelectColumn::ScalarFunction { name, args } => {
                     // Resolve each argument to a Value.
@@ -4835,8 +5809,7 @@ fn apply_scalar_functions(
                         .map(|a| match a {
                             SelectColumnArg::Column(col_name) => {
                                 let pos = resolved.iter().position(|(_, n)| n == col_name);
-                                pos.and_then(|p| row.get(p).cloned())
-                                    .unwrap_or(Value::Null)
+                                pos.and_then(|p| row.get(p).cloned()).unwrap_or(Value::Null)
                             }
                             SelectColumnArg::Literal(v) => v.clone(),
                         })
@@ -4849,11 +5822,18 @@ fn apply_scalar_functions(
                     // Should not happen in mixed scalar mode, but handle gracefully.
                     new_row.extend(row.iter().cloned());
                 }
-                SelectColumn::CaseWhen { conditions, else_value, expr_conditions, expr_else, .. } => {
+                SelectColumn::CaseWhen {
+                    conditions,
+                    else_value,
+                    expr_conditions,
+                    expr_else,
+                    ..
+                } => {
                     let col_names: Vec<String> = resolved.iter().map(|(_, n)| n.clone()).collect();
                     if let Some(econds) = expr_conditions {
                         // Expression-based CASE WHEN
-                        let mut result = expr_else.as_ref()
+                        let mut result = expr_else
+                            .as_ref()
                             .map(|e| evaluate_plan_expr_by_name(e, row, &col_names))
                             .or_else(|| else_value.clone())
                             .unwrap_or(Value::Null);
@@ -4881,7 +5861,8 @@ fn apply_scalar_functions(
                     let val = evaluate_plan_expr_by_name(expr, row, &col_names);
                     new_row.push(val);
                 }
-                SelectColumn::Aggregate { .. } | SelectColumn::WindowFunction(_)
+                SelectColumn::Aggregate { .. }
+                | SelectColumn::WindowFunction(_)
                 | SelectColumn::ScalarSubquery { .. } => {
                     // Aggregates/window/subquery are not handled here; pass through.
                     new_row.push(Value::Null);
@@ -4896,27 +5877,42 @@ fn apply_scalar_functions(
 /// Evaluate a filter condition for CASE WHEN against an in-memory row.
 fn evaluate_case_filter(filter: &Filter, row: &[Value], resolved: &[(usize, String)]) -> bool {
     match filter {
-        Filter::Eq(col, expected) => {
-            get_resolved_value(col, row, resolved).map(|v| v.eq_coerce(expected)).unwrap_or(false)
-        }
-        Filter::Gt(col, expected) => {
-            get_resolved_value(col, row, resolved).map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater)).unwrap_or(false)
-        }
-        Filter::Lt(col, expected) => {
-            get_resolved_value(col, row, resolved).map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less)).unwrap_or(false)
-        }
-        Filter::Gte(col, expected) => {
-            get_resolved_value(col, row, resolved).map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))).unwrap_or(false)
-        }
-        Filter::Lte(col, expected) => {
-            get_resolved_value(col, row, resolved).map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal))).unwrap_or(false)
-        }
-        Filter::Between(col, low, high) => {
-            get_resolved_value(col, row, resolved)
-                .map(|v| matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                      && matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)))
-                .unwrap_or(false)
-        }
+        Filter::Eq(col, expected) => get_resolved_value(col, row, resolved)
+            .map(|v| v.eq_coerce(expected))
+            .unwrap_or(false),
+        Filter::Gt(col, expected) => get_resolved_value(col, row, resolved)
+            .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater))
+            .unwrap_or(false),
+        Filter::Lt(col, expected) => get_resolved_value(col, row, resolved)
+            .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less))
+            .unwrap_or(false),
+        Filter::Gte(col, expected) => get_resolved_value(col, row, resolved)
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(expected),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::Lte(col, expected) => get_resolved_value(col, row, resolved)
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(expected),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::Between(col, low, high) => get_resolved_value(col, row, resolved)
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(low),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    v.cmp_coerce(high),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
         Filter::IsNull(col) => {
             let val = get_resolved_value(col, row, resolved);
             matches!(val, None | Some(Value::Null))
@@ -4925,35 +5921,61 @@ fn evaluate_case_filter(filter: &Filter, row: &[Value], resolved: &[(usize, Stri
             let val = get_resolved_value(col, row, resolved);
             matches!(val, Some(v) if v != Value::Null)
         }
-        Filter::In(col, list) => {
-            get_resolved_value(col, row, resolved).map(|v| list.iter().any(|item| v.eq_coerce(item))).unwrap_or(false)
-        }
-        Filter::NotIn(col, list) => {
-            get_resolved_value(col, row, resolved).map(|v| !list.iter().any(|item| v.eq_coerce(item))).unwrap_or(true)
-        }
-        Filter::Like(col, pattern) => {
-            get_resolved_value(col, row, resolved).map(|v| if let Value::Str(s) = &v { like_match(s, pattern, false) } else { false }).unwrap_or(false)
-        }
-        Filter::NotLike(col, pattern) => {
-            get_resolved_value(col, row, resolved).map(|v| if let Value::Str(s) = &v { !like_match(s, pattern, false) } else { true }).unwrap_or(true)
-        }
-        Filter::ILike(col, pattern) => {
-            get_resolved_value(col, row, resolved).map(|v| if let Value::Str(s) = &v { like_match(s, pattern, true) } else { false }).unwrap_or(false)
-        }
-        Filter::NotEq(col, expected) => {
-            get_resolved_value(col, row, resolved).map(|v| !v.eq_coerce(expected)).unwrap_or(true)
-        }
-        Filter::BetweenSymmetric(col, low, high) => {
-            get_resolved_value(col, row, resolved)
-                .map(|v| {
-                    let fwd = matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                        && matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
-                    let rev = matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                        && matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
-                    fwd || rev
-                })
-                .unwrap_or(false)
-        }
+        Filter::In(col, list) => get_resolved_value(col, row, resolved)
+            .map(|v| list.iter().any(|item| v.eq_coerce(item)))
+            .unwrap_or(false),
+        Filter::NotIn(col, list) => get_resolved_value(col, row, resolved)
+            .map(|v| !list.iter().any(|item| v.eq_coerce(item)))
+            .unwrap_or(true),
+        Filter::Like(col, pattern) => get_resolved_value(col, row, resolved)
+            .map(|v| {
+                if let Value::Str(s) = &v {
+                    like_match(s, pattern, false)
+                } else {
+                    false
+                }
+            })
+            .unwrap_or(false),
+        Filter::NotLike(col, pattern) => get_resolved_value(col, row, resolved)
+            .map(|v| {
+                if let Value::Str(s) = &v {
+                    !like_match(s, pattern, false)
+                } else {
+                    true
+                }
+            })
+            .unwrap_or(true),
+        Filter::ILike(col, pattern) => get_resolved_value(col, row, resolved)
+            .map(|v| {
+                if let Value::Str(s) = &v {
+                    like_match(s, pattern, true)
+                } else {
+                    false
+                }
+            })
+            .unwrap_or(false),
+        Filter::NotEq(col, expected) => get_resolved_value(col, row, resolved)
+            .map(|v| !v.eq_coerce(expected))
+            .unwrap_or(true),
+        Filter::BetweenSymmetric(col, low, high) => get_resolved_value(col, row, resolved)
+            .map(|v| {
+                let fwd = matches!(
+                    v.cmp_coerce(low),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    v.cmp_coerce(high),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
+                let rev = matches!(
+                    v.cmp_coerce(high),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    v.cmp_coerce(low),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
+                fwd || rev
+            })
+            .unwrap_or(false),
         Filter::Not(inner) => !evaluate_case_filter(inner, row, resolved),
         Filter::And(parts) => parts.iter().all(|p| evaluate_case_filter(p, row, resolved)),
         Filter::Or(parts) => parts.iter().any(|p| evaluate_case_filter(p, row, resolved)),
@@ -4966,17 +5988,29 @@ fn evaluate_case_filter(filter: &Filter, row: &[Value], resolved: &[(usize, Stri
                 CompareOp::NotEq => !lv.eq_coerce(&rv),
                 CompareOp::Gt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Greater),
                 CompareOp::Lt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Less),
-                CompareOp::Gte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)),
-                CompareOp::Lte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)),
+                CompareOp::Gte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ),
+                CompareOp::Lte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                ),
             }
         }
-        Filter::Subquery { .. } | Filter::InSubquery { .. } | Filter::Exists { .. }
-        | Filter::All { .. } | Filter::Any { .. } => false,
+        Filter::Subquery { .. }
+        | Filter::InSubquery { .. }
+        | Filter::Exists { .. }
+        | Filter::All { .. }
+        | Filter::Any { .. } => false,
     }
 }
 
 fn get_resolved_value(col: &str, row: &[Value], resolved: &[(usize, String)]) -> Option<Value> {
-    resolved.iter().position(|(_, n)| n == col).and_then(|p| row.get(p).cloned())
+    resolved
+        .iter()
+        .position(|(_, n)| n == col)
+        .and_then(|p| row.get(p).cloned())
 }
 
 /// Type alias for CTE storage: column names + rows.
@@ -5006,26 +6040,38 @@ fn execute_with_cte_context(
         } => {
             // Handle SELECT with no FROM (e.g. SELECT (SELECT count(*) FROM cte))
             if table == "__no_table__" {
-                let has_subqueries = columns.iter().any(|c| matches!(c, SelectColumn::ScalarSubquery { .. }));
+                let has_subqueries = columns
+                    .iter()
+                    .any(|c| matches!(c, SelectColumn::ScalarSubquery { .. }));
                 if has_subqueries {
                     let mut col_names = Vec::new();
                     let mut row = Vec::new();
                     for col in columns.iter() {
                         if let SelectColumn::ScalarSubquery { subquery, alias } = col {
                             col_names.push(alias.clone().unwrap_or_else(|| "subquery".to_string()));
-                            let sub_result = execute_with_cte_context(db_root, subquery, cte_store)?;
+                            let sub_result =
+                                execute_with_cte_context(db_root, subquery, cte_store)?;
                             let val = match sub_result {
-                                QueryResult::Rows { rows, .. } if !rows.is_empty() && !rows[0].is_empty() => rows[0][0].clone(),
+                                QueryResult::Rows { rows, .. }
+                                    if !rows.is_empty() && !rows[0].is_empty() =>
+                                {
+                                    rows[0][0].clone()
+                                }
                                 _ => Value::Null,
                             };
                             row.push(val);
                         }
                     }
-                    return Ok(QueryResult::Rows { columns: col_names, rows: vec![row] });
+                    return Ok(QueryResult::Rows {
+                        columns: col_names,
+                        rows: vec![row],
+                    });
                 }
                 // Handle SELECT with literal expressions and no FROM clause
                 // (e.g., base case of recursive CTE: SELECT 1 AS n).
-                let has_expressions = columns.iter().any(|c| matches!(c, SelectColumn::Expression { .. }));
+                let has_expressions = columns
+                    .iter()
+                    .any(|c| matches!(c, SelectColumn::Expression { .. }));
                 if has_expressions {
                     let mut col_names = Vec::new();
                     let mut row = Vec::new();
@@ -5047,29 +6093,64 @@ fn execute_with_cte_context(
                             }
                         }
                     }
-                    return Ok(QueryResult::Rows { columns: col_names, rows: vec![row] });
+                    return Ok(QueryResult::Rows {
+                        columns: col_names,
+                        rows: vec![row],
+                    });
                 }
                 // For non-subquery no-table queries (system functions, etc.)
                 return execute_select(
-                    db_root, table, columns, filter.as_ref(), order_by, *limit, *offset,
-                    sample_by.as_ref(), latest_on.as_ref(), group_by, having.as_ref(), *distinct,
+                    db_root,
+                    table,
+                    columns,
+                    filter.as_ref(),
+                    order_by,
+                    *limit,
+                    *offset,
+                    sample_by.as_ref(),
+                    latest_on.as_ref(),
+                    group_by,
+                    having.as_ref(),
+                    *distinct,
                 );
             }
             // Check if the table is a CTE.
             if let Some((cte_cols, cte_rows)) = cte_store.get(table.as_str()) {
                 return execute_select_from_virtual(
-                    cte_cols, cte_rows, columns, filter.as_ref(), order_by, *limit,
-                    group_by, having.as_ref(), *distinct, cte_store,
+                    cte_cols,
+                    cte_rows,
+                    columns,
+                    filter.as_ref(),
+                    order_by,
+                    *limit,
+                    group_by,
+                    having.as_ref(),
+                    *distinct,
+                    cte_store,
                 );
             }
             execute_select(
-                db_root, table, columns, filter.as_ref(), order_by, *limit, *offset,
-                sample_by.as_ref(), latest_on.as_ref(), group_by, having.as_ref(), *distinct,
+                db_root,
+                table,
+                columns,
+                filter.as_ref(),
+                order_by,
+                *limit,
+                *offset,
+                sample_by.as_ref(),
+                latest_on.as_ref(),
+                group_by,
+                having.as_ref(),
+                *distinct,
             )
         }
-        QueryPlan::SetOperation { op, left, right, all, limit } => {
-            execute_set_operation(db_root, *op, left, right, *all, *limit, cte_store)
-        }
+        QueryPlan::SetOperation {
+            op,
+            left,
+            right,
+            all,
+            limit,
+        } => execute_set_operation(db_root, *op, left, right, *all, *limit, cte_store),
         QueryPlan::WithCte { ctes, body } => {
             // Nested CTEs: first materialize them into the store, then execute body.
             let mut new_store = cte_store.clone();
@@ -5081,12 +6162,36 @@ fn execute_with_cte_context(
             }
             execute_with_cte_context(db_root, body, &new_store)
         }
-        QueryPlan::DerivedScan { subquery, alias: _, columns, filter, order_by, limit, group_by, having, distinct } => {
-            execute_derived_scan(db_root, subquery, columns, filter.as_ref(), order_by, *limit, group_by, having.as_ref(), *distinct, cte_store)
-        }
+        QueryPlan::DerivedScan {
+            subquery,
+            alias: _,
+            columns,
+            filter,
+            order_by,
+            limit,
+            group_by,
+            having,
+            distinct,
+        } => execute_derived_scan(
+            db_root,
+            subquery,
+            columns,
+            filter.as_ref(),
+            order_by,
+            *limit,
+            group_by,
+            having.as_ref(),
+            *distinct,
+            cte_store,
+        ),
         // For JOINs, materialize any CTE tables as temporary on-disk tables.
-        QueryPlan::Join { left_table, right_table, .. } => {
-            let cte_tables = materialize_cte_tables(db_root, cte_store, &[left_table, right_table])?;
+        QueryPlan::Join {
+            left_table,
+            right_table,
+            ..
+        } => {
+            let cte_tables =
+                materialize_cte_tables(db_root, cte_store, &[left_table, right_table])?;
             let result = execute(db_root, plan);
             // Clean up materialized CTE tables.
             for name in &cte_tables {
@@ -5144,11 +6249,10 @@ fn materialize_cte_tables(
             if !rows.is_empty() {
                 let mut writer = exchange_core::table::TableWriter::open(db_root, name.as_str())?;
                 for (i, row) in rows.iter().enumerate() {
-                    let ts = exchange_common::types::Timestamp(1_710_460_800_000_000_000 + i as i64);
-                    let col_values: Vec<exchange_core::table::ColumnValue<'_>> = row
-                        .iter()
-                        .map(|v| plan_value_to_column_value(v))
-                        .collect();
+                    let ts =
+                        exchange_common::types::Timestamp(1_710_460_800_000_000_000 + i as i64);
+                    let col_values: Vec<exchange_core::table::ColumnValue<'_>> =
+                        row.iter().map(|v| plan_value_to_column_value(v)).collect();
                     writer.write_row(ts, &col_values)?;
                 }
                 writer.flush()?;
@@ -5177,7 +6281,8 @@ fn execute_with_cte(
                 cte_store.insert(cte.name.clone(), (columns, rows));
             } else {
                 return Err(ExchangeDbError::Query(format!(
-                    "recursive CTE '{}' did not produce rows", cte.name
+                    "recursive CTE '{}' did not produce rows",
+                    cte.name
                 )));
             }
         } else {
@@ -5186,7 +6291,8 @@ fn execute_with_cte(
                 cte_store.insert(cte.name.clone(), (columns, rows));
             } else {
                 return Err(ExchangeDbError::Query(format!(
-                    "CTE '{}' did not produce rows", cte.name
+                    "CTE '{}' did not produce rows",
+                    cte.name
                 )));
             }
         }
@@ -5197,7 +6303,9 @@ fn execute_with_cte(
 
     // Post-process: evaluate scalar subqueries in SELECT columns.
     if let QueryPlan::Select { columns, .. } = body {
-        let has_scalar_subqueries = columns.iter().any(|c| matches!(c, SelectColumn::ScalarSubquery { .. }));
+        let has_scalar_subqueries = columns
+            .iter()
+            .any(|c| matches!(c, SelectColumn::ScalarSubquery { .. }));
         if has_scalar_subqueries {
             result = evaluate_scalar_subqueries_in_result(db_root, &result, columns, &cte_store)?;
         }
@@ -5223,9 +6331,13 @@ fn execute_recursive_cte(
 
     // The query plan should be a SetOperation (UNION ALL) with left = base, right = recursive.
     let (base_plan, recursive_plan, _all) = match query {
-        QueryPlan::SetOperation { op: SetOp::Union, left, right, all, .. } => {
-            (left.as_ref(), right.as_ref(), *all)
-        }
+        QueryPlan::SetOperation {
+            op: SetOp::Union,
+            left,
+            right,
+            all,
+            ..
+        } => (left.as_ref(), right.as_ref(), *all),
         _ => {
             // If not a union, just execute normally (non-recursive usage).
             return execute_with_cte_context(db_root, query, parent_cte_store);
@@ -5236,9 +6348,11 @@ fn execute_recursive_cte(
     let base_result = execute_with_cte_context(db_root, base_plan, parent_cte_store)?;
     let (col_names, base_rows) = match base_result {
         QueryResult::Rows { columns, rows } => (columns, rows),
-        _ => return Err(ExchangeDbError::Query(
-            "recursive CTE base case did not produce rows".into(),
-        )),
+        _ => {
+            return Err(ExchangeDbError::Query(
+                "recursive CTE base case did not produce rows".into(),
+            ));
+        }
     };
 
     let mut all_rows = base_rows.clone();
@@ -5282,7 +6396,10 @@ fn evaluate_scalar_subqueries_in_result(
     cte_store: &CteStore,
 ) -> Result<QueryResult> {
     let (col_names, rows) = match result {
-        QueryResult::Rows { columns: cn, rows: r } => (cn.clone(), r.clone()),
+        QueryResult::Rows {
+            columns: cn,
+            rows: r,
+        } => (cn.clone(), r.clone()),
         other => return Ok(other.clone()),
     };
 
@@ -5309,7 +6426,11 @@ fn evaluate_scalar_subqueries_in_result(
 
     // Build new column names and rows with subquery values substituted.
     let mut new_col_names = Vec::new();
-    let mut new_rows: Vec<Vec<Value>> = if rows.is_empty() { vec![Vec::new()] } else { rows.clone() };
+    let mut new_rows: Vec<Vec<Value>> = if rows.is_empty() {
+        vec![Vec::new()]
+    } else {
+        rows.clone()
+    };
 
     let mut orig_col_idx = 0;
     for (i, col) in columns.iter().enumerate() {
@@ -5392,7 +6513,9 @@ fn execute_select_from_virtual(
     let selected_cols = resolve_virtual_columns(source_cols, &scan_columns)?;
 
     // Check if any column is an Expression that needs evaluation.
-    let has_expressions = scan_columns.iter().any(|c| matches!(c, SelectColumn::Expression { .. }));
+    let has_expressions = scan_columns
+        .iter()
+        .any(|c| matches!(c, SelectColumn::Expression { .. }));
 
     // Filter rows.
     let mut all_rows: Vec<Vec<Value>> = source_rows
@@ -5442,15 +6565,19 @@ fn execute_select_from_virtual(
                     }
                 }
                 if result_row.is_empty() {
-                    selected_cols.iter().map(|&(idx, _)| row.get(idx).cloned().unwrap_or(Value::Null)).collect()
+                    selected_cols
+                        .iter()
+                        .map(|&(idx, _)| row.get(idx).cloned().unwrap_or(Value::Null))
+                        .collect()
                 } else {
                     result_row
                 }
             } else {
                 // Standard projection by column index.
-                selected_cols.iter().map(|&(idx, _)| {
-                    row.get(idx).cloned().unwrap_or(Value::Null)
-                }).collect()
+                selected_cols
+                    .iter()
+                    .map(|&(idx, _)| row.get(idx).cloned().unwrap_or(Value::Null))
+                    .collect()
             }
         })
         .collect();
@@ -5524,22 +6651,30 @@ fn resolve_virtual_columns(
                 }
             }
             SelectColumn::Name(name) => {
-                let (idx, resolved_name) = find_virtual_col(source_cols, name)
-                    .ok_or_else(|| ExchangeDbError::Query(format!(
-                        "column '{}' not found in virtual source", name
-                    )))?;
+                let (idx, resolved_name) =
+                    find_virtual_col(source_cols, name).ok_or_else(|| {
+                        ExchangeDbError::Query(format!(
+                            "column '{}' not found in virtual source",
+                            name
+                        ))
+                    })?;
                 result.push((idx, resolved_name));
             }
-            SelectColumn::Aggregate { column, arg_expr, .. } => {
+            SelectColumn::Aggregate {
+                column, arg_expr, ..
+            } => {
                 if column == "*" {
                     if !source_cols.is_empty() {
                         result.push((0, source_cols[0].clone()));
                     }
                 } else {
-                    let (idx, resolved_name) = find_virtual_col(source_cols, column)
-                        .ok_or_else(|| ExchangeDbError::Query(format!(
-                            "column '{}' not found in virtual source", column
-                        )))?;
+                    let (idx, resolved_name) =
+                        find_virtual_col(source_cols, column).ok_or_else(|| {
+                            ExchangeDbError::Query(format!(
+                                "column '{}' not found in virtual source",
+                                column
+                            ))
+                        })?;
                     result.push((idx, resolved_name));
                 }
                 // Also resolve columns referenced by arg_expr (e.g., sum(f.price * f.filled)).
@@ -5549,9 +6684,10 @@ fn resolve_virtual_columns(
                     for col_name in &cols {
                         let already = result.iter().any(|(_, n)| n == col_name);
                         if !already
-                            && let Some((idx, resolved)) = find_virtual_col(source_cols, col_name) {
-                                result.push((idx, resolved));
-                            }
+                            && let Some((idx, resolved)) = find_virtual_col(source_cols, col_name)
+                        {
+                            result.push((idx, resolved));
+                        }
                     }
                 }
             }
@@ -5560,10 +6696,13 @@ fn resolve_virtual_columns(
                     if let SelectColumnArg::Column(name) = arg {
                         let already = result.iter().any(|(_, n)| n == name);
                         if !already {
-                            let idx = source_cols.iter().position(|n| n == name)
-                                .ok_or_else(|| ExchangeDbError::Query(format!(
-                                    "column '{}' not found in virtual source", name
-                                )))?;
+                            let idx =
+                                source_cols.iter().position(|n| n == name).ok_or_else(|| {
+                                    ExchangeDbError::Query(format!(
+                                        "column '{}' not found in virtual source",
+                                        name
+                                    ))
+                                })?;
                             result.push((idx, name.clone()));
                         }
                     }
@@ -5583,10 +6722,9 @@ fn resolve_virtual_columns(
                 expr.collect_columns(&mut cols);
                 for col_name in &cols {
                     let already = result.iter().any(|(_, n)| n == col_name);
-                    if !already
-                        && let Some(idx) = source_cols.iter().position(|n| n == col_name) {
-                            result.push((idx, col_name.clone()));
-                        }
+                    if !already && let Some(idx) = source_cols.iter().position(|n| n == col_name) {
+                        result.push((idx, col_name.clone()));
+                    }
                 }
             }
         }
@@ -5596,19 +6734,31 @@ fn resolve_virtual_columns(
 }
 
 /// Collect column references from a filter for virtual sources.
-fn collect_virtual_filter_cols(filter: &Filter, source_cols: &[String], result: &mut Vec<(usize, String)>) {
+fn collect_virtual_filter_cols(
+    filter: &Filter,
+    source_cols: &[String],
+    result: &mut Vec<(usize, String)>,
+) {
     match filter {
-        Filter::Eq(col, _) | Filter::NotEq(col, _) | Filter::Gt(col, _) | Filter::Lt(col, _)
-        | Filter::Gte(col, _) | Filter::Lte(col, _)
-        | Filter::IsNull(col) | Filter::IsNotNull(col)
-        | Filter::Like(col, _) | Filter::NotLike(col, _) | Filter::ILike(col, _)
-        | Filter::Between(col, _, _) | Filter::BetweenSymmetric(col, _, _)
-        | Filter::In(col, _) | Filter::NotIn(col, _) => {
+        Filter::Eq(col, _)
+        | Filter::NotEq(col, _)
+        | Filter::Gt(col, _)
+        | Filter::Lt(col, _)
+        | Filter::Gte(col, _)
+        | Filter::Lte(col, _)
+        | Filter::IsNull(col)
+        | Filter::IsNotNull(col)
+        | Filter::Like(col, _)
+        | Filter::NotLike(col, _)
+        | Filter::ILike(col, _)
+        | Filter::Between(col, _, _)
+        | Filter::BetweenSymmetric(col, _, _)
+        | Filter::In(col, _)
+        | Filter::NotIn(col, _) => {
             let already = result.iter().any(|(_, n)| n == col);
-            if !already
-                && let Some(idx) = source_cols.iter().position(|n| n == col) {
-                    result.push((idx, col.clone()));
-                }
+            if !already && let Some(idx) = source_cols.iter().position(|n| n == col) {
+                result.push((idx, col.clone()));
+            }
         }
         Filter::And(parts) | Filter::Or(parts) => {
             for p in parts {
@@ -5623,47 +6773,84 @@ fn collect_virtual_filter_cols(filter: &Filter, source_cols: &[String], result: 
 }
 
 /// Evaluate a filter against a virtual row using column names instead of TableMeta.
-pub(crate) fn evaluate_filter_virtual(filter: &Filter, row: &[Value], col_names: &[String]) -> bool {
+pub(crate) fn evaluate_filter_virtual(
+    filter: &Filter,
+    row: &[Value],
+    col_names: &[String],
+) -> bool {
     match filter {
-        Filter::Eq(col, expected) => {
-            get_virtual_value(col, row, col_names).as_ref().map(|v| v.eq_coerce(expected)).unwrap_or(false)
-        }
-        Filter::NotEq(col, expected) => {
-            get_virtual_value(col, row, col_names).as_ref().map(|v| !v.eq_coerce(expected)).unwrap_or(true)
-        }
-        Filter::Gt(col, expected) => {
-            get_virtual_value(col, row, col_names).as_ref().map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater)).unwrap_or(false)
-        }
-        Filter::Lt(col, expected) => {
-            get_virtual_value(col, row, col_names).as_ref().map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less)).unwrap_or(false)
-        }
-        Filter::Gte(col, expected) => {
-            get_virtual_value(col, row, col_names).as_ref().map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))).unwrap_or(false)
-        }
-        Filter::Lte(col, expected) => {
-            get_virtual_value(col, row, col_names).as_ref().map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal))).unwrap_or(false)
-        }
-        Filter::Between(col, low, high) => {
-            get_virtual_value(col, row, col_names)
-                .as_ref()
-                .map(|v| matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                      && matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)))
-                .unwrap_or(false)
-        }
-        Filter::BetweenSymmetric(col, low, high) => {
-            get_virtual_value(col, row, col_names)
-                .as_ref()
-                .map(|v| {
-                    let fwd = matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                        && matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
-                    let rev = matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                        && matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal));
-                    fwd || rev
-                })
-                .unwrap_or(false)
-        }
-        Filter::And(parts) => parts.iter().all(|p| evaluate_filter_virtual(p, row, col_names)),
-        Filter::Or(parts) => parts.iter().any(|p| evaluate_filter_virtual(p, row, col_names)),
+        Filter::Eq(col, expected) => get_virtual_value(col, row, col_names)
+            .as_ref()
+            .map(|v| v.eq_coerce(expected))
+            .unwrap_or(false),
+        Filter::NotEq(col, expected) => get_virtual_value(col, row, col_names)
+            .as_ref()
+            .map(|v| !v.eq_coerce(expected))
+            .unwrap_or(true),
+        Filter::Gt(col, expected) => get_virtual_value(col, row, col_names)
+            .as_ref()
+            .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater))
+            .unwrap_or(false),
+        Filter::Lt(col, expected) => get_virtual_value(col, row, col_names)
+            .as_ref()
+            .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less))
+            .unwrap_or(false),
+        Filter::Gte(col, expected) => get_virtual_value(col, row, col_names)
+            .as_ref()
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(expected),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::Lte(col, expected) => get_virtual_value(col, row, col_names)
+            .as_ref()
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(expected),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::Between(col, low, high) => get_virtual_value(col, row, col_names)
+            .as_ref()
+            .map(|v| {
+                matches!(
+                    v.cmp_coerce(low),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    v.cmp_coerce(high),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                )
+            })
+            .unwrap_or(false),
+        Filter::BetweenSymmetric(col, low, high) => get_virtual_value(col, row, col_names)
+            .as_ref()
+            .map(|v| {
+                let fwd = matches!(
+                    v.cmp_coerce(low),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    v.cmp_coerce(high),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
+                let rev = matches!(
+                    v.cmp_coerce(high),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ) && matches!(
+                    v.cmp_coerce(low),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                );
+                fwd || rev
+            })
+            .unwrap_or(false),
+        Filter::And(parts) => parts
+            .iter()
+            .all(|p| evaluate_filter_virtual(p, row, col_names)),
+        Filter::Or(parts) => parts
+            .iter()
+            .any(|p| evaluate_filter_virtual(p, row, col_names)),
         Filter::IsNull(col) => {
             let val = get_virtual_value(col, row, col_names);
             matches!(val.as_ref(), None | Some(Value::Null))
@@ -5674,28 +6861,54 @@ pub(crate) fn evaluate_filter_virtual(filter: &Filter, row: &[Value], col_names:
         }
         Filter::In(col, list) => {
             let val = get_virtual_value(col, row, col_names);
-            val.as_ref().map(|v| list.iter().any(|item| v.eq_coerce(item))).unwrap_or(false)
+            val.as_ref()
+                .map(|v| list.iter().any(|item| v.eq_coerce(item)))
+                .unwrap_or(false)
         }
         Filter::NotIn(col, list) => {
             let val = get_virtual_value(col, row, col_names);
-            val.as_ref().map(|v| !list.iter().any(|item| v.eq_coerce(item))).unwrap_or(true)
+            val.as_ref()
+                .map(|v| !list.iter().any(|item| v.eq_coerce(item)))
+                .unwrap_or(true)
         }
         Filter::Like(col, pattern) => {
             let val = get_virtual_value(col, row, col_names);
-            val.as_ref().map(|v| if let Value::Str(s) = v { like_match(s, pattern, false) } else { false }).unwrap_or(false)
+            val.as_ref()
+                .map(|v| {
+                    if let Value::Str(s) = v {
+                        like_match(s, pattern, false)
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
         }
         Filter::NotLike(col, pattern) => {
             let val = get_virtual_value(col, row, col_names);
-            val.as_ref().map(|v| if let Value::Str(s) = v { !like_match(s, pattern, false) } else { true }).unwrap_or(true)
+            val.as_ref()
+                .map(|v| {
+                    if let Value::Str(s) = v {
+                        !like_match(s, pattern, false)
+                    } else {
+                        true
+                    }
+                })
+                .unwrap_or(true)
         }
         Filter::ILike(col, pattern) => {
             let val = get_virtual_value(col, row, col_names);
-            val.as_ref().map(|v| if let Value::Str(s) = v { like_match(s, pattern, true) } else { false }).unwrap_or(false)
+            val.as_ref()
+                .map(|v| {
+                    if let Value::Str(s) = v {
+                        like_match(s, pattern, true)
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
         }
         Filter::Not(inner) => !evaluate_filter_virtual(inner, row, col_names),
-        Filter::Subquery { .. } | Filter::InSubquery { .. } | Filter::Exists { .. } => {
-            false
-        }
+        Filter::Subquery { .. } | Filter::InSubquery { .. } | Filter::Exists { .. } => false,
         Filter::Expression { left, op, right } => {
             let lv = evaluate_plan_expr_by_name(left, row, col_names);
             let rv = evaluate_plan_expr_by_name(right, row, col_names);
@@ -5704,8 +6917,14 @@ pub(crate) fn evaluate_filter_virtual(filter: &Filter, row: &[Value], col_names:
                 CompareOp::NotEq => !lv.eq_coerce(&rv),
                 CompareOp::Gt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Greater),
                 CompareOp::Lt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Less),
-                CompareOp::Gte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)),
-                CompareOp::Lte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)),
+                CompareOp::Gte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ),
+                CompareOp::Lte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                ),
             }
         }
         Filter::All { .. } | Filter::Any { .. } => false,
@@ -5719,7 +6938,10 @@ fn get_virtual_value(col: &str, row: &[Value], col_names: &[String]) -> Option<V
     }
     // Suffix match: "price" matches "t.price".
     let suffix = format!(".{col}");
-    col_names.iter().position(|n| n.ends_with(&suffix)).and_then(|idx| row.get(idx).cloned())
+    col_names
+        .iter()
+        .position(|n| n.ends_with(&suffix))
+        .and_then(|idx| row.get(idx).cloned())
 }
 
 /// Execute a set operation (UNION / INTERSECT / EXCEPT).
@@ -5737,12 +6959,20 @@ fn execute_set_operation(
 
     let (left_cols, left_rows) = match left_result {
         QueryResult::Rows { columns, rows } => (columns, rows),
-        _ => return Err(ExchangeDbError::Query("set operation requires SELECT queries".into())),
+        _ => {
+            return Err(ExchangeDbError::Query(
+                "set operation requires SELECT queries".into(),
+            ));
+        }
     };
 
     let (right_cols, right_rows) = match right_result {
         QueryResult::Rows { columns, rows } => (columns, rows),
-        _ => return Err(ExchangeDbError::Query("set operation requires SELECT queries".into())),
+        _ => {
+            return Err(ExchangeDbError::Query(
+                "set operation requires SELECT queries".into(),
+            ));
+        }
     };
 
     // Validate column count matches.
@@ -5832,7 +7062,11 @@ fn execute_derived_scan(
     let sub_result = execute_with_cte_context(db_root, subquery, cte_store)?;
     let (sub_cols, sub_rows) = match sub_result {
         QueryResult::Rows { columns, rows } => (columns, rows),
-        _ => return Err(ExchangeDbError::Query("derived table must produce rows".into())),
+        _ => {
+            return Err(ExchangeDbError::Query(
+                "derived table must produce rows".into(),
+            ));
+        }
     };
 
     // Now execute the outer query against the subquery results.
@@ -5844,16 +7078,27 @@ fn execute_derived_scan(
     };
 
     execute_select_from_virtual(
-        &sub_cols, &sub_rows, columns, resolved_filter.as_ref(),
-        order_by, limit, group_by, having, distinct, cte_store,
+        &sub_cols,
+        &sub_rows,
+        columns,
+        resolved_filter.as_ref(),
+        order_by,
+        limit,
+        group_by,
+        having,
+        distinct,
+        cte_store,
     )
 }
 
 /// Check if a filter tree contains any subquery filters (including IN/EXISTS).
 fn has_subquery_filters(filter: &Filter) -> bool {
     match filter {
-        Filter::Subquery { .. } | Filter::InSubquery { .. } | Filter::Exists { .. }
-        | Filter::All { .. } | Filter::Any { .. } => true,
+        Filter::Subquery { .. }
+        | Filter::InSubquery { .. }
+        | Filter::Exists { .. }
+        | Filter::All { .. }
+        | Filter::Any { .. } => true,
         Filter::And(parts) | Filter::Or(parts) => parts.iter().any(has_subquery_filters),
         _ => false,
     }
@@ -5867,7 +7112,11 @@ fn resolve_subquery_filters(
     cte_store: &CteStore,
 ) -> Result<Filter> {
     match filter {
-        Filter::Subquery { column, op, subquery } => {
+        Filter::Subquery {
+            column,
+            op,
+            subquery,
+        } => {
             let result = execute_with_cte_context(db_root, subquery, cte_store)?;
             let scalar_value = match result {
                 QueryResult::Rows { rows, .. } => {
@@ -5878,9 +7127,11 @@ fn resolve_subquery_filters(
                     }
                     rows[0][0].clone()
                 }
-                _ => return Err(ExchangeDbError::Query(
-                    "scalar subquery did not produce rows".into(),
-                )),
+                _ => {
+                    return Err(ExchangeDbError::Query(
+                        "scalar subquery did not produce rows".into(),
+                    ));
+                }
             };
             match op {
                 CompareOp::Eq => Ok(Filter::Eq(column.clone(), scalar_value)),
@@ -5905,15 +7156,28 @@ fn resolve_subquery_filters(
                 .collect::<Result<Vec<_>>>()?;
             Ok(Filter::Or(resolved))
         }
-        Filter::InSubquery { column, subquery, negated } => {
+        Filter::InSubquery {
+            column,
+            subquery,
+            negated,
+        } => {
             let result = execute_with_cte_context(db_root, subquery, cte_store)?;
             let values = match result {
-                QueryResult::Rows { rows, .. } => {
-                    rows.into_iter().filter_map(|row| row.into_iter().next()).collect::<Vec<Value>>()
+                QueryResult::Rows { rows, .. } => rows
+                    .into_iter()
+                    .filter_map(|row| row.into_iter().next())
+                    .collect::<Vec<Value>>(),
+                _ => {
+                    return Err(ExchangeDbError::Query(
+                        "IN subquery did not produce rows".into(),
+                    ));
                 }
-                _ => return Err(ExchangeDbError::Query("IN subquery did not produce rows".into())),
             };
-            if *negated { Ok(Filter::NotIn(column.clone(), values)) } else { Ok(Filter::In(column.clone(), values)) }
+            if *negated {
+                Ok(Filter::NotIn(column.clone(), values))
+            } else {
+                Ok(Filter::In(column.clone(), values))
+            }
         }
         Filter::Exists { subquery, negated } => {
             let result = execute_with_cte_context(db_root, subquery, cte_store)?;
@@ -5924,61 +7188,87 @@ fn resolve_subquery_filters(
                 Ok(Filter::And(Vec::new()))
             } else {
                 // Trivially false: match on a non-existent column.
-                Ok(Filter::Eq("__nonexistent_exists_check__".to_string(), Value::Null))
+                Ok(Filter::Eq(
+                    "__nonexistent_exists_check__".to_string(),
+                    Value::Null,
+                ))
             }
         }
-        Filter::All { column, op, subquery } => {
+        Filter::All {
+            column,
+            op,
+            subquery,
+        } => {
             let result = execute_with_cte_context(db_root, subquery, cte_store)?;
             let values = match result {
-                QueryResult::Rows { rows, .. } => {
-                    rows.into_iter().filter_map(|row| row.into_iter().next()).collect::<Vec<Value>>()
+                QueryResult::Rows { rows, .. } => rows
+                    .into_iter()
+                    .filter_map(|row| row.into_iter().next())
+                    .collect::<Vec<Value>>(),
+                _ => {
+                    return Err(ExchangeDbError::Query(
+                        "ALL subquery did not produce rows".into(),
+                    ));
                 }
-                _ => return Err(ExchangeDbError::Query("ALL subquery did not produce rows".into())),
             };
             // Resolve ALL: column op ALL(...) -> AND of column op each value
             if values.is_empty() {
                 // ALL with empty set is TRUE.
                 Ok(Filter::And(Vec::new()))
             } else {
-                let filters: Vec<Filter> = values.into_iter().map(|v| {
-                    match op {
+                let filters: Vec<Filter> = values
+                    .into_iter()
+                    .map(|v| match op {
                         CompareOp::Eq => Filter::Eq(column.clone(), v),
                         CompareOp::NotEq => Filter::NotEq(column.clone(), v),
                         CompareOp::Gt => Filter::Gt(column.clone(), v),
                         CompareOp::Lt => Filter::Lt(column.clone(), v),
                         CompareOp::Gte => Filter::Gte(column.clone(), v),
                         CompareOp::Lte => Filter::Lte(column.clone(), v),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 Ok(Filter::And(filters))
             }
         }
-        Filter::Any { column, op, subquery } => {
+        Filter::Any {
+            column,
+            op,
+            subquery,
+        } => {
             let result = execute_with_cte_context(db_root, subquery, cte_store)?;
             let values = match result {
-                QueryResult::Rows { rows, .. } => {
-                    rows.into_iter().filter_map(|row| row.into_iter().next()).collect::<Vec<Value>>()
+                QueryResult::Rows { rows, .. } => rows
+                    .into_iter()
+                    .filter_map(|row| row.into_iter().next())
+                    .collect::<Vec<Value>>(),
+                _ => {
+                    return Err(ExchangeDbError::Query(
+                        "ANY subquery did not produce rows".into(),
+                    ));
                 }
-                _ => return Err(ExchangeDbError::Query("ANY subquery did not produce rows".into())),
             };
             // Resolve ANY: column op ANY(...) -> OR of column op each value
             if values.is_empty() {
                 // ANY with empty set is FALSE.
-                Ok(Filter::Eq("__nonexistent_any_check__".to_string(), Value::Null))
+                Ok(Filter::Eq(
+                    "__nonexistent_any_check__".to_string(),
+                    Value::Null,
+                ))
             } else if matches!(op, CompareOp::Eq) {
                 // Optimized: column = ANY(...) -> column IN (...)
                 Ok(Filter::In(column.clone(), values))
             } else {
-                let filters: Vec<Filter> = values.into_iter().map(|v| {
-                    match op {
+                let filters: Vec<Filter> = values
+                    .into_iter()
+                    .map(|v| match op {
                         CompareOp::Eq => Filter::Eq(column.clone(), v),
                         CompareOp::NotEq => Filter::NotEq(column.clone(), v),
                         CompareOp::Gt => Filter::Gt(column.clone(), v),
                         CompareOp::Lt => Filter::Lt(column.clone(), v),
                         CompareOp::Gte => Filter::Gte(column.clone(), v),
                         CompareOp::Lte => Filter::Lte(column.clone(), v),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 Ok(Filter::Or(filters))
             }
         }
@@ -6030,28 +7320,74 @@ mod hex {
         bytes.iter().map(|b| format!("{b:02x}")).collect()
     }
 }
-fn execute_copy_to(db_root: &Path, table: &str, path: &PathBuf, options: &CopyOptions) -> Result<QueryResult> {
+fn execute_copy_to(
+    db_root: &Path,
+    table: &str,
+    path: &PathBuf,
+    options: &CopyOptions,
+) -> Result<QueryResult> {
     // Parquet format: use the PAR1XCHG writer.
     if options.format == CopyFormat::Parquet {
         return execute_copy_to_parquet(db_root, table, path);
     }
 
-    let select_plan = QueryPlan::Select { table: table.to_string(), columns: vec![SelectColumn::Wildcard], filter: None, order_by: vec![], limit: None, offset: None, sample_by: None, latest_on: None, group_by: vec![], group_by_mode: GroupByMode::Normal, having: None, distinct: false, distinct_on: vec![] };
+    let select_plan = QueryPlan::Select {
+        table: table.to_string(),
+        columns: vec![SelectColumn::Wildcard],
+        filter: None,
+        order_by: vec![],
+        limit: None,
+        offset: None,
+        sample_by: None,
+        latest_on: None,
+        group_by: vec![],
+        group_by_mode: GroupByMode::Normal,
+        having: None,
+        distinct: false,
+        distinct_on: vec![],
+    };
     let result = execute(db_root, &select_plan)?;
-    let (columns, rows) = match result { QueryResult::Rows { columns, rows } => (columns, rows), _ => return Err(ExchangeDbError::Query("COPY TO requires a table with rows".into())) };
+    let (columns, rows) = match result {
+        QueryResult::Rows { columns, rows } => (columns, rows),
+        _ => {
+            return Err(ExchangeDbError::Query(
+                "COPY TO requires a table with rows".into(),
+            ));
+        }
+    };
     let delim = options.delimiter;
-    if let Some(parent) = path.parent() { std::fs::create_dir_all(parent)?; }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     let file = std::fs::File::create(path)?;
     let mut wtr = std::io::BufWriter::new(file);
-    if options.header { let hdr: Vec<&str> = columns.iter().map(|c| c.as_str()).collect(); writeln!(wtr, "{}", hdr.join(&delim.to_string())).map_err(ExchangeDbError::Io)?; }
+    if options.header {
+        let hdr: Vec<&str> = columns.iter().map(|c| c.as_str()).collect();
+        writeln!(wtr, "{}", hdr.join(&delim.to_string())).map_err(ExchangeDbError::Io)?;
+    }
     let mut count = 0u64;
-    for row in &rows { let fields: Vec<String> = row.iter().map(|v| match v { Value::Null => String::new(), Value::I64(n) => n.to_string(), Value::F64(n) => n.to_string(), Value::Str(s) => s.clone(), Value::Timestamp(ns) => ns.to_string() }).collect(); writeln!(wtr, "{}", fields.join(&delim.to_string())).map_err(ExchangeDbError::Io)?; count += 1; }
+    for row in &rows {
+        let fields: Vec<String> = row
+            .iter()
+            .map(|v| match v {
+                Value::Null => String::new(),
+                Value::I64(n) => n.to_string(),
+                Value::F64(n) => n.to_string(),
+                Value::Str(s) => s.clone(),
+                Value::Timestamp(ns) => ns.to_string(),
+            })
+            .collect();
+        writeln!(wtr, "{}", fields.join(&delim.to_string())).map_err(ExchangeDbError::Io)?;
+        count += 1;
+    }
     wtr.flush().map_err(ExchangeDbError::Io)?;
-    Ok(QueryResult::Ok { affected_rows: count })
+    Ok(QueryResult::Ok {
+        affected_rows: count,
+    })
 }
 fn execute_copy_to_parquet(db_root: &Path, table: &str, path: &Path) -> Result<QueryResult> {
-    use exchange_core::parquet::writer::{ParquetColumn, ParquetType, ParquetWriter};
     use exchange_core::parquet::reader::RowValue;
+    use exchange_core::parquet::writer::{ParquetColumn, ParquetType, ParquetWriter};
 
     let table_dir = db_root.join(table);
     if !table_dir.exists() {
@@ -6060,40 +7396,74 @@ fn execute_copy_to_parquet(db_root: &Path, table: &str, path: &Path) -> Result<Q
     let meta = TableMeta::load(&table_dir.join("_meta"))?;
 
     // Build schema.
-    let schema: Vec<ParquetColumn> = meta.columns.iter().map(|c| {
-        let ct: ColumnType = c.col_type.into();
-        ParquetColumn {
-            name: c.name.clone(),
-            parquet_type: ParquetType::from_column_type(ct),
-            col_type: ct,
-        }
-    }).collect();
+    let schema: Vec<ParquetColumn> = meta
+        .columns
+        .iter()
+        .map(|c| {
+            let ct: ColumnType = c.col_type.into();
+            ParquetColumn {
+                name: c.name.clone(),
+                parquet_type: ParquetType::from_column_type(ct),
+                col_type: ct,
+            }
+        })
+        .collect();
 
     // Read all data via SELECT *.
-    let select_plan = QueryPlan::Select { table: table.to_string(), columns: vec![SelectColumn::Wildcard], filter: None, order_by: vec![], limit: None, offset: None, sample_by: None, latest_on: None, group_by: vec![], group_by_mode: GroupByMode::Normal, having: None, distinct: false, distinct_on: vec![] };
+    let select_plan = QueryPlan::Select {
+        table: table.to_string(),
+        columns: vec![SelectColumn::Wildcard],
+        filter: None,
+        order_by: vec![],
+        limit: None,
+        offset: None,
+        sample_by: None,
+        latest_on: None,
+        group_by: vec![],
+        group_by_mode: GroupByMode::Normal,
+        having: None,
+        distinct: false,
+        distinct_on: vec![],
+    };
     let result = execute(db_root, &select_plan)?;
     let (columns, rows) = match result {
         QueryResult::Rows { columns, rows } => (columns, rows),
-        _ => return Err(ExchangeDbError::Query("COPY TO requires a table with rows".into())),
+        _ => {
+            return Err(ExchangeDbError::Query(
+                "COPY TO requires a table with rows".into(),
+            ));
+        }
     };
 
     // Convert Value rows to RowValue rows.
-    let pq_rows: Vec<Vec<RowValue>> = rows.iter().map(|row| {
-        row.iter().map(|v| match v {
-            Value::I64(n) => RowValue::I64(*n),
-            Value::F64(n) => RowValue::F64(*n),
-            Value::Str(s) => RowValue::Str(s.clone()),
-            Value::Timestamp(ns) => RowValue::Timestamp(*ns),
-            Value::Null => RowValue::Null,
-        }).collect()
-    }).collect();
+    let pq_rows: Vec<Vec<RowValue>> = rows
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|v| match v {
+                    Value::I64(n) => RowValue::I64(*n),
+                    Value::F64(n) => RowValue::F64(*n),
+                    Value::Str(s) => RowValue::Str(s.clone()),
+                    Value::Timestamp(ns) => RowValue::Timestamp(*ns),
+                    Value::Null => RowValue::Null,
+                })
+                .collect()
+        })
+        .collect();
 
     let writer = ParquetWriter::new(path, schema);
     let stats = writer.write_rows(&columns, &pq_rows)?;
 
-    Ok(QueryResult::Ok { affected_rows: stats.rows_written })
+    Ok(QueryResult::Ok {
+        affected_rows: stats.rows_written,
+    })
 }
-fn execute_copy_from(db_root: &Path, table: &str, path: &PathBuf, options: &CopyOptions) -> Result<QueryResult> {
+fn execute_copy_from(
+    db_root: &Path,
+    table: &str,
+    path: &PathBuf,
+    options: &CopyOptions,
+) -> Result<QueryResult> {
     // Parquet format: use the PAR1XCHG reader.
     if options.format == CopyFormat::Parquet {
         return execute_copy_from_parquet(db_root, table, path);
@@ -6103,13 +7473,59 @@ fn execute_copy_from(db_root: &Path, table: &str, path: &PathBuf, options: &Copy
     let rdr = std::io::BufReader::new(file);
     let delim = options.delimiter;
     let mut lines_it = rdr.lines();
-    let csv_cols: Vec<String> = if options.header { let header = lines_it.next().ok_or_else(|| ExchangeDbError::Query("COPY FROM: empty file".into()))?.map_err(ExchangeDbError::Io)?; header.split(delim).map(|s| s.trim().to_string()).collect() } else { Vec::new() };
+    let csv_cols: Vec<String> = if options.header {
+        let header = lines_it
+            .next()
+            .ok_or_else(|| ExchangeDbError::Query("COPY FROM: empty file".into()))?
+            .map_err(ExchangeDbError::Io)?;
+        header.split(delim).map(|s| s.trim().to_string()).collect()
+    } else {
+        Vec::new()
+    };
     let table_dir = db_root.join(table);
-    if !table_dir.exists() { if csv_cols.is_empty() { return Err(ExchangeDbError::Query("COPY FROM: table does not exist and CSV has no header".into())); } let mut builder = TableBuilder::new(table); builder = builder.column(&csv_cols[0], ColumnType::Timestamp); for col in &csv_cols[1..] { builder = builder.column(col, ColumnType::Varchar); } builder = builder.timestamp(&csv_cols[0]); builder.build(db_root)?; }
+    if !table_dir.exists() {
+        if csv_cols.is_empty() {
+            return Err(ExchangeDbError::Query(
+                "COPY FROM: table does not exist and CSV has no header".into(),
+            ));
+        }
+        let mut builder = TableBuilder::new(table);
+        builder = builder.column(&csv_cols[0], ColumnType::Timestamp);
+        for col in &csv_cols[1..] {
+            builder = builder.column(col, ColumnType::Varchar);
+        }
+        builder = builder.timestamp(&csv_cols[0]);
+        builder.build(db_root)?;
+    }
     let meta = TableMeta::load(&table_dir.join("_meta"))?;
     let mut values: Vec<Vec<Value>> = Vec::new();
-    for lr in lines_it { let line = lr.map_err(ExchangeDbError::Io)?; if line.trim().is_empty() { continue; } let fields: Vec<&str> = line.split(delim).collect(); let mut row = Vec::with_capacity(meta.columns.len()); for (i, cd) in meta.columns.iter().enumerate() { let f = if i < fields.len() { fields[i].trim() } else { "" }; let ct: ColumnType = cd.col_type.into(); row.push(parse_csv_fld(f, ct)); } values.push(row); }
-    execute(db_root, &QueryPlan::Insert { table: table.to_string(), columns: meta.columns.iter().map(|c| c.name.clone()).collect(), values, upsert: false })
+    for lr in lines_it {
+        let line = lr.map_err(ExchangeDbError::Io)?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let fields: Vec<&str> = line.split(delim).collect();
+        let mut row = Vec::with_capacity(meta.columns.len());
+        for (i, cd) in meta.columns.iter().enumerate() {
+            let f = if i < fields.len() {
+                fields[i].trim()
+            } else {
+                ""
+            };
+            let ct: ColumnType = cd.col_type.into();
+            row.push(parse_csv_fld(f, ct));
+        }
+        values.push(row);
+    }
+    execute(
+        db_root,
+        &QueryPlan::Insert {
+            table: table.to_string(),
+            columns: meta.columns.iter().map(|c| c.name.clone()).collect(),
+            values,
+            upsert: false,
+        },
+    )
 }
 fn execute_copy_from_parquet(db_root: &Path, table: &str, path: &Path) -> Result<QueryResult> {
     use exchange_core::parquet::reader::{ParquetReader, RowValue};
@@ -6118,17 +7534,27 @@ fn execute_copy_from_parquet(db_root: &Path, table: &str, path: &Path) -> Result
     let pq_rows = reader.read_all()?;
 
     // Convert RowValue rows to Value rows for INSERT.
-    let col_names: Vec<String> = reader.metadata().columns.iter().map(|c| c.name.clone()).collect();
-    let values: Vec<Vec<Value>> = pq_rows.iter().map(|row| {
-        row.iter().map(|v| match v {
-            RowValue::I64(n) => Value::I64(*n),
-            RowValue::F64(n) => Value::F64(*n),
-            RowValue::Str(s) => Value::Str(s.clone()),
-            RowValue::Timestamp(ns) => Value::Timestamp(*ns),
-            RowValue::Bytes(_) => Value::Null,
-            RowValue::Null => Value::Null,
-        }).collect()
-    }).collect();
+    let col_names: Vec<String> = reader
+        .metadata()
+        .columns
+        .iter()
+        .map(|c| c.name.clone())
+        .collect();
+    let values: Vec<Vec<Value>> = pq_rows
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|v| match v {
+                    RowValue::I64(n) => Value::I64(*n),
+                    RowValue::F64(n) => Value::F64(*n),
+                    RowValue::Str(s) => Value::Str(s.clone()),
+                    RowValue::Timestamp(ns) => Value::Timestamp(*ns),
+                    RowValue::Bytes(_) => Value::Null,
+                    RowValue::Null => Value::Null,
+                })
+                .collect()
+        })
+        .collect();
 
     // If the table does not exist, create it from parquet schema.
     let table_dir = db_root.join(table);
@@ -6138,23 +7564,57 @@ fn execute_copy_from_parquet(db_root: &Path, table: &str, path: &Path) -> Result
             builder = builder.column(&cm.name, cm.col_type);
         }
         // Try to set the first timestamp column as the designated timestamp.
-        if let Some(ts_col) = reader.metadata().columns.iter().find(|c| c.col_type == ColumnType::Timestamp) {
+        if let Some(ts_col) = reader
+            .metadata()
+            .columns
+            .iter()
+            .find(|c| c.col_type == ColumnType::Timestamp)
+        {
             builder = builder.timestamp(&ts_col.name);
         }
         builder.build(db_root)?;
     }
 
-    execute(db_root, &QueryPlan::Insert { table: table.to_string(), columns: col_names, values, upsert: false })
+    execute(
+        db_root,
+        &QueryPlan::Insert {
+            table: table.to_string(),
+            columns: col_names,
+            values,
+            upsert: false,
+        },
+    )
 }
 fn parse_csv_fld(field: &str, col_type: ColumnType) -> Value {
-    if field.is_empty() { return Value::Null; }
-    match col_type { ColumnType::Timestamp => field.parse::<i64>().map(Value::Timestamp).unwrap_or(Value::Str(field.to_string())), ColumnType::I64 | ColumnType::I32 | ColumnType::I16 | ColumnType::I8 => field.parse::<i64>().map(Value::I64).unwrap_or(Value::Null), ColumnType::F64 | ColumnType::F32 => field.parse::<f64>().map(Value::F64).unwrap_or(Value::Null), ColumnType::Boolean => match field.to_ascii_lowercase().as_str() { "true" | "1" => Value::I64(1), _ => Value::I64(0) }, _ => Value::Str(field.to_string()) }
+    if field.is_empty() {
+        return Value::Null;
+    }
+    match col_type {
+        ColumnType::Timestamp => field
+            .parse::<i64>()
+            .map(Value::Timestamp)
+            .unwrap_or(Value::Str(field.to_string())),
+        ColumnType::I64 | ColumnType::I32 | ColumnType::I16 | ColumnType::I8 => {
+            field.parse::<i64>().map(Value::I64).unwrap_or(Value::Null)
+        }
+        ColumnType::F64 | ColumnType::F32 => {
+            field.parse::<f64>().map(Value::F64).unwrap_or(Value::Null)
+        }
+        ColumnType::Boolean => match field.to_ascii_lowercase().as_str() {
+            "true" | "1" => Value::I64(1),
+            _ => Value::I64(0),
+        },
+        _ => Value::Str(field.to_string()),
+    }
 }
 fn execute_explain(_db_root: &Path, query: &QueryPlan) -> Result<QueryResult> {
-    Ok(QueryResult::Rows { columns: vec!["plan".to_string()], rows: vec![vec![Value::Str(fmt_plan(query))]] })
+    Ok(QueryResult::Rows {
+        columns: vec!["plan".to_string()],
+        rows: vec![vec![Value::Str(fmt_plan(query))]],
+    })
 }
 fn execute_explain_analyze(db_root: &Path, query: &QueryPlan) -> Result<QueryResult> {
-    use crate::profiler::{QueryProfiler, ProfilingStep};
+    use crate::profiler::{ProfilingStep, QueryProfiler};
     use std::time::Instant;
 
     let mut profiler = QueryProfiler::new();
@@ -6178,9 +7638,10 @@ fn execute_explain_analyze(db_root: &Path, query: &QueryPlan) -> Result<QueryRes
     let exec_duration = exec_start.elapsed();
 
     let (rows_out, result_desc) = match &result {
-        QueryResult::Rows { columns, rows } => {
-            (rows.len() as u64, format!("{} columns, {} rows", columns.len(), rows.len()))
-        }
+        QueryResult::Rows { columns, rows } => (
+            rows.len() as u64,
+            format!("{} columns, {} rows", columns.len(), rows.len()),
+        ),
         QueryResult::Ok { affected_rows } => {
             (*affected_rows, format!("{} rows affected", affected_rows))
         }
@@ -6204,52 +7665,126 @@ fn execute_explain_analyze(db_root: &Path, query: &QueryPlan) -> Result<QueryRes
 }
 fn fmt_plan(plan: &QueryPlan) -> String {
     match plan {
-        QueryPlan::Select { table, columns, filter, order_by, limit, sample_by, group_by, .. } => {
+        QueryPlan::Select {
+            table,
+            columns,
+            filter,
+            order_by,
+            limit,
+            sample_by,
+            group_by,
+            ..
+        } => {
             let mut p = vec![format!("SELECT on table: {table}")];
-            let cs: Vec<String> = columns.iter().map(|c| match c {
-                SelectColumn::Wildcard => "*".into(),
-                SelectColumn::Name(n) => n.clone(),
-                SelectColumn::Aggregate { function, column, alias, .. } => {
-                    if let Some(a) = alias { a.clone() } else { format!("{function:?}({column})") }
-                },
-                SelectColumn::ScalarFunction { name, .. } => name.clone(),
-                SelectColumn::WindowFunction(wf) => wf.name.clone(),
-                SelectColumn::CaseWhen { alias, .. } => alias.clone().unwrap_or_else(|| "case".to_string()),
-                SelectColumn::Expression { alias, .. } => alias.clone().unwrap_or_else(|| "expr".to_string()),
-                SelectColumn::ScalarSubquery { alias, .. } => alias.clone().unwrap_or_else(|| "subquery".to_string()),
-            }).collect();
+            let cs: Vec<String> = columns
+                .iter()
+                .map(|c| match c {
+                    SelectColumn::Wildcard => "*".into(),
+                    SelectColumn::Name(n) => n.clone(),
+                    SelectColumn::Aggregate {
+                        function,
+                        column,
+                        alias,
+                        ..
+                    } => {
+                        if let Some(a) = alias {
+                            a.clone()
+                        } else {
+                            format!("{function:?}({column})")
+                        }
+                    }
+                    SelectColumn::ScalarFunction { name, .. } => name.clone(),
+                    SelectColumn::WindowFunction(wf) => wf.name.clone(),
+                    SelectColumn::CaseWhen { alias, .. } => {
+                        alias.clone().unwrap_or_else(|| "case".to_string())
+                    }
+                    SelectColumn::Expression { alias, .. } => {
+                        alias.clone().unwrap_or_else(|| "expr".to_string())
+                    }
+                    SelectColumn::ScalarSubquery { alias, .. } => {
+                        alias.clone().unwrap_or_else(|| "subquery".to_string())
+                    }
+                })
+                .collect();
             p.push(format!("  columns: [{}]", cs.join(", ")));
 
-            if let Some(f) = filter { p.push(format!("  filter: {f:?}")); }
+            if let Some(f) = filter {
+                p.push(format!("  filter: {f:?}"));
+            }
 
             if !order_by.is_empty() {
-                let ob: Vec<String> = order_by.iter().map(|o| if o.descending { format!("{} DESC", o.column) } else { format!("{} ASC", o.column) }).collect();
+                let ob: Vec<String> = order_by
+                    .iter()
+                    .map(|o| {
+                        if o.descending {
+                            format!("{} DESC", o.column)
+                        } else {
+                            format!("{} ASC", o.column)
+                        }
+                    })
+                    .collect();
                 p.push(format!("  order_by: [{}]", ob.join(", ")));
             }
 
-            if let Some(l) = limit { p.push(format!("  limit: {l}")); }
+            if let Some(l) = limit {
+                p.push(format!("  limit: {l}"));
+            }
 
-            if let Some(sb) = sample_by { p.push(format!("  sample_by: {:?}", sb.interval)); }
+            if let Some(sb) = sample_by {
+                p.push(format!("  sample_by: {:?}", sb.interval));
+            }
 
-            if !group_by.is_empty() { p.push(format!("  group_by: [{}]", group_by.join(", "))); }
+            if !group_by.is_empty() {
+                p.push(format!("  group_by: [{}]", group_by.join(", ")));
+            }
             p.join("\n")
         }
-        QueryPlan::Insert { table, values, .. } => format!("INSERT into table: {table}, rows: {}", values.len()),
-        QueryPlan::CreateTable { name, columns, .. } => format!("CREATE TABLE {name} with {} columns", columns.len()),
-        QueryPlan::Join { left_table, right_table, join_type, .. } => format!("{join_type:?} JOIN {left_table} x {right_table}"),
-        QueryPlan::MultiJoin { left, right_table, join_type, .. } => format!("{join_type:?} JOIN ({}) x {right_table}", fmt_plan(left)),
-        QueryPlan::AsofJoin { left_table, right_table, .. } => format!("ASOF JOIN {left_table} x {right_table}"),
-        QueryPlan::Delete { table, filter, .. } => format!("DELETE from {table}, filter: {filter:?}"),
+        QueryPlan::Insert { table, values, .. } => {
+            format!("INSERT into table: {table}, rows: {}", values.len())
+        }
+        QueryPlan::CreateTable { name, columns, .. } => {
+            format!("CREATE TABLE {name} with {} columns", columns.len())
+        }
+        QueryPlan::Join {
+            left_table,
+            right_table,
+            join_type,
+            ..
+        } => format!("{join_type:?} JOIN {left_table} x {right_table}"),
+        QueryPlan::MultiJoin {
+            left,
+            right_table,
+            join_type,
+            ..
+        } => format!("{join_type:?} JOIN ({}) x {right_table}", fmt_plan(left)),
+        QueryPlan::AsofJoin {
+            left_table,
+            right_table,
+            ..
+        } => format!("ASOF JOIN {left_table} x {right_table}"),
+        QueryPlan::Delete { table, filter, .. } => {
+            format!("DELETE from {table}, filter: {filter:?}")
+        }
         QueryPlan::Update { table, filter, .. } => format!("UPDATE {table}, filter: {filter:?}"),
         QueryPlan::Vacuum { table } => format!("VACUUM {table}"),
-        QueryPlan::DetachPartition { table, partition } => format!("ALTER TABLE {table} DETACH PARTITION '{partition}'"),
-        QueryPlan::AttachPartition { table, partition } => format!("ALTER TABLE {table} ATTACH PARTITION '{partition}'"),
-        QueryPlan::SquashPartitions { table, partition1, partition2 } => format!("ALTER TABLE {table} SQUASH PARTITIONS '{partition1}', '{partition2}'"),
+        QueryPlan::DetachPartition { table, partition } => {
+            format!("ALTER TABLE {table} DETACH PARTITION '{partition}'")
+        }
+        QueryPlan::AttachPartition { table, partition } => {
+            format!("ALTER TABLE {table} ATTACH PARTITION '{partition}'")
+        }
+        QueryPlan::SquashPartitions {
+            table,
+            partition1,
+            partition2,
+        } => format!("ALTER TABLE {table} SQUASH PARTITIONS '{partition1}', '{partition2}'"),
         QueryPlan::CopyTo { table, path, .. } => format!("COPY {table} TO {}", path.display()),
         QueryPlan::CopyFrom { table, path, .. } => format!("COPY {table} FROM {}", path.display()),
         QueryPlan::ReadParquet { path, .. } => format!("READ_PARQUET({})", path.display()),
         QueryPlan::ReadCsv { path, .. } => format!("READ_CSV({})", path.display()),
-        QueryPlan::CreateTableAs { name, source, .. } => format!("CREATE TABLE {name} AS\n{}", fmt_plan(source)),
+        QueryPlan::CreateTableAs { name, source, .. } => {
+            format!("CREATE TABLE {name} AS\n{}", fmt_plan(source))
+        }
         QueryPlan::Explain { query } => format!("EXPLAIN\n{}", fmt_plan(query)),
         QueryPlan::ExplainAnalyze { query } => format!("EXPLAIN ANALYZE\n{}", fmt_plan(query)),
         other => format!("{other:?}"),
@@ -6257,30 +7792,56 @@ fn fmt_plan(plan: &QueryPlan) -> String {
 }
 fn execute_vacuum(db_root: &Path, table: &str) -> Result<QueryResult> {
     let table_dir = db_root.join(table);
-    if !table_dir.exists() { return Err(ExchangeDbError::TableNotFound(table.to_string())); }
+    if !table_dir.exists() {
+        return Err(ExchangeDbError::TableNotFound(table.to_string()));
+    }
     let meta = TableMeta::load(&table_dir.join("_meta"))?;
     let job = exchange_core::vacuum::VacuumJob::new(table_dir, meta);
     let stats = job.run()?;
-    Ok(QueryResult::Rows { columns: vec!["wal_segments_removed".into(), "empty_partitions_removed".into(), "orphan_files_removed".into(), "bytes_freed".into()], rows: vec![vec![Value::I64(stats.wal_segments_removed as i64), Value::I64(stats.empty_partitions_removed as i64), Value::I64(stats.orphan_files_removed as i64), Value::I64(stats.bytes_freed as i64)]] })
+    Ok(QueryResult::Rows {
+        columns: vec![
+            "wal_segments_removed".into(),
+            "empty_partitions_removed".into(),
+            "orphan_files_removed".into(),
+            "bytes_freed".into(),
+        ],
+        rows: vec![vec![
+            Value::I64(stats.wal_segments_removed as i64),
+            Value::I64(stats.empty_partitions_removed as i64),
+            Value::I64(stats.orphan_files_removed as i64),
+            Value::I64(stats.bytes_freed as i64),
+        ]],
+    })
 }
 
 fn execute_detach_partition(db_root: &Path, table: &str, partition: &str) -> Result<QueryResult> {
     let table_dir = db_root.join(table);
-    if !table_dir.exists() { return Err(ExchangeDbError::TableNotFound(table.to_string())); }
+    if !table_dir.exists() {
+        return Err(ExchangeDbError::TableNotFound(table.to_string()));
+    }
     exchange_core::partition_mgmt::detach_partition(&table_dir, partition)?;
     Ok(QueryResult::Ok { affected_rows: 1 })
 }
 
 fn execute_attach_partition(db_root: &Path, table: &str, partition: &str) -> Result<QueryResult> {
     let table_dir = db_root.join(table);
-    if !table_dir.exists() { return Err(ExchangeDbError::TableNotFound(table.to_string())); }
+    if !table_dir.exists() {
+        return Err(ExchangeDbError::TableNotFound(table.to_string()));
+    }
     exchange_core::partition_mgmt::attach_partition(&table_dir, partition)?;
     Ok(QueryResult::Ok { affected_rows: 1 })
 }
 
-fn execute_squash_partitions(db_root: &Path, table: &str, p1: &str, p2: &str) -> Result<QueryResult> {
+fn execute_squash_partitions(
+    db_root: &Path,
+    table: &str,
+    p1: &str,
+    p2: &str,
+) -> Result<QueryResult> {
     let table_dir = db_root.join(table);
-    if !table_dir.exists() { return Err(ExchangeDbError::TableNotFound(table.to_string())); }
+    if !table_dir.exists() {
+        return Err(ExchangeDbError::TableNotFound(table.to_string()));
+    }
     let meta = TableMeta::load(&table_dir.join("_meta"))?;
     let merged = exchange_core::partition_mgmt::squash_partitions(&table_dir, p1, p2, &meta)?;
     Ok(QueryResult::Rows {
@@ -6292,11 +7853,7 @@ fn execute_squash_partitions(db_root: &Path, table: &str, p1: &str, p2: &str) ->
 
 /// Execute CREATE MATERIALIZED VIEW: parse and run the defining query,
 /// store the results as a regular table, and save the matview metadata.
-fn execute_create_mat_view(
-    db_root: &Path,
-    name: &str,
-    source_sql: &str,
-) -> Result<QueryResult> {
+fn execute_create_mat_view(db_root: &Path, name: &str, source_sql: &str) -> Result<QueryResult> {
     use exchange_core::matview::MatViewMeta;
     use exchange_core::table::{ColumnDef, ColumnTypeSerializable};
 
@@ -6496,10 +8053,8 @@ fn write_matview_rows(
         // Use a synthetic timestamp offset by row index to ensure unique timestamps.
         let row_ts = Timestamp(ts.as_nanos() + row_idx as i64);
 
-        let col_values: Vec<ColumnValue<'_>> = row
-            .iter()
-            .map(|v| plan_value_to_column_value(v))
-            .collect();
+        let col_values: Vec<ColumnValue<'_>> =
+            row.iter().map(|v| plan_value_to_column_value(v)).collect();
 
         writer.write_row(row_ts, &col_values)?;
     }
@@ -6517,17 +8072,13 @@ fn extract_source_table(sql: &str) -> Option<String> {
         .find(|c: char| c.is_whitespace() || c == ';' || c == ')')
         .unwrap_or(rest.len());
     let table = rest[..end].trim().to_string();
-    if table.is_empty() {
-        None
-    } else {
-        Some(table)
-    }
+    if table.is_empty() { None } else { Some(table) }
 }
 
 // ── RBAC execution ──────────────────────────────────────────────────
 
 fn execute_create_user(db_root: &Path, username: &str, password: &str) -> Result<QueryResult> {
-    use exchange_core::rbac::{hash_password, RbacStore, User};
+    use exchange_core::rbac::{RbacStore, User, hash_password};
 
     let store = RbacStore::open(db_root)?;
     let now = std::time::SystemTime::now()
@@ -6574,7 +8125,11 @@ fn execute_drop_role(db_root: &Path, name: &str) -> Result<QueryResult> {
     Ok(QueryResult::Ok { affected_rows: 0 })
 }
 
-fn execute_grant(db_root: &Path, permission: &GrantPermission, target: &str) -> Result<QueryResult> {
+fn execute_grant(
+    db_root: &Path,
+    permission: &GrantPermission,
+    target: &str,
+) -> Result<QueryResult> {
     use exchange_core::rbac::RbacStore;
 
     let store = RbacStore::open(db_root)?;
@@ -6611,7 +8166,11 @@ fn execute_grant(db_root: &Path, permission: &GrantPermission, target: &str) -> 
     Ok(QueryResult::Ok { affected_rows: 0 })
 }
 
-fn execute_revoke(db_root: &Path, permission: &GrantPermission, target: &str) -> Result<QueryResult> {
+fn execute_revoke(
+    db_root: &Path,
+    permission: &GrantPermission,
+    target: &str,
+) -> Result<QueryResult> {
     use exchange_core::rbac::RbacStore;
 
     let store = RbacStore::open(db_root)?;
@@ -6661,7 +8220,9 @@ fn grant_permission_to_permission(gp: &GrantPermission) -> exchange_core::rbac::
         GrantPermission::Select { table } => Permission::Read {
             table: Some(table.clone()),
         },
-        GrantPermission::Insert { table } | GrantPermission::Update { table } | GrantPermission::Delete { table } => Permission::Write {
+        GrantPermission::Insert { table }
+        | GrantPermission::Update { table }
+        | GrantPermission::Delete { table } => Permission::Write {
             table: Some(table.clone()),
         },
         GrantPermission::All { table } => Permission::Write {
@@ -6687,13 +8248,23 @@ fn execute_pivot(
     let source_result = execute(db_root, source)?;
     let (src_cols, src_rows) = match source_result {
         QueryResult::Rows { columns, rows } => (columns, rows),
-        _ => return Err(ExchangeDbError::Query("PIVOT source did not return rows".into())),
+        _ => {
+            return Err(ExchangeDbError::Query(
+                "PIVOT source did not return rows".into(),
+            ));
+        }
     };
 
-    let pivot_col_idx = src_cols.iter().position(|c| c == pivot_col)
+    let pivot_col_idx = src_cols
+        .iter()
+        .position(|c| c == pivot_col)
         .ok_or_else(|| ExchangeDbError::Query(format!("PIVOT column '{pivot_col}' not found")))?;
-    let agg_col_idx = src_cols.iter().position(|c| c == agg_column)
-        .ok_or_else(|| ExchangeDbError::Query(format!("aggregate column '{agg_column}' not found")))?;
+    let agg_col_idx = src_cols
+        .iter()
+        .position(|c| c == agg_column)
+        .ok_or_else(|| {
+            ExchangeDbError::Query(format!("aggregate column '{agg_column}' not found"))
+        })?;
 
     // Group-by columns: all columns except pivot_col and agg_column.
     let group_col_idxs: Vec<usize> = (0..src_cols.len())
@@ -6701,7 +8272,10 @@ fn execute_pivot(
         .collect();
 
     // Build result columns: group columns + one per pivot value.
-    let mut result_cols: Vec<String> = group_col_idxs.iter().map(|i| src_cols[*i].clone()).collect();
+    let mut result_cols: Vec<String> = group_col_idxs
+        .iter()
+        .map(|i| src_cols[*i].clone())
+        .collect();
     for pv in values {
         result_cols.push(pv.alias.clone());
     }
@@ -6715,14 +8289,18 @@ fn execute_pivot(
 
     let mut result_rows = Vec::new();
     for (key_strs, rows) in &groups {
-        let mut result_row: Vec<Value> = group_col_idxs.iter().enumerate().map(|(ki, gi)| {
-            // Re-extract the original value from the first row.
-            if let Some(first) = rows.first() {
-                first[*gi].clone()
-            } else {
-                Value::Str(key_strs[ki].clone())
-            }
-        }).collect();
+        let mut result_row: Vec<Value> = group_col_idxs
+            .iter()
+            .enumerate()
+            .map(|(ki, gi)| {
+                // Re-extract the original value from the first row.
+                if let Some(first) = rows.first() {
+                    first[*gi].clone()
+                } else {
+                    Value::Str(key_strs[ki].clone())
+                }
+            })
+            .collect();
 
         for pv in values {
             // Filter rows matching this pivot value.
@@ -6730,12 +8308,11 @@ fn execute_pivot(
                 Value::Str(s) => s.clone(),
                 other => other.to_string().trim_matches('\'').to_string(),
             };
-            let matching: Vec<&Value> = rows.iter()
-                .filter(|r| {
-                    match &r[pivot_col_idx] {
-                        Value::Str(s) => *s == pv_str,
-                        other => other.to_string().trim_matches('\'') == pv_str.as_str(),
-                    }
+            let matching: Vec<&Value> = rows
+                .iter()
+                .filter(|r| match &r[pivot_col_idx] {
+                    Value::Str(s) => *s == pv_str,
+                    other => other.to_string().trim_matches('\'') == pv_str.as_str(),
                 })
                 .map(|r| &r[agg_col_idx])
                 .collect();
@@ -6758,18 +8335,31 @@ fn compute_simple_aggregate(kind: AggregateKind, values: &[&Value]) -> Value {
         return Value::Null;
     }
     match kind {
-        AggregateKind::Avg | AggregateKind::AvgDouble | AggregateKind::AvgFloat
-        | AggregateKind::AvgInt | AggregateKind::AvgLong => {
+        AggregateKind::Avg
+        | AggregateKind::AvgDouble
+        | AggregateKind::AvgFloat
+        | AggregateKind::AvgInt
+        | AggregateKind::AvgLong => {
             let mut sum = 0.0f64;
             let mut count = 0usize;
             for v in values {
                 match v {
-                    Value::F64(f) => { sum += f; count += 1; }
-                    Value::I64(i) => { sum += *i as f64; count += 1; }
+                    Value::F64(f) => {
+                        sum += f;
+                        count += 1;
+                    }
+                    Value::I64(i) => {
+                        sum += *i as f64;
+                        count += 1;
+                    }
                     _ => {}
                 }
             }
-            if count > 0 { Value::F64(sum / count as f64) } else { Value::Null }
+            if count > 0 {
+                Value::F64(sum / count as f64)
+            } else {
+                Value::Null
+            }
         }
         AggregateKind::Sum | AggregateKind::SumDouble | AggregateKind::SumFloat => {
             let mut sum = 0.0f64;
@@ -6782,20 +8372,18 @@ fn compute_simple_aggregate(kind: AggregateKind, values: &[&Value]) -> Value {
             }
             Value::F64(sum)
         }
-        AggregateKind::Min | AggregateKind::MinDouble | AggregateKind::MinFloat => {
-            values.iter()
-                .filter(|v| !matches!(v, Value::Null))
-                .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|v| (*v).clone())
-                .unwrap_or(Value::Null)
-        }
-        AggregateKind::Max | AggregateKind::MaxDouble | AggregateKind::MaxFloat => {
-            values.iter()
-                .filter(|v| !matches!(v, Value::Null))
-                .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|v| (*v).clone())
-                .unwrap_or(Value::Null)
-        }
+        AggregateKind::Min | AggregateKind::MinDouble | AggregateKind::MinFloat => values
+            .iter()
+            .filter(|v| !matches!(v, Value::Null))
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|v| (*v).clone())
+            .unwrap_or(Value::Null),
+        AggregateKind::Max | AggregateKind::MaxDouble | AggregateKind::MaxFloat => values
+            .iter()
+            .filter(|v| !matches!(v, Value::Null))
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|v| (*v).clone())
+            .unwrap_or(Value::Null),
         AggregateKind::Count => Value::I64(values.len() as i64),
         AggregateKind::First => values.first().map(|v| (*v).clone()).unwrap_or(Value::Null),
         AggregateKind::Last => values.last().map(|v| (*v).clone()).unwrap_or(Value::Null),
@@ -6812,54 +8400,77 @@ fn execute_merge(
     when_clauses: &[MergeWhen],
 ) -> Result<QueryResult> {
     // Read target table.
-    let target_result = execute(db_root, &QueryPlan::Select {
-        table: target_table.to_string(),
-        columns: vec![SelectColumn::Wildcard],
-        filter: None,
-        order_by: vec![],
-        limit: None,
-        offset: None,
-        sample_by: None,
-        latest_on: None,
-        group_by: vec![],
-        group_by_mode: GroupByMode::Normal,
-        having: None,
-        distinct: false,
-        distinct_on: vec![],
-    })?;
+    let target_result = execute(
+        db_root,
+        &QueryPlan::Select {
+            table: target_table.to_string(),
+            columns: vec![SelectColumn::Wildcard],
+            filter: None,
+            order_by: vec![],
+            limit: None,
+            offset: None,
+            sample_by: None,
+            latest_on: None,
+            group_by: vec![],
+            group_by_mode: GroupByMode::Normal,
+            having: None,
+            distinct: false,
+            distinct_on: vec![],
+        },
+    )?;
     let (target_cols, target_rows) = match target_result {
         QueryResult::Rows { columns, rows } => (columns, rows),
-        _ => return Err(ExchangeDbError::Query("MERGE target did not return rows".into())),
+        _ => {
+            return Err(ExchangeDbError::Query(
+                "MERGE target did not return rows".into(),
+            ));
+        }
     };
 
     // Read source table.
-    let source_result = execute(db_root, &QueryPlan::Select {
-        table: source_table.to_string(),
-        columns: vec![SelectColumn::Wildcard],
-        filter: None,
-        order_by: vec![],
-        limit: None,
-        offset: None,
-        sample_by: None,
-        latest_on: None,
-        group_by: vec![],
-        group_by_mode: GroupByMode::Normal,
-        having: None,
-        distinct: false,
-        distinct_on: vec![],
-    })?;
+    let source_result = execute(
+        db_root,
+        &QueryPlan::Select {
+            table: source_table.to_string(),
+            columns: vec![SelectColumn::Wildcard],
+            filter: None,
+            order_by: vec![],
+            limit: None,
+            offset: None,
+            sample_by: None,
+            latest_on: None,
+            group_by: vec![],
+            group_by_mode: GroupByMode::Normal,
+            having: None,
+            distinct: false,
+            distinct_on: vec![],
+        },
+    )?;
     let (source_cols, source_rows) = match source_result {
         QueryResult::Rows { columns, rows } => (columns, rows),
-        _ => return Err(ExchangeDbError::Query("MERGE source did not return rows".into())),
+        _ => {
+            return Err(ExchangeDbError::Query(
+                "MERGE source did not return rows".into(),
+            ));
+        }
     };
 
-    let target_key_idx = target_cols.iter().position(|c| c == &on_column.0)
-        .ok_or_else(|| ExchangeDbError::Query(format!("column '{}' not found in target", on_column.0)))?;
-    let source_key_idx = source_cols.iter().position(|c| c == &on_column.1)
-        .ok_or_else(|| ExchangeDbError::Query(format!("column '{}' not found in source", on_column.1)))?;
+    let target_key_idx = target_cols
+        .iter()
+        .position(|c| c == &on_column.0)
+        .ok_or_else(|| {
+            ExchangeDbError::Query(format!("column '{}' not found in target", on_column.0))
+        })?;
+    let source_key_idx = source_cols
+        .iter()
+        .position(|c| c == &on_column.1)
+        .ok_or_else(|| {
+            ExchangeDbError::Query(format!("column '{}' not found in source", on_column.1))
+        })?;
 
     // Build a set of target keys.
-    let target_keys: HashSet<String> = target_rows.iter()
+    let target_keys: HashSet<String> = target_rows
+        .iter()
         .map(|r| r[target_key_idx].to_string())
         .collect();
 
@@ -6872,33 +8483,46 @@ fn execute_merge(
             for clause in when_clauses {
                 match clause {
                     MergeWhen::MatchedUpdate { assignments } => {
-                        let filter = Filter::Eq(on_column.0.clone(), source_row[source_key_idx].clone());
-                        let plan_assignments: Vec<(String, PlanExpr)> = assignments.iter().map(|(col, expr)| {
-                            let resolved = match expr {
-                                PlanExpr::Column(name) => {
-                                    if let Some(idx) = source_cols.iter().position(|c| c == name) {
-                                        PlanExpr::Literal(source_row[idx].clone())
-                                    } else {
-                                        expr.clone()
+                        let filter =
+                            Filter::Eq(on_column.0.clone(), source_row[source_key_idx].clone());
+                        let plan_assignments: Vec<(String, PlanExpr)> = assignments
+                            .iter()
+                            .map(|(col, expr)| {
+                                let resolved = match expr {
+                                    PlanExpr::Column(name) => {
+                                        if let Some(idx) =
+                                            source_cols.iter().position(|c| c == name)
+                                        {
+                                            PlanExpr::Literal(source_row[idx].clone())
+                                        } else {
+                                            expr.clone()
+                                        }
                                     }
-                                }
-                                other => other.clone(),
-                            };
-                            (col.clone(), resolved)
-                        }).collect();
-                        execute(db_root, &QueryPlan::Update {
-                            table: target_table.to_string(),
-                            assignments: plan_assignments,
-                            filter: Some(filter),
-                        })?;
+                                    other => other.clone(),
+                                };
+                                (col.clone(), resolved)
+                            })
+                            .collect();
+                        execute(
+                            db_root,
+                            &QueryPlan::Update {
+                                table: target_table.to_string(),
+                                assignments: plan_assignments,
+                                filter: Some(filter),
+                            },
+                        )?;
                         affected += 1;
                     }
                     MergeWhen::MatchedDelete => {
-                        let filter = Filter::Eq(on_column.0.clone(), source_row[source_key_idx].clone());
-                        execute(db_root, &QueryPlan::Delete {
-                            table: target_table.to_string(),
-                            filter: Some(filter),
-                        })?;
+                        let filter =
+                            Filter::Eq(on_column.0.clone(), source_row[source_key_idx].clone());
+                        execute(
+                            db_root,
+                            &QueryPlan::Delete {
+                                table: target_table.to_string(),
+                                filter: Some(filter),
+                            },
+                        )?;
                         affected += 1;
                     }
                     MergeWhen::NotMatchedInsert { .. } => {}
@@ -6908,8 +8532,9 @@ fn execute_merge(
             // NOT MATCHED.
             for clause in when_clauses {
                 if let MergeWhen::NotMatchedInsert { values } = clause {
-                    let row_values: Vec<Value> = values.iter().map(|expr| {
-                        match expr {
+                    let row_values: Vec<Value> = values
+                        .iter()
+                        .map(|expr| match expr {
                             PlanExpr::Column(name) => {
                                 if let Some(idx) = source_cols.iter().position(|c| c == name) {
                                     source_row[idx].clone()
@@ -6919,21 +8544,26 @@ fn execute_merge(
                             }
                             PlanExpr::Literal(v) => v.clone(),
                             _ => Value::Null,
-                        }
-                    }).collect();
-                    execute(db_root, &QueryPlan::Insert {
-                        table: target_table.to_string(),
-                        columns: vec![],
-                        values: vec![row_values],
-                        upsert: false,
-                    })?;
+                        })
+                        .collect();
+                    execute(
+                        db_root,
+                        &QueryPlan::Insert {
+                            table: target_table.to_string(),
+                            columns: vec![],
+                            values: vec![row_values],
+                            upsert: false,
+                        },
+                    )?;
                     affected += 1;
                 }
             }
         }
     }
 
-    Ok(QueryResult::Ok { affected_rows: affected })
+    Ok(QueryResult::Ok {
+        affected_rows: affected,
+    })
 }
 
 /// Execute INSERT ... ON CONFLICT.
@@ -6954,21 +8584,24 @@ fn execute_insert_on_conflict(
             let col_name = &on_conflict.columns[0];
             if let Some(col_idx) = meta.columns.iter().position(|c| c.name == *col_name) {
                 if let Some(val) = row.get(col_idx) {
-                    let check_result = execute(db_root, &QueryPlan::Select {
-                        table: table.to_string(),
-                        columns: vec![SelectColumn::Wildcard],
-                        filter: Some(Filter::Eq(col_name.clone(), val.clone())),
-                        order_by: vec![],
-                        limit: Some(1),
-                        offset: None,
-                        sample_by: None,
-                        latest_on: None,
-                        group_by: vec![],
-                        group_by_mode: GroupByMode::Normal,
-                        having: None,
-                        distinct: false,
-                        distinct_on: vec![],
-                    })?;
+                    let check_result = execute(
+                        db_root,
+                        &QueryPlan::Select {
+                            table: table.to_string(),
+                            columns: vec![SelectColumn::Wildcard],
+                            filter: Some(Filter::Eq(col_name.clone(), val.clone())),
+                            order_by: vec![],
+                            limit: Some(1),
+                            offset: None,
+                            sample_by: None,
+                            latest_on: None,
+                            group_by: vec![],
+                            group_by_mode: GroupByMode::Normal,
+                            having: None,
+                            distinct: false,
+                            distinct_on: vec![],
+                        },
+                    )?;
                     match check_result {
                         QueryResult::Rows { rows, .. } => !rows.is_empty(),
                         _ => false,
@@ -6990,19 +8623,29 @@ fn execute_insert_on_conflict(
                 }
                 OnConflictAction::DoUpdate { assignments } => {
                     let col_name = &on_conflict.columns[0];
-                    let col_idx = meta.columns.iter().position(|c| c.name == *col_name).unwrap();
+                    let col_idx = meta
+                        .columns
+                        .iter()
+                        .position(|c| c.name == *col_name)
+                        .unwrap();
                     let filter = Filter::Eq(col_name.clone(), row[col_idx].clone());
 
-                    let resolved_assignments: Vec<(String, PlanExpr)> = assignments.iter().map(|(col, expr)| {
-                        let resolved = resolve_excluded_refs(expr, &meta, row);
-                        (col.clone(), resolved)
-                    }).collect();
+                    let resolved_assignments: Vec<(String, PlanExpr)> = assignments
+                        .iter()
+                        .map(|(col, expr)| {
+                            let resolved = resolve_excluded_refs(expr, &meta, row);
+                            (col.clone(), resolved)
+                        })
+                        .collect();
 
-                    execute(db_root, &QueryPlan::Update {
-                        table: table.to_string(),
-                        assignments: resolved_assignments,
-                        filter: Some(filter),
-                    })?;
+                    execute(
+                        db_root,
+                        &QueryPlan::Update {
+                            table: table.to_string(),
+                            assignments: resolved_assignments,
+                            filter: Some(filter),
+                        },
+                    )?;
                     affected += 1;
                 }
             }
@@ -7012,7 +8655,9 @@ fn execute_insert_on_conflict(
         }
     }
 
-    Ok(QueryResult::Ok { affected_rows: affected })
+    Ok(QueryResult::Ok {
+        affected_rows: affected,
+    })
 }
 
 /// Replace EXCLUDED.col references with literal values from the insert row.
@@ -7020,9 +8665,10 @@ fn resolve_excluded_refs(expr: &PlanExpr, meta: &TableMeta, row: &[Value]) -> Pl
     match expr {
         PlanExpr::Column(name) => {
             if let Some(idx) = meta.columns.iter().position(|c| c.name == *name)
-                && let Some(val) = row.get(idx) {
-                    return PlanExpr::Literal(val.clone());
-                }
+                && let Some(val) = row.get(idx)
+            {
+                return PlanExpr::Literal(val.clone());
+            }
             expr.clone()
         }
         PlanExpr::BinaryOp { left, op, right } => PlanExpr::BinaryOp {
@@ -7036,7 +8682,10 @@ fn resolve_excluded_refs(expr: &PlanExpr, meta: &TableMeta, row: &[Value]) -> Pl
         },
         PlanExpr::Function { name, args } => PlanExpr::Function {
             name: name.clone(),
-            args: args.iter().map(|a| resolve_excluded_refs(a, meta, row)).collect(),
+            args: args
+                .iter()
+                .map(|a| resolve_excluded_refs(a, meta, row))
+                .collect(),
         },
         PlanExpr::Literal(_) => expr.clone(),
     }
@@ -7055,25 +8704,32 @@ fn execute_lateral_join(
     limit: Option<u64>,
 ) -> Result<QueryResult> {
     // Read all rows from the left table.
-    let left_result = execute(db_root, &QueryPlan::Select {
-        table: left_table.to_string(),
-        columns: vec![SelectColumn::Wildcard],
-        filter: None,
-        order_by: vec![],
-        limit: None,
-        offset: None,
-        sample_by: None,
-        latest_on: None,
-        group_by: vec![],
-        group_by_mode: GroupByMode::Normal,
-        having: None,
-        distinct: false,
-        distinct_on: vec![],
-    })?;
+    let left_result = execute(
+        db_root,
+        &QueryPlan::Select {
+            table: left_table.to_string(),
+            columns: vec![SelectColumn::Wildcard],
+            filter: None,
+            order_by: vec![],
+            limit: None,
+            offset: None,
+            sample_by: None,
+            latest_on: None,
+            group_by: vec![],
+            group_by_mode: GroupByMode::Normal,
+            having: None,
+            distinct: false,
+            distinct_on: vec![],
+        },
+    )?;
 
     let (left_cols, left_rows) = match left_result {
         QueryResult::Rows { columns, rows } => (columns, rows),
-        _ => return Err(ExchangeDbError::Query("LATERAL: left table returned no rows".into())),
+        _ => {
+            return Err(ExchangeDbError::Query(
+                "LATERAL: left table returned no rows".into(),
+            ));
+        }
     };
 
     let mut result_cols: Option<Vec<String>> = None;
@@ -7118,8 +8774,11 @@ fn execute_lateral_join(
 
     // Apply ORDER BY.
     if !order_by.is_empty() {
-        let resolved: Vec<(usize, String)> = final_cols.iter().enumerate()
-            .map(|(i, n)| (i, n.clone())).collect();
+        let resolved: Vec<(usize, String)> = final_cols
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (i, n.clone()))
+            .collect();
         apply_order_by(&mut all_rows, &resolved, order_by);
     }
 
@@ -7145,23 +8804,42 @@ fn execute_lateral_subquery(
     // For the lateral subquery, we substitute filter column references
     // that match left table columns with the current left row values.
     match subquery {
-        QueryPlan::Select { table, columns, filter, order_by, limit, offset, sample_by, latest_on, group_by, group_by_mode, having, distinct, distinct_on } => {
-            let resolved_filter = filter.as_ref().map(|f| substitute_lateral_filter(f, left_cols, left_row));
-            execute(db_root, &QueryPlan::Select {
-                table: table.clone(),
-                columns: columns.clone(),
-                filter: resolved_filter,
-                order_by: order_by.clone(),
-                limit: *limit,
-                offset: *offset,
-                sample_by: sample_by.clone(),
-                latest_on: latest_on.clone(),
-                group_by: group_by.clone(),
-                group_by_mode: group_by_mode.clone(),
-                having: having.clone(),
-                distinct: *distinct,
-                distinct_on: distinct_on.clone(),
-            })
+        QueryPlan::Select {
+            table,
+            columns,
+            filter,
+            order_by,
+            limit,
+            offset,
+            sample_by,
+            latest_on,
+            group_by,
+            group_by_mode,
+            having,
+            distinct,
+            distinct_on,
+        } => {
+            let resolved_filter = filter
+                .as_ref()
+                .map(|f| substitute_lateral_filter(f, left_cols, left_row));
+            execute(
+                db_root,
+                &QueryPlan::Select {
+                    table: table.clone(),
+                    columns: columns.clone(),
+                    filter: resolved_filter,
+                    order_by: order_by.clone(),
+                    limit: *limit,
+                    offset: *offset,
+                    sample_by: sample_by.clone(),
+                    latest_on: latest_on.clone(),
+                    group_by: group_by.clone(),
+                    group_by_mode: group_by_mode.clone(),
+                    having: having.clone(),
+                    distinct: *distinct,
+                    distinct_on: distinct_on.clone(),
+                },
+            )
         }
         other => execute(db_root, other),
     }
@@ -7179,10 +8857,16 @@ fn substitute_lateral_filter(filter: &Filter, left_cols: &[String], left_row: &[
             }
         }
         Filter::And(parts) => Filter::And(
-            parts.iter().map(|p| substitute_lateral_filter(p, left_cols, left_row)).collect()
+            parts
+                .iter()
+                .map(|p| substitute_lateral_filter(p, left_cols, left_row))
+                .collect(),
         ),
         Filter::Or(parts) => Filter::Or(
-            parts.iter().map(|p| substitute_lateral_filter(p, left_cols, left_row)).collect()
+            parts
+                .iter()
+                .map(|p| substitute_lateral_filter(p, left_cols, left_row))
+                .collect(),
         ),
         Filter::Expression { left, op, right } => Filter::Expression {
             left: substitute_lateral_expr(left, left_cols, left_row),
@@ -7215,13 +8899,22 @@ fn substitute_lateral_expr(expr: &PlanExpr, left_cols: &[String], left_row: &[Va
 }
 
 #[allow(dead_code)]
-fn resolve_lateral_value(_val: &Value, _left_cols: &[String], _left_row: &[Value]) -> Option<Value> {
+fn resolve_lateral_value(
+    _val: &Value,
+    _left_cols: &[String],
+    _left_row: &[Value],
+) -> Option<Value> {
     // Values are already resolved literals; no substitution needed.
     // Column references in LATERAL WHERE clauses become Expression filters.
     None
 }
 
-fn execute_create_index(db_root: &Path, name: &str, table: &str, columns: &[String]) -> Result<QueryResult> {
+fn execute_create_index(
+    db_root: &Path,
+    name: &str,
+    table: &str,
+    columns: &[String],
+) -> Result<QueryResult> {
     let table_dir = db_root.join(table);
     if !table_dir.exists() {
         return Err(ExchangeDbError::TableNotFound(table.to_string()));
@@ -7230,7 +8923,8 @@ fn execute_create_index(db_root: &Path, name: &str, table: &str, columns: &[Stri
     for col in columns {
         if !meta.columns.iter().any(|c| c.name == *col) {
             return Err(ExchangeDbError::Query(format!(
-                "column '{}' not found in table '{}'", col, table
+                "column '{}' not found in table '{}'",
+                col, table
             )));
         }
     }
@@ -7238,8 +8932,11 @@ fn execute_create_index(db_root: &Path, name: &str, table: &str, columns: &[Stri
     let _ = std::fs::create_dir_all(&index_dir);
     let index_meta = serde_json::json!({ "name": name, "table": table, "columns": columns });
     let meta_path = index_dir.join(format!("{}.json", name));
-    std::fs::write(&meta_path, serde_json::to_string_pretty(&index_meta).unwrap())
-        .map_err(ExchangeDbError::Io)?;
+    std::fs::write(
+        &meta_path,
+        serde_json::to_string_pretty(&index_meta).unwrap(),
+    )
+    .map_err(ExchangeDbError::Io)?;
     for col_name in columns {
         if meta.columns.iter().any(|c| c.name == *col_name) {
             let _ = exchange_core::index_builder::rebuild_index(&table_dir, col_name, &meta);
@@ -7264,15 +8961,19 @@ fn execute_rename_table(db_root: &Path, old_name: &str, new_name: &str) -> Resul
     }
     let new_dir = db_root.join(new_name);
     if new_dir.exists() {
-        return Err(ExchangeDbError::Query(format!("table '{}' already exists", new_name)));
+        return Err(ExchangeDbError::Query(format!(
+            "table '{}' already exists",
+            new_name
+        )));
     }
     std::fs::rename(&old_dir, &new_dir).map_err(ExchangeDbError::Io)?;
     let meta_path = new_dir.join("_meta");
     if meta_path.exists()
-        && let Ok(mut meta) = TableMeta::load(&meta_path) {
-            meta.name = new_name.to_string();
-            let _ = meta.save(&meta_path);
-        }
+        && let Ok(mut meta) = TableMeta::load(&meta_path)
+    {
+        meta.name = new_name.to_string();
+        let _ = meta.save(&meta_path);
+    }
     Ok(QueryResult::Ok { affected_rows: 0 })
 }
 
@@ -7295,9 +8996,16 @@ fn validate_check_constraints(db_root: &Path, table: &str, values: &[Vec<Value>]
     let mut parsed_filters: Vec<(String, Option<Filter>)> = Vec::new();
     for constraint in &constraints {
         let filter = crate::planner::plan_query(&format!(
-            "SELECT * FROM __dummy__ WHERE {}", constraint.expr_sql
-        )).ok().and_then(|plan| {
-            if let QueryPlan::Select { filter, .. } = plan { filter } else { None }
+            "SELECT * FROM __dummy__ WHERE {}",
+            constraint.expr_sql
+        ))
+        .ok()
+        .and_then(|plan| {
+            if let QueryPlan::Select { filter, .. } = plan {
+                filter
+            } else {
+                None
+            }
         });
         parsed_filters.push((constraint.column.clone(), filter));
     }
@@ -7305,12 +9013,13 @@ fn validate_check_constraints(db_root: &Path, table: &str, values: &[Vec<Value>]
     for (row_idx, row) in values.iter().enumerate() {
         for (col_name, filter) in &parsed_filters {
             if let Some(f) = filter
-                && !evaluate_filter_virtual(f, row, &col_names) {
-                    return Err(ExchangeDbError::Query(format!(
-                        "CHECK constraint on column '{}' violated by row {}",
-                        col_name, row_idx
-                    )));
-                }
+                && !evaluate_filter_virtual(f, row, &col_names)
+            {
+                return Err(ExchangeDbError::Query(format!(
+                    "CHECK constraint on column '{}' violated by row {}",
+                    col_name, row_idx
+                )));
+            }
         }
     }
     Ok(())
@@ -7379,14 +9088,37 @@ fn execute_create_downsampling(
     let ds_columns: Vec<DownsampleColumn> = columns
         .iter()
         .map(|(func, src, alias)| match func.as_str() {
-            "first" => DownsampleColumn::First { source: src.clone(), alias: alias.clone() },
-            "last" => DownsampleColumn::Last { source: src.clone(), alias: alias.clone() },
-            "min" => DownsampleColumn::Min { source: src.clone(), alias: alias.clone() },
-            "max" => DownsampleColumn::Max { source: src.clone(), alias: alias.clone() },
-            "sum" => DownsampleColumn::Sum { source: src.clone(), alias: alias.clone() },
-            "avg" => DownsampleColumn::Avg { source: src.clone(), alias: alias.clone() },
-            "count" => DownsampleColumn::Count { alias: alias.clone() },
-            _ => DownsampleColumn::Sum { source: src.clone(), alias: alias.clone() },
+            "first" => DownsampleColumn::First {
+                source: src.clone(),
+                alias: alias.clone(),
+            },
+            "last" => DownsampleColumn::Last {
+                source: src.clone(),
+                alias: alias.clone(),
+            },
+            "min" => DownsampleColumn::Min {
+                source: src.clone(),
+                alias: alias.clone(),
+            },
+            "max" => DownsampleColumn::Max {
+                source: src.clone(),
+                alias: alias.clone(),
+            },
+            "sum" => DownsampleColumn::Sum {
+                source: src.clone(),
+                alias: alias.clone(),
+            },
+            "avg" => DownsampleColumn::Avg {
+                source: src.clone(),
+                alias: alias.clone(),
+            },
+            "count" => DownsampleColumn::Count {
+                alias: alias.clone(),
+            },
+            _ => DownsampleColumn::Sum {
+                source: src.clone(),
+                alias: alias.clone(),
+            },
         })
         .collect();
 
@@ -7435,7 +9167,9 @@ fn execute_create_view(db_root: &Path, name: &str, sql: &str) -> Result<QueryRes
     std::fs::create_dir_all(&dir)?;
     let path = dir.join(format!("{name}.json"));
     if path.exists() {
-        return Err(ExchangeDbError::Query(format!("view '{name}' already exists")));
+        return Err(ExchangeDbError::Query(format!(
+            "view '{name}' already exists"
+        )));
     }
     let data = serde_json::json!({ "name": name, "sql": sql });
     std::fs::write(&path, data.to_string())?;
@@ -7479,12 +9213,13 @@ fn resolve_view(
 
     // Merge outer filter into the inner plan if present.
     if let Some(outer_f) = outer_filter
-        && let QueryPlan::Select { ref mut filter, .. } = inner_plan {
-            *filter = Some(match filter.take() {
-                Some(existing) => Filter::And(vec![existing, outer_f.clone()]),
-                None => outer_f.clone(),
-            });
-        }
+        && let QueryPlan::Select { ref mut filter, .. } = inner_plan
+    {
+        *filter = Some(match filter.take() {
+            Some(existing) => Filter::And(vec![existing, outer_f.clone()]),
+            None => outer_f.clone(),
+        });
+    }
 
     Some(inner_plan)
 }
@@ -7498,7 +9233,12 @@ fn triggers_dir(db_root: &Path, table: &str) -> PathBuf {
     db_root.join("_triggers").join(table)
 }
 
-fn execute_create_trigger(db_root: &Path, name: &str, table: &str, procedure: &str) -> Result<QueryResult> {
+fn execute_create_trigger(
+    db_root: &Path,
+    name: &str,
+    table: &str,
+    procedure: &str,
+) -> Result<QueryResult> {
     let dir = triggers_dir(db_root, table);
     std::fs::create_dir_all(&dir)?;
     let path = dir.join(format!("{name}.json"));
@@ -7533,10 +9273,11 @@ fn fire_triggers_after_insert(db_root: &Path, table: &str) {
         }
         if let Ok(data) = std::fs::read_to_string(&path)
             && let Ok(json) = serde_json::from_str::<serde_json::Value>(&data)
-                && let Some(proc_name) = json.get("procedure").and_then(|v| v.as_str()) {
-                    // Call the stored procedure (best-effort).
-                    let _ = execute_call_procedure(db_root, proc_name);
-                }
+            && let Some(proc_name) = json.get("procedure").and_then(|v| v.as_str())
+        {
+            // Call the stored procedure (best-effort).
+            let _ = execute_call_procedure(db_root, proc_name);
+        }
     }
 }
 
@@ -7565,7 +9306,8 @@ fn validate_unique_constraints(db_root: &Path, table: &str, values: &[Vec<Value>
     let partitions = exchange_core::table::list_partitions(&table_dir)?;
     let mut existing_rows: Vec<Vec<Value>> = Vec::new();
     for partition_path in &partitions {
-        let rows = exchange_core::table::read_partition_rows_tiered(partition_path, &meta, &table_dir)?;
+        let rows =
+            exchange_core::table::read_partition_rows_tiered(partition_path, &meta, &table_dir)?;
         for row in rows {
             let vals: Vec<Value> = row.iter().map(|v| cv_to_plan_value(v)).collect();
             existing_rows.push(vals);
@@ -7573,23 +9315,32 @@ fn validate_unique_constraints(db_root: &Path, table: &str, values: &[Vec<Value>
     }
 
     for constraint in &constraints {
-        let col_indices: Vec<usize> = constraint.columns.iter().filter_map(|cn| {
-            col_names.iter().position(|n| n.eq_ignore_ascii_case(cn))
-        }).collect();
+        let col_indices: Vec<usize> = constraint
+            .columns
+            .iter()
+            .filter_map(|cn| col_names.iter().position(|n| n.eq_ignore_ascii_case(cn)))
+            .collect();
         if col_indices.is_empty() {
             continue;
         }
 
         // Collect existing values for the unique columns.
-        let mut seen: Vec<Vec<Value>> = existing_rows.iter().map(|row| {
-            col_indices.iter().map(|&i| row.get(i).cloned().unwrap_or(Value::Null)).collect()
-        }).collect();
+        let mut seen: Vec<Vec<Value>> = existing_rows
+            .iter()
+            .map(|row| {
+                col_indices
+                    .iter()
+                    .map(|&i| row.get(i).cloned().unwrap_or(Value::Null))
+                    .collect()
+            })
+            .collect();
 
         // Check new rows against existing + previous new rows.
         for new_row in values {
-            let key: Vec<Value> = col_indices.iter().map(|&i| {
-                new_row.get(i).cloned().unwrap_or(Value::Null)
-            }).collect();
+            let key: Vec<Value> = col_indices
+                .iter()
+                .map(|&i| new_row.get(i).cloned().unwrap_or(Value::Null))
+                .collect();
             // NULL values are not considered duplicates.
             if key.iter().any(|v| matches!(v, Value::Null)) {
                 seen.push(key);
@@ -7624,7 +9375,11 @@ fn cv_to_plan_value(cv: &ColumnValue<'_>) -> Value {
 // FOREIGN KEY constraint validation
 // ---------------------------------------------------------------------------
 
-fn validate_foreign_key_constraints(db_root: &Path, table: &str, values: &[Vec<Value>]) -> Result<()> {
+fn validate_foreign_key_constraints(
+    db_root: &Path,
+    table: &str,
+    values: &[Vec<Value>],
+) -> Result<()> {
     let fk_path = db_root.join(table).join("_fkeys.json");
     if !fk_path.exists() {
         return Ok(());
@@ -7641,7 +9396,9 @@ fn validate_foreign_key_constraints(db_root: &Path, table: &str, values: &[Vec<V
     let col_names: Vec<String> = meta.columns.iter().map(|c| c.name.clone()).collect();
 
     for fk in &constraints {
-        let col_idx = col_names.iter().position(|n| n.eq_ignore_ascii_case(&fk.column));
+        let col_idx = col_names
+            .iter()
+            .position(|n| n.eq_ignore_ascii_case(&fk.column));
         let col_idx = match col_idx {
             Some(i) => i,
             None => continue,
@@ -7651,20 +9408,28 @@ fn validate_foreign_key_constraints(db_root: &Path, table: &str, values: &[Vec<V
         let parent_dir = db_root.join(&fk.ref_table);
         if !parent_dir.exists() {
             return Err(ExchangeDbError::Query(format!(
-                "foreign key references table '{}' which does not exist", fk.ref_table
+                "foreign key references table '{}' which does not exist",
+                fk.ref_table
             )));
         }
         let parent_meta = TableMeta::load(&parent_dir.join("_meta"))?;
-        let parent_col_names: Vec<String> = parent_meta.columns.iter().map(|c| c.name.clone()).collect();
-        let ref_col_idx = parent_col_names.iter().position(|n| n.eq_ignore_ascii_case(&fk.ref_column))
-            .ok_or_else(|| ExchangeDbError::Query(format!(
-                "foreign key column '{}' not found in table '{}'", fk.ref_column, fk.ref_table
-            )))?;
+        let parent_col_names: Vec<String> =
+            parent_meta.columns.iter().map(|c| c.name.clone()).collect();
+        let ref_col_idx = parent_col_names
+            .iter()
+            .position(|n| n.eq_ignore_ascii_case(&fk.ref_column))
+            .ok_or_else(|| {
+                ExchangeDbError::Query(format!(
+                    "foreign key column '{}' not found in table '{}'",
+                    fk.ref_column, fk.ref_table
+                ))
+            })?;
 
         let parent_partitions = exchange_core::table::list_partitions(&parent_dir)?;
         let mut parent_values: HashSet<String> = HashSet::new();
         for pp in &parent_partitions {
-            let rows = exchange_core::table::read_partition_rows_tiered(pp, &parent_meta, &parent_dir)?;
+            let rows =
+                exchange_core::table::read_partition_rows_tiered(pp, &parent_meta, &parent_dir)?;
             for row in rows {
                 if let Some(v) = row.get(ref_col_idx) {
                     parent_values.insert(format!("{:?}", v));
@@ -7744,7 +9509,9 @@ fn execute_comment_on(
     let mut store = load_comments(db_root);
     match object_type {
         CommentObjectType::Table => {
-            store.tables.insert(object_name.to_string(), comment.to_string());
+            store
+                .tables
+                .insert(object_name.to_string(), comment.to_string());
         }
         CommentObjectType::Column => {
             let table = table_name.unwrap_or("");
@@ -7761,16 +9528,28 @@ fn execute_comment_on(
 // ---------------------------------------------------------------------------
 
 /// Extended grant_permission_to_permission that handles SQL-standard privileges.
-fn grant_std_permission_to_permissions(gp: &GrantPermission) -> Vec<exchange_core::rbac::Permission> {
+fn grant_std_permission_to_permissions(
+    gp: &GrantPermission,
+) -> Vec<exchange_core::rbac::Permission> {
     use exchange_core::rbac::Permission;
     match gp {
-        GrantPermission::Select { table } => vec![Permission::Read { table: Some(table.clone()) }],
-        GrantPermission::Insert { table } | GrantPermission::Update { table } | GrantPermission::Delete { table } => {
-            vec![Permission::Write { table: Some(table.clone()) }]
+        GrantPermission::Select { table } => vec![Permission::Read {
+            table: Some(table.clone()),
+        }],
+        GrantPermission::Insert { table }
+        | GrantPermission::Update { table }
+        | GrantPermission::Delete { table } => {
+            vec![Permission::Write {
+                table: Some(table.clone()),
+            }]
         }
         GrantPermission::All { table } => vec![
-            Permission::Read { table: Some(table.clone()) },
-            Permission::Write { table: Some(table.clone()) },
+            Permission::Read {
+                table: Some(table.clone()),
+            },
+            Permission::Write {
+                table: Some(table.clone()),
+            },
         ],
         other => vec![grant_permission_to_permission(other)],
     }
@@ -7785,7 +9564,14 @@ mod tests {
         // Simulate: SELECT symbol, sum(price) FROM ... GROUP BY symbol
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Sum, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Sum,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let resolved = vec![(0, "symbol".into()), (1, "price".into())];
         let rows = vec![
@@ -7800,11 +9586,17 @@ mod tests {
         assert_eq!(result.len(), 2);
 
         // Find BTC group
-        let btc = result.iter().find(|r| r[0] == Value::Str("BTC".into())).unwrap();
+        let btc = result
+            .iter()
+            .find(|r| r[0] == Value::Str("BTC".into()))
+            .unwrap();
         assert_eq!(btc[1], Value::F64(300.0));
 
         // Find ETH group
-        let eth = result.iter().find(|r| r[0] == Value::Str("ETH".into())).unwrap();
+        let eth = result
+            .iter()
+            .find(|r| r[0] == Value::Str("ETH".into()))
+            .unwrap();
         assert_eq!(eth[1], Value::F64(125.0));
     }
 
@@ -7814,7 +9606,14 @@ mod tests {
         let select_cols = vec![
             SelectColumn::Name("exchange".into()),
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Count, column: "*".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Count,
+                column: "*".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let resolved = vec![
             (0, "exchange".into()),
@@ -7822,19 +9621,36 @@ mod tests {
             (2, "price".into()), // placeholder for count(*)
         ];
         let rows = vec![
-            vec![Value::Str("NYSE".into()), Value::Str("BTC".into()), Value::F64(100.0)],
-            vec![Value::Str("NYSE".into()), Value::Str("BTC".into()), Value::F64(200.0)],
-            vec![Value::Str("NASDAQ".into()), Value::Str("BTC".into()), Value::F64(150.0)],
-            vec![Value::Str("NYSE".into()), Value::Str("ETH".into()), Value::F64(50.0)],
+            vec![
+                Value::Str("NYSE".into()),
+                Value::Str("BTC".into()),
+                Value::F64(100.0),
+            ],
+            vec![
+                Value::Str("NYSE".into()),
+                Value::Str("BTC".into()),
+                Value::F64(200.0),
+            ],
+            vec![
+                Value::Str("NASDAQ".into()),
+                Value::Str("BTC".into()),
+                Value::F64(150.0),
+            ],
+            vec![
+                Value::Str("NYSE".into()),
+                Value::Str("ETH".into()),
+                Value::F64(50.0),
+            ],
         ];
         let group_by = vec!["exchange".to_string(), "symbol".to_string()];
 
         let result = apply_group_by(&select_cols, &resolved, &rows, &group_by, None).unwrap();
         assert_eq!(result.len(), 3); // NYSE/BTC, NASDAQ/BTC, NYSE/ETH
 
-        let nyse_btc = result.iter().find(|r| {
-            r[0] == Value::Str("NYSE".into()) && r[1] == Value::Str("BTC".into())
-        }).unwrap();
+        let nyse_btc = result
+            .iter()
+            .find(|r| r[0] == Value::Str("NYSE".into()) && r[1] == Value::Str("BTC".into()))
+            .unwrap();
         assert_eq!(nyse_btc[2], Value::I64(2));
     }
 
@@ -7843,7 +9659,14 @@ mod tests {
         // SELECT symbol, count(*) FROM ... GROUP BY symbol HAVING count(*) > 2
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Count, column: "*".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Count,
+                column: "*".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let resolved = vec![(0, "symbol".into()), (1, "price".into())];
         let rows = vec![
@@ -7856,7 +9679,8 @@ mod tests {
         let group_by = vec!["symbol".to_string()];
         let having = Filter::Gt("count(*)".into(), Value::I64(2));
 
-        let result = apply_group_by(&select_cols, &resolved, &rows, &group_by, Some(&having)).unwrap();
+        let result =
+            apply_group_by(&select_cols, &resolved, &rows, &group_by, Some(&having)).unwrap();
         assert_eq!(result.len(), 1); // Only BTC has count > 2
         assert_eq!(result[0][0], Value::Str("BTC".into()));
         assert_eq!(result[0][1], Value::I64(3));
@@ -7867,7 +9691,14 @@ mod tests {
         // SELECT symbol, avg(price) FROM ... GROUP BY symbol
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Avg, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Avg,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let resolved = vec![(0, "symbol".into()), (1, "price".into())];
         let rows = vec![
@@ -7878,10 +9709,16 @@ mod tests {
         let group_by = vec!["symbol".to_string()];
 
         let result = apply_group_by(&select_cols, &resolved, &rows, &group_by, None).unwrap();
-        let btc = result.iter().find(|r| r[0] == Value::Str("BTC".into())).unwrap();
+        let btc = result
+            .iter()
+            .find(|r| r[0] == Value::Str("BTC".into()))
+            .unwrap();
         assert_eq!(btc[1], Value::F64(150.0));
 
-        let eth = result.iter().find(|r| r[0] == Value::Str("ETH".into())).unwrap();
+        let eth = result
+            .iter()
+            .find(|r| r[0] == Value::Str("ETH".into()))
+            .unwrap();
         assert_eq!(eth[1], Value::F64(50.0));
     }
 
@@ -7960,10 +9797,8 @@ mod tests {
         let db_root = setup_test_table(dir.path());
 
         // Delete rows where symbol = 'BTC/USD'
-        let plan = crate::planner::plan_query(
-            "DELETE FROM trades WHERE symbol = 'BTC/USD'",
-        )
-        .unwrap();
+        let plan =
+            crate::planner::plan_query("DELETE FROM trades WHERE symbol = 'BTC/USD'").unwrap();
         let result = execute(&db_root, &plan).unwrap();
 
         match result {
@@ -8017,10 +9852,7 @@ mod tests {
         let db_root = setup_test_table(dir.path());
 
         // Update price to 99999 for all rows
-        let plan = crate::planner::plan_query(
-            "UPDATE trades SET price = 99999.0",
-        )
-        .unwrap();
+        let plan = crate::planner::plan_query("UPDATE trades SET price = 99999.0").unwrap();
         let result = execute(&db_root, &plan).unwrap();
 
         match result {
@@ -8060,10 +9892,9 @@ mod tests {
         }
 
         // Verify BTC prices changed, others unchanged
-        let select = crate::planner::plan_query(
-            "SELECT symbol, price FROM trades ORDER BY timestamp",
-        )
-        .unwrap();
+        let select =
+            crate::planner::plan_query("SELECT symbol, price FROM trades ORDER BY timestamp")
+                .unwrap();
         let result = execute(&db_root, &select).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -8137,7 +9968,8 @@ mod tests {
              (30000000000, 'BTC/USD', 200.0, 2.0), \
              (60000000000, 'BTC/USD', 300.0, 3.0), \
              (90000000000, 'BTC/USD', 400.0, 4.0)",
-        ).unwrap();
+        )
+        .unwrap();
         execute(&db_root, &ins).unwrap();
 
         let cmv = crate::planner::plan_query(
@@ -8146,16 +9978,17 @@ mod tests {
                     min(price) as low, last(price) as close, \
                     sum(volume) as total_vol \
              FROM trades SAMPLE BY 1m",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &cmv).unwrap();
         assert!(matches!(result, QueryResult::Ok { .. }));
 
         assert!(db_root.join("ohlcv_1m").exists());
         assert!(db_root.join("ohlcv_1m").join("_matview").exists());
 
-        let select = crate::planner::plan_query(
-            "SELECT open, high, low, close, total_vol FROM ohlcv_1m",
-        ).unwrap();
+        let select =
+            crate::planner::plan_query("SELECT open, high, low, close, total_vol FROM ohlcv_1m")
+                .unwrap();
         let result = execute(&db_root, &select).unwrap();
         match result {
             QueryResult::Rows { columns, rows } => {
@@ -8182,19 +10015,22 @@ mod tests {
              (1000000000, 'BTC/USD', 100.0, 1.0), \
              (2000000000, 'ETH/USD', 50.0, 2.0), \
              (3000000000, 'BTC/USD', 200.0, 3.0)",
-        ).unwrap();
+        )
+        .unwrap();
         execute(&db_root, &ins).unwrap();
 
         let cmv = crate::planner::plan_query(
             "CREATE MATERIALIZED VIEW trade_summary AS \
              SELECT symbol, sum(volume) as total_vol, avg(price) as avg_price \
              FROM trades GROUP BY symbol",
-        ).unwrap();
+        )
+        .unwrap();
         execute(&db_root, &cmv).unwrap();
 
         let select = crate::planner::plan_query(
             "SELECT symbol, total_vol FROM trade_summary WHERE symbol = 'BTC/USD'",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &select).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -8220,23 +10056,27 @@ mod tests {
             "INSERT INTO trades VALUES \
              (1000000000, 'BTC/USD', 100.0, 1.0), \
              (2000000000, 'ETH/USD', 50.0, 2.0)",
-        ).unwrap();
+        )
+        .unwrap();
         execute(&db_root, &ins).unwrap();
 
         let cmv = crate::planner::plan_query(
             "CREATE MATERIALIZED VIEW vol_summary AS \
              SELECT symbol, sum(volume) as total_vol FROM trades GROUP BY symbol",
-        ).unwrap();
+        )
+        .unwrap();
         execute(&db_root, &cmv).unwrap();
 
         let ins2 = crate::planner::plan_query(
             "INSERT INTO trades VALUES (3000000000, 'BTC/USD', 150.0, 5.0)",
-        ).unwrap();
+        )
+        .unwrap();
         execute(&db_root, &ins2).unwrap();
 
         let select = crate::planner::plan_query(
             "SELECT total_vol FROM vol_summary WHERE symbol = 'BTC/USD'",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &select).unwrap();
         match &result {
             QueryResult::Rows { rows, .. } => {
@@ -8246,15 +10086,14 @@ mod tests {
             other => panic!("expected Rows, got {other:?}"),
         }
 
-        let refresh = crate::planner::plan_query(
-            "REFRESH MATERIALIZED VIEW vol_summary",
-        ).unwrap();
+        let refresh = crate::planner::plan_query("REFRESH MATERIALIZED VIEW vol_summary").unwrap();
         let result = execute(&db_root, &refresh).unwrap();
         assert!(matches!(result, QueryResult::Ok { .. }));
 
         let select2 = crate::planner::plan_query(
             "SELECT total_vol FROM vol_summary WHERE symbol = 'BTC/USD'",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &select2).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -8277,13 +10116,15 @@ mod tests {
 
         let ins = crate::planner::plan_query(
             "INSERT INTO trades VALUES (1000000000, 'BTC/USD', 100.0, 1.0)",
-        ).unwrap();
+        )
+        .unwrap();
         execute(&db_root, &ins).unwrap();
 
         let cmv = crate::planner::plan_query(
             "CREATE MATERIALIZED VIEW test_mv AS \
              SELECT symbol, sum(volume) as total_vol FROM trades GROUP BY symbol",
-        ).unwrap();
+        )
+        .unwrap();
         execute(&db_root, &cmv).unwrap();
         assert!(db_root.join("test_mv").exists());
 
@@ -8315,7 +10156,8 @@ mod tests {
              (3000000000, 'ETH/USD', 50.0, 3.0), \
              (4000000000, 'ETH/USD', 60.0, 4.0), \
              (5000000000, 'SOL/USD', 10.0, 10.0)",
-        ).unwrap();
+        )
+        .unwrap();
         execute(&db_root, &ins).unwrap();
 
         let cmv = crate::planner::plan_query(
@@ -8323,20 +10165,23 @@ mod tests {
              SELECT symbol, count(price) as trade_count, max(price) as max_price, \
                     min(price) as min_price, sum(volume) as total_vol \
              FROM trades GROUP BY symbol",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &cmv).unwrap();
         assert!(matches!(result, QueryResult::Ok { .. }));
 
         let matview_meta = exchange_core::matview::MatViewMeta::load(
             &db_root.join("symbol_stats").join("_matview"),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(matview_meta.name, "symbol_stats");
         assert_eq!(matview_meta.source_table, "trades");
         assert!(matview_meta.last_refresh.is_some());
 
         let select = crate::planner::plan_query(
             "SELECT symbol, trade_count, max_price, total_vol FROM symbol_stats ORDER BY symbol",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &select).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -8358,7 +10203,8 @@ mod tests {
         let plan = crate::planner::plan_query(
             "WITH high_volume AS (SELECT symbol, price, volume FROM trades WHERE volume > 5) \
              SELECT symbol, price FROM high_volume ORDER BY price",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { columns, rows } => {
@@ -8385,7 +10231,8 @@ mod tests {
         let plan = crate::planner::plan_query(
             "WITH btc_trades AS (SELECT symbol, price FROM trades WHERE symbol = 'BTC/USD') \
              SELECT symbol, avg(price) FROM btc_trades GROUP BY symbol",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -8411,7 +10258,8 @@ mod tests {
             "SELECT symbol FROM trades WHERE symbol = 'BTC/USD' \
              UNION ALL \
              SELECT symbol FROM trades WHERE symbol = 'ETH/USD'",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -8431,7 +10279,8 @@ mod tests {
             "SELECT symbol FROM trades WHERE symbol = 'BTC/USD' \
              UNION \
              SELECT symbol FROM trades WHERE symbol = 'ETH/USD'",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -8457,7 +10306,8 @@ mod tests {
             "SELECT symbol FROM trades \
              INTERSECT \
              SELECT symbol FROM trades WHERE price > 1000",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -8481,7 +10331,8 @@ mod tests {
             "SELECT symbol FROM trades \
              EXCEPT \
              SELECT symbol FROM trades WHERE price > 1000",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -8529,7 +10380,8 @@ mod tests {
             "SELECT symbol, avg_price FROM \
              (SELECT symbol, avg(price) as avg_price FROM trades GROUP BY symbol) sub \
              WHERE avg_price > 1000 ORDER BY avg_price",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { columns, rows } => {
@@ -8554,7 +10406,8 @@ mod tests {
         // Create and populate a table.
         let create = crate::planner::plan_query(
             "CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)",
-        ).unwrap();
+        )
+        .unwrap();
         execute(db_root, &create).unwrap();
 
         let insert = crate::planner::plan_query(
@@ -8612,12 +10465,14 @@ mod tests {
         // Create a table so the planner can reference it.
         let create = crate::planner::plan_query(
             "CREATE TABLE trades (timestamp TIMESTAMP, price DOUBLE, symbol VARCHAR)",
-        ).unwrap();
+        )
+        .unwrap();
         execute(db, &create).unwrap();
 
         let plan = crate::planner::plan_query(
             "EXPLAIN SELECT * FROM trades WHERE price > 100 ORDER BY timestamp",
-        ).unwrap();
+        )
+        .unwrap();
 
         // Verify it's an Explain variant.
         match &plan {
@@ -8649,14 +10504,13 @@ mod tests {
         let db_root = dir.path();
 
         // Create and populate a table.
-        let create = crate::planner::plan_query(
-            "CREATE TABLE trades (timestamp TIMESTAMP, price DOUBLE)",
-        ).unwrap();
+        let create =
+            crate::planner::plan_query("CREATE TABLE trades (timestamp TIMESTAMP, price DOUBLE)")
+                .unwrap();
         execute(db_root, &create).unwrap();
 
-        let insert = crate::planner::plan_query(
-            "INSERT INTO trades VALUES (1000000000, 65000.0)",
-        ).unwrap();
+        let insert =
+            crate::planner::plan_query("INSERT INTO trades VALUES (1000000000, 65000.0)").unwrap();
         execute(db_root, &insert).unwrap();
 
         // Create a fake applied WAL segment.
@@ -8719,13 +10573,29 @@ mod tests {
 
         // Row with null symbol
         let row_null = vec![Value::Null, Value::F64(100.0)];
-        assert!(evaluate_case_filter(&Filter::IsNull("symbol".into()), &row_null, &resolved));
-        assert!(!evaluate_case_filter(&Filter::IsNotNull("symbol".into()), &row_null, &resolved));
+        assert!(evaluate_case_filter(
+            &Filter::IsNull("symbol".into()),
+            &row_null,
+            &resolved
+        ));
+        assert!(!evaluate_case_filter(
+            &Filter::IsNotNull("symbol".into()),
+            &row_null,
+            &resolved
+        ));
 
         // Row with non-null symbol
         let row_present = vec![Value::Str("BTC".into()), Value::F64(100.0)];
-        assert!(!evaluate_case_filter(&Filter::IsNull("symbol".into()), &row_present, &resolved));
-        assert!(evaluate_case_filter(&Filter::IsNotNull("symbol".into()), &row_present, &resolved));
+        assert!(!evaluate_case_filter(
+            &Filter::IsNull("symbol".into()),
+            &row_present,
+            &resolved
+        ));
+        assert!(evaluate_case_filter(
+            &Filter::IsNotNull("symbol".into()),
+            &row_present,
+            &resolved
+        ));
     }
 
     // ── IN / NOT IN executor tests ─────────────────────────────────
@@ -8736,12 +10606,28 @@ mod tests {
         let row = vec![Value::Str("BTC".into())];
         let list = vec![Value::Str("BTC".into()), Value::Str("ETH".into())];
 
-        assert!(evaluate_case_filter(&Filter::In("symbol".into(), list.clone()), &row, &resolved));
-        assert!(!evaluate_case_filter(&Filter::NotIn("symbol".into(), list.clone()), &row, &resolved));
+        assert!(evaluate_case_filter(
+            &Filter::In("symbol".into(), list.clone()),
+            &row,
+            &resolved
+        ));
+        assert!(!evaluate_case_filter(
+            &Filter::NotIn("symbol".into(), list.clone()),
+            &row,
+            &resolved
+        ));
 
         let row2 = vec![Value::Str("SOL".into())];
-        assert!(!evaluate_case_filter(&Filter::In("symbol".into(), list.clone()), &row2, &resolved));
-        assert!(evaluate_case_filter(&Filter::NotIn("symbol".into(), list), &row2, &resolved));
+        assert!(!evaluate_case_filter(
+            &Filter::In("symbol".into(), list.clone()),
+            &row2,
+            &resolved
+        ));
+        assert!(evaluate_case_filter(
+            &Filter::NotIn("symbol".into(), list),
+            &row2,
+            &resolved
+        ));
     }
 
     #[test]
@@ -8750,28 +10636,40 @@ mod tests {
         let row = vec![Value::I64(100)];
         let list = vec![Value::I64(100), Value::I64(200), Value::I64(300)];
 
-        assert!(evaluate_case_filter(&Filter::In("price".into(), list.clone()), &row, &resolved));
+        assert!(evaluate_case_filter(
+            &Filter::In("price".into(), list.clone()),
+            &row,
+            &resolved
+        ));
 
         let row2 = vec![Value::I64(150)];
-        assert!(!evaluate_case_filter(&Filter::In("price".into(), list), &row2, &resolved));
+        assert!(!evaluate_case_filter(
+            &Filter::In("price".into(), list),
+            &row2,
+            &resolved
+        ));
     }
 
     // ── CASE WHEN executor tests ───────────────────────────────────
 
     #[test]
     fn test_apply_scalar_case_when() {
-        let select_cols = vec![
-            SelectColumn::CaseWhen {
-                conditions: vec![
-                    (Filter::Gt("price".into(), Value::F64(100.0)), Value::Str("high".into())),
-                    (Filter::Gt("price".into(), Value::F64(50.0)), Value::Str("mid".into())),
-                ],
-                else_value: Some(Value::Str("low".into())),
-                alias: None,
-                expr_conditions: None,
-                expr_else: None,
-            },
-        ];
+        let select_cols = vec![SelectColumn::CaseWhen {
+            conditions: vec![
+                (
+                    Filter::Gt("price".into(), Value::F64(100.0)),
+                    Value::Str("high".into()),
+                ),
+                (
+                    Filter::Gt("price".into(), Value::F64(50.0)),
+                    Value::Str("mid".into()),
+                ),
+            ],
+            else_value: Some(Value::Str("low".into())),
+            alias: None,
+            expr_conditions: None,
+            expr_else: None,
+        }];
         let resolved = vec![(0, "price".into())];
 
         // price = 200 -> "high"
@@ -8793,18 +10691,22 @@ mod tests {
     #[test]
     fn test_apply_scalar_case_when_simple() {
         // Simulates: CASE symbol WHEN 'BTC' THEN 'Bitcoin' WHEN 'ETH' THEN 'Ethereum' ELSE 'Other' END
-        let select_cols = vec![
-            SelectColumn::CaseWhen {
-                conditions: vec![
-                    (Filter::Eq("symbol".into(), Value::Str("BTC".into())), Value::Str("Bitcoin".into())),
-                    (Filter::Eq("symbol".into(), Value::Str("ETH".into())), Value::Str("Ethereum".into())),
-                ],
-                else_value: Some(Value::Str("Other".into())),
-                alias: None,
-                expr_conditions: None,
-                expr_else: None,
-            },
-        ];
+        let select_cols = vec![SelectColumn::CaseWhen {
+            conditions: vec![
+                (
+                    Filter::Eq("symbol".into(), Value::Str("BTC".into())),
+                    Value::Str("Bitcoin".into()),
+                ),
+                (
+                    Filter::Eq("symbol".into(), Value::Str("ETH".into())),
+                    Value::Str("Ethereum".into()),
+                ),
+            ],
+            else_value: Some(Value::Str("Other".into())),
+            alias: None,
+            expr_conditions: None,
+            expr_else: None,
+        }];
         let resolved = vec![(0, "symbol".into())];
 
         let rows = vec![vec![Value::Str("BTC".into())]];
@@ -8822,8 +10724,16 @@ mod tests {
         let meta = TableMeta {
             name: "test".into(),
             columns: vec![
-                ColumnDef { name: "timestamp".into(), col_type: ColumnTypeSerializable::Timestamp, indexed: false },
-                ColumnDef { name: "price".into(), col_type: ColumnTypeSerializable::F64, indexed: false },
+                ColumnDef {
+                    name: "timestamp".into(),
+                    col_type: ColumnTypeSerializable::Timestamp,
+                    indexed: false,
+                },
+                ColumnDef {
+                    name: "price".into(),
+                    col_type: ColumnTypeSerializable::F64,
+                    indexed: false,
+                },
             ],
             partition_by: PartitionBySerializable::None,
             timestamp_column: 0,
@@ -8831,7 +10741,14 @@ mod tests {
         };
         let select_cols = vec![
             SelectColumn::Name("timestamp".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Avg, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Avg,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let resolved = vec![(0, "timestamp".into()), (1, "price".into())];
         // Rows at hour 0 and hour 2, missing hour 1.
@@ -8859,8 +10776,16 @@ mod tests {
         let meta = TableMeta {
             name: "test".into(),
             columns: vec![
-                ColumnDef { name: "timestamp".into(), col_type: ColumnTypeSerializable::Timestamp, indexed: false },
-                ColumnDef { name: "price".into(), col_type: ColumnTypeSerializable::F64, indexed: false },
+                ColumnDef {
+                    name: "timestamp".into(),
+                    col_type: ColumnTypeSerializable::Timestamp,
+                    indexed: false,
+                },
+                ColumnDef {
+                    name: "price".into(),
+                    col_type: ColumnTypeSerializable::F64,
+                    indexed: false,
+                },
             ],
             partition_by: PartitionBySerializable::None,
             timestamp_column: 0,
@@ -8868,7 +10793,14 @@ mod tests {
         };
         let select_cols = vec![
             SelectColumn::Name("timestamp".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Avg, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Avg,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let resolved = vec![(0, "timestamp".into()), (1, "price".into())];
         let hour_ns = 3_600_000_000_000i64;
@@ -8894,8 +10826,16 @@ mod tests {
         let meta = TableMeta {
             name: "test".into(),
             columns: vec![
-                ColumnDef { name: "timestamp".into(), col_type: ColumnTypeSerializable::Timestamp, indexed: false },
-                ColumnDef { name: "price".into(), col_type: ColumnTypeSerializable::F64, indexed: false },
+                ColumnDef {
+                    name: "timestamp".into(),
+                    col_type: ColumnTypeSerializable::Timestamp,
+                    indexed: false,
+                },
+                ColumnDef {
+                    name: "price".into(),
+                    col_type: ColumnTypeSerializable::F64,
+                    indexed: false,
+                },
             ],
             partition_by: PartitionBySerializable::None,
             timestamp_column: 0,
@@ -8903,7 +10843,14 @@ mod tests {
         };
         let select_cols = vec![
             SelectColumn::Name("timestamp".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Avg, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Avg,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let resolved = vec![(0, "timestamp".into()), (1, "price".into())];
         let hour_ns = 3_600_000_000_000i64;
@@ -8929,8 +10876,16 @@ mod tests {
         let meta = TableMeta {
             name: "test".into(),
             columns: vec![
-                ColumnDef { name: "timestamp".into(), col_type: ColumnTypeSerializable::Timestamp, indexed: false },
-                ColumnDef { name: "price".into(), col_type: ColumnTypeSerializable::F64, indexed: false },
+                ColumnDef {
+                    name: "timestamp".into(),
+                    col_type: ColumnTypeSerializable::Timestamp,
+                    indexed: false,
+                },
+                ColumnDef {
+                    name: "price".into(),
+                    col_type: ColumnTypeSerializable::F64,
+                    indexed: false,
+                },
             ],
             partition_by: PartitionBySerializable::None,
             timestamp_column: 0,
@@ -8938,7 +10893,14 @@ mod tests {
         };
         let select_cols = vec![
             SelectColumn::Name("timestamp".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Avg, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Avg,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let resolved = vec![(0, "timestamp".into()), (1, "price".into())];
         let hour_ns = 3_600_000_000_000i64;
@@ -8964,7 +10926,10 @@ mod tests {
         let columns = vec![SelectColumn::Name("x".into())];
         let result = execute_long_sequence(5, &columns).unwrap();
         match result {
-            QueryResult::Rows { columns: cols, rows } => {
+            QueryResult::Rows {
+                columns: cols,
+                rows,
+            } => {
                 assert_eq!(cols, vec!["x"]);
                 assert_eq!(rows.len(), 5);
                 for (i, row) in rows.iter().enumerate() {
@@ -8977,15 +10942,13 @@ mod tests {
 
     #[test]
     fn test_long_sequence_with_scalar_fn() {
-        let columns = vec![
-            SelectColumn::ScalarFunction {
-                name: "rnd_int".into(),
-                args: vec![
-                    SelectColumnArg::Literal(Value::I64(0)),
-                    SelectColumnArg::Literal(Value::I64(100)),
-                ],
-            },
-        ];
+        let columns = vec![SelectColumn::ScalarFunction {
+            name: "rnd_int".into(),
+            args: vec![
+                SelectColumnArg::Literal(Value::I64(0)),
+                SelectColumnArg::Literal(Value::I64(100)),
+            ],
+        }];
         let result = execute_long_sequence(10, &columns).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -9006,9 +10969,8 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let db_root = tmp.path();
         // Create a table.
-        let plan = crate::planner::plan_query(
-            "CREATE TABLE test_tbl (ts TIMESTAMP, v DOUBLE)"
-        ).unwrap();
+        let plan =
+            crate::planner::plan_query("CREATE TABLE test_tbl (ts TIMESTAMP, v DOUBLE)").unwrap();
         execute(db_root, &plan).unwrap();
 
         let result = execute_show_tables(db_root).unwrap();
@@ -9026,8 +10988,9 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let db_root = tmp.path();
         let plan = crate::planner::plan_query(
-            "CREATE TABLE test_cols (ts TIMESTAMP, price DOUBLE, symbol VARCHAR)"
-        ).unwrap();
+            "CREATE TABLE test_cols (ts TIMESTAMP, price DOUBLE, symbol VARCHAR)",
+        )
+        .unwrap();
         execute(db_root, &plan).unwrap();
 
         let result = execute_show_columns(db_root, "test_cols").unwrap();
@@ -9045,40 +11008,85 @@ mod tests {
     fn test_arithmetic_select_price_times_volume() {
         let dir = tempfile::tempdir().unwrap();
         let db_root = setup_test_table(dir.path());
-        let plan = crate::planner::plan_query("SELECT price * volume AS notional FROM trades ORDER BY timestamp").unwrap();
+        let plan = crate::planner::plan_query(
+            "SELECT price * volume AS notional FROM trades ORDER BY timestamp",
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
-        match result { QueryResult::Rows { columns, rows } => { assert_eq!(columns, vec!["notional"]); assert_eq!(rows.len(), 5); assert_eq!(rows[0][0], Value::F64(65000.0 * 1.5)); assert_eq!(rows[1][0], Value::F64(3000.0 * 10.0)); } other => panic!("expected Rows, got {other:?}") }
+        match result {
+            QueryResult::Rows { columns, rows } => {
+                assert_eq!(columns, vec!["notional"]);
+                assert_eq!(rows.len(), 5);
+                assert_eq!(rows[0][0], Value::F64(65000.0 * 1.5));
+                assert_eq!(rows[1][0], Value::F64(3000.0 * 10.0));
+            }
+            other => panic!("expected Rows, got {other:?}"),
+        }
     }
 
     #[test]
     fn test_arithmetic_select_with_literal() {
         let dir = tempfile::tempdir().unwrap();
         let db_root = setup_test_table(dir.path());
-        let plan = crate::planner::plan_query("SELECT price * 1.1 AS price_plus_10pct FROM trades ORDER BY timestamp LIMIT 1").unwrap();
+        let plan = crate::planner::plan_query(
+            "SELECT price * 1.1 AS price_plus_10pct FROM trades ORDER BY timestamp LIMIT 1",
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
-        match result { QueryResult::Rows { columns, rows } => { assert_eq!(columns, vec!["price_plus_10pct"]); assert_eq!(rows.len(), 1); assert_eq!(rows[0][0], Value::F64(65000.0 * 1.1)); } other => panic!("expected Rows, got {other:?}") }
+        match result {
+            QueryResult::Rows { columns, rows } => {
+                assert_eq!(columns, vec!["price_plus_10pct"]);
+                assert_eq!(rows.len(), 1);
+                assert_eq!(rows[0][0], Value::F64(65000.0 * 1.1));
+            }
+            other => panic!("expected Rows, got {other:?}"),
+        }
     }
 
     #[test]
     fn test_string_concatenation() {
         let dir = tempfile::tempdir().unwrap();
         let db_root = dir.path().to_path_buf();
-        let create = crate::planner::plan_query("CREATE TABLE users (timestamp TIMESTAMP, first_name VARCHAR, last_name VARCHAR)").unwrap();
+        let create = crate::planner::plan_query(
+            "CREATE TABLE users (timestamp TIMESTAMP, first_name VARCHAR, last_name VARCHAR)",
+        )
+        .unwrap();
         execute(&db_root, &create).unwrap();
-        let insert = crate::planner::plan_query("INSERT INTO users VALUES (1000, 'John', 'Doe'), (2000, 'Jane', 'Smith')").unwrap();
+        let insert = crate::planner::plan_query(
+            "INSERT INTO users VALUES (1000, 'John', 'Doe'), (2000, 'Jane', 'Smith')",
+        )
+        .unwrap();
         execute(&db_root, &insert).unwrap();
-        let plan = crate::planner::plan_query("SELECT first_name || ' ' || last_name AS full_name FROM users ORDER BY timestamp").unwrap();
+        let plan = crate::planner::plan_query(
+            "SELECT first_name || ' ' || last_name AS full_name FROM users ORDER BY timestamp",
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
-        match result { QueryResult::Rows { columns, rows } => { assert_eq!(columns, vec!["full_name"]); assert_eq!(rows.len(), 2); assert_eq!(rows[0][0], Value::Str("John Doe".into())); assert_eq!(rows[1][0], Value::Str("Jane Smith".into())); } other => panic!("expected Rows, got {other:?}") }
+        match result {
+            QueryResult::Rows { columns, rows } => {
+                assert_eq!(columns, vec!["full_name"]);
+                assert_eq!(rows.len(), 2);
+                assert_eq!(rows[0][0], Value::Str("John Doe".into()));
+                assert_eq!(rows[1][0], Value::Str("Jane Smith".into()));
+            }
+            other => panic!("expected Rows, got {other:?}"),
+        }
     }
 
     #[test]
     fn test_arithmetic_in_where() {
         let dir = tempfile::tempdir().unwrap();
         let db_root = setup_test_table(dir.path());
-        let plan = crate::planner::plan_query("SELECT symbol FROM trades WHERE price * volume > 50000").unwrap();
+        let plan =
+            crate::planner::plan_query("SELECT symbol FROM trades WHERE price * volume > 50000")
+                .unwrap();
         let result = execute(&db_root, &plan).unwrap();
-        match result { QueryResult::Rows { rows, .. } => { assert!(rows.len() >= 2); } other => panic!("expected Rows, got {other:?}") }
+        match result {
+            QueryResult::Rows { rows, .. } => {
+                assert!(rows.len() >= 2);
+            }
+            other => panic!("expected Rows, got {other:?}"),
+        }
     }
 
     #[test]
@@ -9087,12 +11095,24 @@ mod tests {
         let db_root = setup_test_table(dir.path());
         let create = crate::planner::plan_query("CREATE TABLE trades_backup (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE, volume DOUBLE)").unwrap();
         execute(&db_root, &create).unwrap();
-        let plan = crate::planner::plan_query("INSERT INTO trades_backup SELECT * FROM trades WHERE symbol = 'BTC/USD'").unwrap();
+        let plan = crate::planner::plan_query(
+            "INSERT INTO trades_backup SELECT * FROM trades WHERE symbol = 'BTC/USD'",
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
-        match result { QueryResult::Ok { affected_rows } => assert_eq!(affected_rows, 2), other => panic!("expected Ok, got {other:?}") }
-        let select = crate::planner::plan_query("SELECT * FROM trades_backup ORDER BY timestamp").unwrap();
+        match result {
+            QueryResult::Ok { affected_rows } => assert_eq!(affected_rows, 2),
+            other => panic!("expected Ok, got {other:?}"),
+        }
+        let select =
+            crate::planner::plan_query("SELECT * FROM trades_backup ORDER BY timestamp").unwrap();
         let result = execute(&db_root, &select).unwrap();
-        match result { QueryResult::Rows { rows, .. } => { assert_eq!(rows.len(), 2); } other => panic!("expected Rows, got {other:?}") }
+        match result {
+            QueryResult::Rows { rows, .. } => {
+                assert_eq!(rows.len(), 2);
+            }
+            other => panic!("expected Rows, got {other:?}"),
+        }
     }
 
     #[test]
@@ -9101,34 +11121,64 @@ mod tests {
         let db_root = setup_test_table(dir.path());
         let select_before = crate::planner::plan_query("SELECT * FROM trades").unwrap();
         let result = execute(&db_root, &select_before).unwrap();
-        match &result { QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 5), other => panic!("expected Rows, got {other:?}") }
+        match &result {
+            QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 5),
+            other => panic!("expected Rows, got {other:?}"),
+        }
         let plan = crate::planner::plan_query("TRUNCATE TABLE trades").unwrap();
         let result = execute(&db_root, &plan).unwrap();
-        match result { QueryResult::Ok { affected_rows } => assert_eq!(affected_rows, 0), other => panic!("expected Ok, got {other:?}") }
+        match result {
+            QueryResult::Ok { affected_rows } => assert_eq!(affected_rows, 0),
+            other => panic!("expected Ok, got {other:?}"),
+        }
         let select_after = crate::planner::plan_query("SELECT * FROM trades").unwrap();
         let result = execute(&db_root, &select_after).unwrap();
-        match result { QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 0), other => panic!("expected Rows, got {other:?}") }
+        match result {
+            QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 0),
+            other => panic!("expected Rows, got {other:?}"),
+        }
     }
 
     #[test]
     fn test_explain_analyze_output_contains_timing() {
         let db_root = tempfile::tempdir().unwrap();
         let db = db_root.path();
-        let create = crate::planner::plan_query("CREATE TABLE trades (timestamp TIMESTAMP, price DOUBLE, symbol VARCHAR)").unwrap();
+        let create = crate::planner::plan_query(
+            "CREATE TABLE trades (timestamp TIMESTAMP, price DOUBLE, symbol VARCHAR)",
+        )
+        .unwrap();
         execute(db, &create).unwrap();
-        let insert = crate::planner::plan_query("INSERT INTO trades VALUES (1704067200000000000, 65000.0, 'BTC/USD')").unwrap();
+        let insert = crate::planner::plan_query(
+            "INSERT INTO trades VALUES (1704067200000000000, 65000.0, 'BTC/USD')",
+        )
+        .unwrap();
         execute(db, &insert).unwrap();
-        let plan = crate::planner::plan_query("EXPLAIN ANALYZE SELECT * FROM trades WHERE price > 100 ORDER BY timestamp").unwrap();
-        match &plan { QueryPlan::ExplainAnalyze { .. } => {} other => panic!("expected ExplainAnalyze, got {other:?}") }
+        let plan = crate::planner::plan_query(
+            "EXPLAIN ANALYZE SELECT * FROM trades WHERE price > 100 ORDER BY timestamp",
+        )
+        .unwrap();
+        match &plan {
+            QueryPlan::ExplainAnalyze { .. } => {}
+            other => panic!("expected ExplainAnalyze, got {other:?}"),
+        }
         let result = execute(db, &plan).unwrap();
         match result {
             QueryResult::Rows { columns, rows } => {
                 assert_eq!(columns, vec!["plan".to_string()]);
                 assert!(!rows.is_empty());
-                let plan_text = match &rows[0][0] { Value::Str(s) => s.clone(), other => panic!("expected Str, got {other:?}") };
-                assert!(plan_text.contains("Query Plan:"), "missing Query Plan header");
+                let plan_text = match &rows[0][0] {
+                    Value::Str(s) => s.clone(),
+                    other => panic!("expected Str, got {other:?}"),
+                };
+                assert!(
+                    plan_text.contains("Query Plan:"),
+                    "missing Query Plan header"
+                );
                 assert!(plan_text.contains("Time:"), "missing timing info");
-                assert!(plan_text.contains("Total execution time:"), "missing total time");
+                assert!(
+                    plan_text.contains("Total execution time:"),
+                    "missing total time"
+                );
                 assert!(plan_text.contains("Execute:"), "missing Execute step");
             }
             other => panic!("expected Rows, got {other:?}"),
@@ -9141,23 +11191,25 @@ mod tests {
     fn test_not_eq_operator() {
         let dir = tempfile::tempdir().unwrap();
         let db_root = setup_test_table(dir.path());
-        let plan = crate::planner::plan_query(
-            "SELECT * FROM trades WHERE symbol != 'BTC/USD'",
-        ).unwrap();
+        let plan =
+            crate::planner::plan_query("SELECT * FROM trades WHERE symbol != 'BTC/USD'").unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(rows.len(), 3);
-                for row in &rows { assert_ne!(row[1], Value::Str("BTC/USD".into())); }
+                for row in &rows {
+                    assert_ne!(row[1], Value::Str("BTC/USD".into()));
+                }
             }
             other => panic!("expected Rows, got {other:?}"),
         }
-        let plan2 = crate::planner::plan_query(
-            "SELECT * FROM trades WHERE price <> 65000.0",
-        ).unwrap();
+        let plan2 =
+            crate::planner::plan_query("SELECT * FROM trades WHERE price <> 65000.0").unwrap();
         let result2 = execute(&db_root, &plan2).unwrap();
         match result2 {
-            QueryResult::Rows { rows, .. } => { assert_eq!(rows.len(), 4); }
+            QueryResult::Rows { rows, .. } => {
+                assert_eq!(rows.len(), 4);
+            }
             other => panic!("expected Rows, got {other:?}"),
         }
     }
@@ -9168,11 +11220,13 @@ mod tests {
         let db_root = dir.path().to_path_buf();
         let plan = crate::planner::plan_query(
             "CREATE TABLE IF NOT EXISTS trades (timestamp TIMESTAMP, price DOUBLE)",
-        ).unwrap();
+        )
+        .unwrap();
         execute(&db_root, &plan).unwrap();
         let plan2 = crate::planner::plan_query(
             "CREATE TABLE IF NOT EXISTS trades (timestamp TIMESTAMP, price DOUBLE)",
-        ).unwrap();
+        )
+        .unwrap();
         let result2 = execute(&db_root, &plan2).unwrap();
         assert!(matches!(result2, QueryResult::Ok { .. }));
     }
@@ -9192,27 +11246,31 @@ mod tests {
     fn test_expression_based_update() {
         let dir = tempfile::tempdir().unwrap();
         let db_root = setup_test_table(dir.path());
-        let plan = crate::planner::plan_query(
-            "UPDATE trades SET price = price * 1.1 WHERE volume > 5.0",
-        ).unwrap();
+        let plan =
+            crate::planner::plan_query("UPDATE trades SET price = price * 1.1 WHERE volume > 5.0")
+                .unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Ok { affected_rows } => assert_eq!(affected_rows, 2),
             other => panic!("expected Ok, got {other:?}"),
         }
-        let select = crate::planner::plan_query(
-            "SELECT price, volume FROM trades ORDER BY timestamp",
-        ).unwrap();
+        let select =
+            crate::planner::plan_query("SELECT price, volume FROM trades ORDER BY timestamp")
+                .unwrap();
         let result = execute(&db_root, &select).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
-                assert_eq!(rows[0][0], Value::F64(65000.0));  // BTC vol=1.5, unchanged
+                assert_eq!(rows[0][0], Value::F64(65000.0)); // BTC vol=1.5, unchanged
                 // ETH vol=10.0: 3000.0 * 1.1 (floating point)
-                if let Value::F64(v) = rows[1][0] { assert!((v - 3300.0).abs() < 0.01); }
-                assert_eq!(rows[2][0], Value::F64(64000.0));  // BTC vol=2.0, unchanged
-                assert_eq!(rows[3][0], Value::F64(3100.0));   // ETH vol=5.0, unchanged
+                if let Value::F64(v) = rows[1][0] {
+                    assert!((v - 3300.0).abs() < 0.01);
+                }
+                assert_eq!(rows[2][0], Value::F64(64000.0)); // BTC vol=2.0, unchanged
+                assert_eq!(rows[3][0], Value::F64(3100.0)); // ETH vol=5.0, unchanged
                 // SOL vol=100.0: 100.0 * 1.1 (floating point)
-                if let Value::F64(v) = rows[4][0] { assert!((v - 110.0).abs() < 0.01); }
+                if let Value::F64(v) = rows[4][0] {
+                    assert!((v - 110.0).abs() < 0.01);
+                }
             }
             other => panic!("expected Rows, got {other:?}"),
         }
@@ -9228,7 +11286,8 @@ mod tests {
             QueryResult::Ok { affected_rows } => assert_eq!(affected_rows, 5),
             other => panic!("expected Ok, got {other:?}"),
         }
-        let select = crate::planner::plan_query("SELECT volume FROM trades ORDER BY timestamp").unwrap();
+        let select =
+            crate::planner::plan_query("SELECT volume FROM trades ORDER BY timestamp").unwrap();
         let result = execute(&db_root, &select).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -9246,13 +11305,25 @@ mod tests {
     fn test_null_in_insert_values() {
         let dir = tempfile::tempdir().unwrap();
         let db_root = dir.path().to_path_buf();
-        execute(&db_root, &crate::planner::plan_query(
-            "CREATE TABLE t1 (timestamp TIMESTAMP, name VARCHAR, price DOUBLE, volume DOUBLE)",
-        ).unwrap()).unwrap();
-        execute(&db_root, &crate::planner::plan_query(
-            "INSERT INTO t1 VALUES (1000, NULL, 65000.0, 1.5)",
-        ).unwrap()).unwrap();
-        let result = execute(&db_root, &crate::planner::plan_query("SELECT * FROM t1").unwrap()).unwrap();
+        execute(
+            &db_root,
+            &crate::planner::plan_query(
+                "CREATE TABLE t1 (timestamp TIMESTAMP, name VARCHAR, price DOUBLE, volume DOUBLE)",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        execute(
+            &db_root,
+            &crate::planner::plan_query("INSERT INTO t1 VALUES (1000, NULL, 65000.0, 1.5)")
+                .unwrap(),
+        )
+        .unwrap();
+        let result = execute(
+            &db_root,
+            &crate::planner::plan_query("SELECT * FROM t1").unwrap(),
+        )
+        .unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(rows.len(), 1);
@@ -9270,10 +11341,17 @@ mod tests {
         execute(&db_root, &crate::planner::plan_query(
             "CREATE TABLE t2 (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE, volume DOUBLE)",
         ).unwrap()).unwrap();
-        execute(&db_root, &crate::planner::plan_query(
-            "INSERT INTO t2 (timestamp, price) VALUES (1000, 65000.0)",
-        ).unwrap()).unwrap();
-        let result = execute(&db_root, &crate::planner::plan_query("SELECT * FROM t2").unwrap()).unwrap();
+        execute(
+            &db_root,
+            &crate::planner::plan_query("INSERT INTO t2 (timestamp, price) VALUES (1000, 65000.0)")
+                .unwrap(),
+        )
+        .unwrap();
+        let result = execute(
+            &db_root,
+            &crate::planner::plan_query("SELECT * FROM t2").unwrap(),
+        )
+        .unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(rows.len(), 1);
@@ -9289,13 +11367,27 @@ mod tests {
     fn test_column_reordering_in_insert() {
         let dir = tempfile::tempdir().unwrap();
         let db_root = dir.path().to_path_buf();
-        execute(&db_root, &crate::planner::plan_query(
-            "CREATE TABLE t3 (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)",
-        ).unwrap()).unwrap();
-        execute(&db_root, &crate::planner::plan_query(
-            "INSERT INTO t3 (price, timestamp, symbol) VALUES (65000.0, 1000, 'BTC/USD')",
-        ).unwrap()).unwrap();
-        let result = execute(&db_root, &crate::planner::plan_query("SELECT * FROM t3").unwrap()).unwrap();
+        execute(
+            &db_root,
+            &crate::planner::plan_query(
+                "CREATE TABLE t3 (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        execute(
+            &db_root,
+            &crate::planner::plan_query(
+                "INSERT INTO t3 (price, timestamp, symbol) VALUES (65000.0, 1000, 'BTC/USD')",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let result = execute(
+            &db_root,
+            &crate::planner::plan_query("SELECT * FROM t3").unwrap(),
+        )
+        .unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(rows.len(), 1);
@@ -9310,9 +11402,8 @@ mod tests {
     fn test_not_operator_in_filter() {
         let dir = tempfile::tempdir().unwrap();
         let db_root = setup_test_table(dir.path());
-        let plan = crate::planner::plan_query(
-            "SELECT * FROM trades WHERE NOT (price > 100)",
-        ).unwrap();
+        let plan =
+            crate::planner::plan_query("SELECT * FROM trades WHERE NOT (price > 100)").unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -9329,10 +11420,13 @@ mod tests {
         let db_root = setup_test_table(dir.path());
         let plan = crate::planner::plan_query(
             "SELECT * FROM trades UNION ALL SELECT * FROM trades LIMIT 3",
-        ).unwrap();
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
-            QueryResult::Rows { rows, .. } => { assert_eq!(rows.len(), 3); }
+            QueryResult::Rows { rows, .. } => {
+                assert_eq!(rows.len(), 3);
+            }
             other => panic!("expected Rows, got {other:?}"),
         }
     }
@@ -9395,9 +11489,8 @@ mod tests {
     fn test_fetch_first_rows_only() {
         let dir = tempfile::tempdir().unwrap();
         let db_root = setup_test_table(dir.path());
-        let plan = crate::planner::plan_query(
-            "SELECT * FROM trades FETCH FIRST 1 ROWS ONLY"
-        ).unwrap();
+        let plan =
+            crate::planner::plan_query("SELECT * FROM trades FETCH FIRST 1 ROWS ONLY").unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -9413,8 +11506,9 @@ mod tests {
         let db_root = setup_test_table(dir.path());
         // BETWEEN SYMMETRIC 70000 AND 60000 should still match 65000.
         let plan = crate::planner::plan_query(
-            "SELECT * FROM trades WHERE price BETWEEN SYMMETRIC 70000 AND 60000"
-        ).unwrap();
+            "SELECT * FROM trades WHERE price BETWEEN SYMMETRIC 70000 AND 60000",
+        )
+        .unwrap();
         let result = execute(&db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -9430,11 +11524,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let db_root = setup_test_table(dir.path());
         // Verify the plan is correctly formed with Expression filter.
-        let plan = crate::planner::plan_query(
-            "SELECT * FROM trades WHERE CAST(volume AS INTEGER) > 5"
-        ).unwrap();
+        let plan =
+            crate::planner::plan_query("SELECT * FROM trades WHERE CAST(volume AS INTEGER) > 5")
+                .unwrap();
         match &plan {
-            QueryPlan::Select { filter: Some(Filter::Expression { left, op, right }), .. } => {
+            QueryPlan::Select {
+                filter: Some(Filter::Expression { left, op, right }),
+                ..
+            } => {
                 // CAST produces a Function PlanExpr.
                 assert!(matches!(left, PlanExpr::Function { .. }));
                 assert_eq!(*op, CompareOp::Gt);
@@ -9453,13 +11550,17 @@ mod tests {
         let db_root = dir.path();
 
         let create = crate::planner::plan_query(
-            "CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)"
-        ).unwrap();
+            "CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)",
+        )
+        .unwrap();
         execute(db_root, &create).unwrap();
 
         for (ts, sym, price) in &[
-            (1000, "BTC", 100.0), (2000, "BTC", 200.0), (3000, "BTC", 300.0),
-            (1000, "ETH", 50.0), (2000, "ETH", 60.0),
+            (1000, "BTC", 100.0),
+            (2000, "BTC", 200.0),
+            (3000, "BTC", 300.0),
+            (1000, "ETH", 50.0),
+            (2000, "ETH", 60.0),
         ] {
             let sql = format!("INSERT INTO trades VALUES ({ts}, '{sym}', {price})");
             let plan = crate::planner::plan_query(&sql).unwrap();
@@ -9467,15 +11568,22 @@ mod tests {
         }
 
         let plan = crate::planner::plan_query(
-            "SELECT DISTINCT ON (symbol) symbol, price FROM trades ORDER BY symbol, timestamp DESC"
-        ).unwrap();
+            "SELECT DISTINCT ON (symbol) symbol, price FROM trades ORDER BY symbol, timestamp DESC",
+        )
+        .unwrap();
         let result = execute(db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
                 assert_eq!(rows.len(), 2); // one per symbol
-                let btc = rows.iter().find(|r| r[0] == Value::Str("BTC".into())).unwrap();
+                let btc = rows
+                    .iter()
+                    .find(|r| r[0] == Value::Str("BTC".into()))
+                    .unwrap();
                 assert_eq!(btc[1], Value::F64(300.0)); // latest BTC price
-                let eth = rows.iter().find(|r| r[0] == Value::Str("ETH".into())).unwrap();
+                let eth = rows
+                    .iter()
+                    .find(|r| r[0] == Value::Str("ETH".into()))
+                    .unwrap();
                 assert_eq!(eth[1], Value::F64(60.0)); // latest ETH price
             }
             other => panic!("expected Rows, got {other:?}"),
@@ -9488,13 +11596,12 @@ mod tests {
         let db_root = dir.path();
 
         let create = crate::planner::plan_query(
-            "CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)"
-        ).unwrap();
+            "CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)",
+        )
+        .unwrap();
         execute(db_root, &create).unwrap();
 
-        let plan = crate::planner::plan_query(
-            "CREATE INDEX idx_sym ON trades (symbol)"
-        ).unwrap();
+        let plan = crate::planner::plan_query("CREATE INDEX idx_sym ON trades (symbol)").unwrap();
         let result = execute(db_root, &plan).unwrap();
         assert!(matches!(result, QueryResult::Ok { .. }));
 
@@ -9511,14 +11618,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let db_root = dir.path();
 
-        let create = crate::planner::plan_query(
-            "CREATE TABLE trades (timestamp TIMESTAMP, price DOUBLE)"
-        ).unwrap();
+        let create =
+            crate::planner::plan_query("CREATE TABLE trades (timestamp TIMESTAMP, price DOUBLE)")
+                .unwrap();
         execute(db_root, &create).unwrap();
 
-        let plan = crate::planner::plan_query(
-            "ALTER TABLE trades RENAME TO trades_archive"
-        ).unwrap();
+        let plan =
+            crate::planner::plan_query("ALTER TABLE trades RENAME TO trades_archive").unwrap();
         let result = execute(db_root, &plan).unwrap();
         assert!(matches!(result, QueryResult::Ok { .. }));
 
@@ -9593,29 +11699,51 @@ mod tests {
         let db_root = dir.path();
 
         let create = crate::planner::plan_query(
-            "CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)"
-        ).unwrap();
+            "CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)",
+        )
+        .unwrap();
         execute(db_root, &create).unwrap();
 
         let create2 = crate::planner::plan_query(
-            "CREATE TABLE watchlist (timestamp TIMESTAMP, symbol VARCHAR)"
-        ).unwrap();
+            "CREATE TABLE watchlist (timestamp TIMESTAMP, symbol VARCHAR)",
+        )
+        .unwrap();
         execute(db_root, &create2).unwrap();
 
         let base_ts = 1710460800_000_000_000i64;
-        for (i, (sym, price)) in [("BTC", 100.0), ("ETH", 200.0), ("SOL", 50.0)].iter().enumerate() {
+        for (i, (sym, price)) in [("BTC", 100.0), ("ETH", 200.0), ("SOL", 50.0)]
+            .iter()
+            .enumerate()
+        {
             let ts = base_ts + (i as i64) * 1_000_000_000;
             let sql = format!("INSERT INTO trades VALUES ({ts}, '{sym}', {price})");
             execute(db_root, &crate::planner::plan_query(&sql).unwrap()).unwrap();
         }
 
-        execute(db_root, &crate::planner::plan_query(&format!("INSERT INTO watchlist VALUES ({}, 'BTC')", base_ts)).unwrap()).unwrap();
-        execute(db_root, &crate::planner::plan_query(&format!("INSERT INTO watchlist VALUES ({}, 'ETH')", base_ts + 1_000_000_000)).unwrap()).unwrap();
+        execute(
+            db_root,
+            &crate::planner::plan_query(&format!(
+                "INSERT INTO watchlist VALUES ({}, 'BTC')",
+                base_ts
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        execute(
+            db_root,
+            &crate::planner::plan_query(&format!(
+                "INSERT INTO watchlist VALUES ({}, 'ETH')",
+                base_ts + 1_000_000_000
+            ))
+            .unwrap(),
+        )
+        .unwrap();
 
         // ANY: symbol = ANY (SELECT symbol FROM watchlist)
         let plan = crate::planner::plan_query(
-            "SELECT * FROM trades WHERE symbol = ANY (SELECT symbol FROM watchlist)"
-        ).unwrap();
+            "SELECT * FROM trades WHERE symbol = ANY (SELECT symbol FROM watchlist)",
+        )
+        .unwrap();
         let result = execute(db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -9646,8 +11774,9 @@ mod tests {
 
         // Create source table.
         let create = crate::planner::plan_query(
-            "CREATE TABLE source (ts TIMESTAMP, price DOUBLE PRECISION, symbol VARCHAR)"
-        ).unwrap();
+            "CREATE TABLE source (ts TIMESTAMP, price DOUBLE PRECISION, symbol VARCHAR)",
+        )
+        .unwrap();
         execute(db_root, &create).unwrap();
 
         // Insert data.
@@ -9657,9 +11786,8 @@ mod tests {
         execute(db_root, &ins).unwrap();
 
         // CREATE TABLE AS SELECT
-        let ctas = crate::planner::plan_query(
-            "CREATE TABLE backup AS SELECT * FROM source"
-        ).unwrap();
+        let ctas =
+            crate::planner::plan_query("CREATE TABLE backup AS SELECT * FROM source").unwrap();
         match &ctas {
             QueryPlan::CreateTableAs { name, .. } => {
                 assert_eq!(name, "backup");
@@ -9692,8 +11820,9 @@ mod tests {
         let db_root = tmp.path();
 
         let create = crate::planner::plan_query(
-            "CREATE TABLE trades (ts TIMESTAMP, price DOUBLE PRECISION, symbol VARCHAR)"
-        ).unwrap();
+            "CREATE TABLE trades (ts TIMESTAMP, price DOUBLE PRECISION, symbol VARCHAR)",
+        )
+        .unwrap();
         execute(db_root, &create).unwrap();
 
         let ins = crate::planner::plan_query(
@@ -9703,8 +11832,9 @@ mod tests {
 
         // CREATE TABLE AS SELECT with aggregation
         let ctas = crate::planner::plan_query(
-            "CREATE TABLE summary AS SELECT symbol, avg(price) FROM trades GROUP BY symbol"
-        ).unwrap();
+            "CREATE TABLE summary AS SELECT symbol, avg(price) FROM trades GROUP BY symbol",
+        )
+        .unwrap();
         let result = execute(db_root, &ctas).unwrap();
         match result {
             QueryResult::Ok { affected_rows } => {
@@ -9721,9 +11851,8 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let db_root = tmp.path();
 
-        let create = crate::planner::plan_query(
-            "CREATE TABLE items (ts TIMESTAMP, price BIGINT)"
-        ).unwrap();
+        let create =
+            crate::planner::plan_query("CREATE TABLE items (ts TIMESTAMP, price BIGINT)").unwrap();
         execute(db_root, &create).unwrap();
 
         let ins = crate::planner::plan_query(
@@ -9732,9 +11861,9 @@ mod tests {
         execute(db_root, &ins).unwrap();
 
         // NOT BETWEEN should exclude rows with price in [100, 200]
-        let plan = crate::planner::plan_query(
-            "SELECT * FROM items WHERE price NOT BETWEEN 100 AND 200"
-        ).unwrap();
+        let plan =
+            crate::planner::plan_query("SELECT * FROM items WHERE price NOT BETWEEN 100 AND 200")
+                .unwrap();
         let result = execute(db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -9759,8 +11888,9 @@ mod tests {
         // Boolean columns are stored as 1-byte in storage, but the Sum aggregate
         // correctly handles I64(0)/I64(1) values regardless of source.
         let create = crate::planner::plan_query(
-            "CREATE TABLE users (ts TIMESTAMP, name VARCHAR, is_active BIGINT)"
-        ).unwrap();
+            "CREATE TABLE users (ts TIMESTAMP, name VARCHAR, is_active BIGINT)",
+        )
+        .unwrap();
         execute(db_root, &create).unwrap();
 
         // Insert with 0/1 as boolean-like values.
@@ -9770,9 +11900,7 @@ mod tests {
         execute(db_root, &ins).unwrap();
 
         // sum(is_active) should count TRUE values (1+0+1 = 2)
-        let plan = crate::planner::plan_query(
-            "SELECT sum(is_active) FROM users"
-        ).unwrap();
+        let plan = crate::planner::plan_query("SELECT sum(is_active) FROM users").unwrap();
         let result = execute(db_root, &plan).unwrap();
         match result {
             QueryResult::Rows { rows, .. } => {
@@ -9786,20 +11914,18 @@ mod tests {
     /// Test that sum() works on boolean expressions like sum(price > 100).
     #[test]
     fn test_sum_boolean_expression() {
-        let select_cols = vec![
-            SelectColumn::Aggregate {
-                function: AggregateKind::Sum,
-                column: "price".into(),
-                alias: None,
-                filter: None,
-                within_group_order: None,
-                arg_expr: Some(PlanExpr::BinaryOp {
-                    left: Box::new(PlanExpr::Column("price".into())),
-                    op: BinaryOp::Gt,
-                    right: Box::new(PlanExpr::Literal(Value::I64(100))),
-                }),
-            },
-        ];
+        let select_cols = vec![SelectColumn::Aggregate {
+            function: AggregateKind::Sum,
+            column: "price".into(),
+            alias: None,
+            filter: None,
+            within_group_order: None,
+            arg_expr: Some(PlanExpr::BinaryOp {
+                left: Box::new(PlanExpr::Column("price".into())),
+                op: BinaryOp::Gt,
+                right: Box::new(PlanExpr::Literal(Value::I64(100))),
+            }),
+        }];
         let resolved = vec![(0, "price".into())];
         let rows = vec![
             vec![Value::I64(50)],
@@ -9824,9 +11950,11 @@ mod tests {
         // Write a test CSV file.
         std::fs::write(&csv_path, "name,age,score\nalice,30,95.5\nbob,25,88.0\n").unwrap();
 
-        let plan = crate::planner::plan_query(
-            &format!("SELECT * FROM read_csv('{}')", csv_path.display())
-        ).unwrap();
+        let plan = crate::planner::plan_query(&format!(
+            "SELECT * FROM read_csv('{}')",
+            csv_path.display()
+        ))
+        .unwrap();
         match &plan {
             QueryPlan::ReadCsv { .. } => {}
             other => panic!("expected ReadCsv, got {other:?}"),
@@ -9852,9 +11980,11 @@ mod tests {
 
         std::fs::write(&csv_path, "id,name,value\n1,foo,10\n2,bar,20\n").unwrap();
 
-        let plan = crate::planner::plan_query(
-            &format!("SELECT name, value FROM read_csv('{}')", csv_path.display())
-        ).unwrap();
+        let plan = crate::planner::plan_query(&format!(
+            "SELECT name, value FROM read_csv('{}')",
+            csv_path.display()
+        ))
+        .unwrap();
 
         let result = execute(tmp.path(), &plan).unwrap();
         match result {
@@ -9876,9 +12006,9 @@ mod tests {
         let db_root = tmp.path();
 
         // DECIMAL(18, 8) should parse and create a table using Decimal128
-        let plan = crate::planner::plan_query(
-            "CREATE TABLE prices (ts TIMESTAMP, amount DECIMAL(18, 8))"
-        ).unwrap();
+        let plan =
+            crate::planner::plan_query("CREATE TABLE prices (ts TIMESTAMP, amount DECIMAL(18, 8))")
+                .unwrap();
         let result = execute(db_root, &plan).unwrap();
         match result {
             QueryResult::Ok { .. } => {}
@@ -9903,9 +12033,8 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let db_root = tmp.path();
 
-        let plan = crate::planner::plan_query(
-            "CREATE TABLE connections (ts TIMESTAMP, addr IPV6)"
-        ).unwrap();
+        let plan = crate::planner::plan_query("CREATE TABLE connections (ts TIMESTAMP, addr IPV6)")
+            .unwrap();
         let result = execute(db_root, &plan).unwrap();
         match result {
             QueryResult::Ok { .. } => {}

@@ -673,7 +673,9 @@ pub fn decrypt_buffer(encrypted: &[u8], config: &EncryptionConfig) -> Result<Vec
     })?;
 
     match parse_header(encrypted)? {
-        ParsedHeader::Legacy { iv, data_offset, .. } => {
+        ParsedHeader::Legacy {
+            iv, data_offset, ..
+        } => {
             // Legacy XOR decryption
             let ciphertext = &encrypted[data_offset..];
             Ok(xor_cipher(ciphertext, &config.key, &iv))
@@ -891,11 +893,8 @@ mod tests {
         let plaintext = b"secret data";
         let encrypted = encrypt_buffer(plaintext, &config).unwrap();
 
-        let wrong_config = EncryptionConfig::new(
-            EncryptionAlgorithm::ChaCha20Poly1305,
-            vec![0xCD; 32],
-        )
-        .unwrap();
+        let wrong_config =
+            EncryptionConfig::new(EncryptionAlgorithm::ChaCha20Poly1305, vec![0xCD; 32]).unwrap();
         // With authenticated encryption, wrong key should produce an error, not wrong plaintext
         let result = decrypt_buffer(&encrypted, &wrong_config);
         assert!(result.is_err());
@@ -963,10 +962,10 @@ mod tests {
 
     #[test]
     fn different_keys_produce_different_ciphertext() {
-        let c1 = EncryptionConfig::new(EncryptionAlgorithm::ChaCha20Poly1305, vec![0xAA; 32])
-            .unwrap();
-        let c2 = EncryptionConfig::new(EncryptionAlgorithm::ChaCha20Poly1305, vec![0xBB; 32])
-            .unwrap();
+        let c1 =
+            EncryptionConfig::new(EncryptionAlgorithm::ChaCha20Poly1305, vec![0xAA; 32]).unwrap();
+        let c2 =
+            EncryptionConfig::new(EncryptionAlgorithm::ChaCha20Poly1305, vec![0xBB; 32]).unwrap();
         let plain = b"test data";
         let e1 = encrypt_buffer(plain, &c1).unwrap();
         let e2 = encrypt_buffer(plain, &c2).unwrap();

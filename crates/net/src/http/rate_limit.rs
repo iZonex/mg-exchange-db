@@ -178,6 +178,9 @@ mod tests {
 
         std::thread::sleep(Duration::from_millis(5));
         limiter.cleanup();
-        assert!(limiter.requests.is_empty(), "expired entries should be removed");
+        assert!(
+            limiter.requests.is_empty(),
+            "expired entries should be removed"
+        );
     }
 }

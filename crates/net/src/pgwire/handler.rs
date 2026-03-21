@@ -7,10 +7,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::sink::Sink;
 use futures::stream;
-use pgwire::api::query::SimpleQueryHandler;
-use pgwire::api::results::{DataRowEncoder, FieldFormat, FieldInfo, QueryResponse, Response, Tag};
 use pgwire::api::ClientInfo;
 use pgwire::api::Type;
+use pgwire::api::query::SimpleQueryHandler;
+use pgwire::api::results::{DataRowEncoder, FieldFormat, FieldInfo, QueryResponse, Response, Tag};
 use pgwire::error::{ErrorInfo, PgWireError, PgWireResult};
 use pgwire::messages::PgWireBackendMessage;
 
@@ -31,7 +31,10 @@ pub struct ExchangeDbHandler {
 impl ExchangeDbHandler {
     /// Create a new handler rooted at the given database directory.
     pub fn new(db_root: PathBuf, replication_manager: Option<Arc<ReplicationManager>>) -> Self {
-        Self { db_root, replication_manager }
+        Self {
+            db_root,
+            replication_manager,
+        }
     }
 }
 
@@ -53,9 +56,10 @@ impl ExchangeDbHandler {
         // Detect pg_class queries by OID (e.g. WHERE c.oid = '12345') - used by \d table
         if upper.contains("PG_CATALOG.PG_CLASS") {
             if let Some(oid) = extract_oid_from_query(query)
-                && let Some(name) = self.resolve_oid_to_table(oid) {
-                    return Some(self.handle_pg_class_by_oid(&name));
-                }
+                && let Some(name) = self.resolve_oid_to_table(oid)
+            {
+                return Some(self.handle_pg_class_by_oid(&name));
+            }
             // Try to extract table name from relname pattern
             let table_name = extract_table_name_from_describe(query);
             if let Some(name) = table_name {
@@ -66,9 +70,10 @@ impl ExchangeDbHandler {
         // Detect \d <table> attribute query: SELECT ... FROM pg_catalog.pg_attribute
         if upper.contains("PG_CATALOG.PG_ATTRIBUTE") {
             if let Some(oid) = extract_oid_from_query(query)
-                && let Some(name) = self.resolve_oid_to_table(oid) {
-                    return Some(self.handle_describe_table(&name));
-                }
+                && let Some(name) = self.resolve_oid_to_table(oid)
+            {
+                return Some(self.handle_describe_table(&name));
+            }
             let table_name = extract_table_name_from_describe(query);
             if let Some(name) = table_name {
                 return Some(self.handle_describe_table(&name));
@@ -99,15 +104,23 @@ impl ExchangeDbHandler {
         }
         table_names.sort();
 
-        let columns = vec!["Schema".to_string(), "Name".to_string(), "Type".to_string(), "Owner".to_string()];
-        let rows: Vec<Vec<Value>> = table_names.iter().map(|name| {
-            vec![
-                Value::Str("public".to_string()),
-                Value::Str(name.clone()),
-                Value::Str("table".to_string()),
-                Value::Str("exchangedb".to_string()),
-            ]
-        }).collect();
+        let columns = vec![
+            "Schema".to_string(),
+            "Name".to_string(),
+            "Type".to_string(),
+            "Owner".to_string(),
+        ];
+        let rows: Vec<Vec<Value>> = table_names
+            .iter()
+            .map(|name| {
+                vec![
+                    Value::Str("public".to_string()),
+                    Value::Str(name.clone()),
+                    Value::Str("table".to_string()),
+                    Value::Str("exchangedb".to_string()),
+                ]
+            })
+            .collect();
 
         let field_infos = infer_field_infos(&columns, &rows);
         let schema = Arc::new(field_infos);
@@ -158,26 +171,34 @@ impl ExchangeDbHandler {
     fn handle_pg_class_by_oid<'a>(&self, table_name: &str) -> PgWireResult<Vec<Response<'a>>> {
         // Return the columns that psql expects for the describe command
         let columns = vec![
-            "relchecks".to_string(), "relkind".to_string(), "relhasindex".to_string(),
-            "relhasrules".to_string(), "relhastriggers".to_string(), "relrowsecurity".to_string(),
-            "relforcerowsecurity".to_string(), "relhasoids".to_string(),
-            "relispartition".to_string(), "reltablespace_name".to_string(),
-            "reltablespace".to_string(), "reloftype".to_string(), "relpersistence".to_string(),
+            "relchecks".to_string(),
+            "relkind".to_string(),
+            "relhasindex".to_string(),
+            "relhasrules".to_string(),
+            "relhastriggers".to_string(),
+            "relrowsecurity".to_string(),
+            "relforcerowsecurity".to_string(),
+            "relhasoids".to_string(),
+            "relispartition".to_string(),
+            "reltablespace_name".to_string(),
+            "reltablespace".to_string(),
+            "reloftype".to_string(),
+            "relpersistence".to_string(),
         ];
         let _ = table_name;
         let rows = vec![vec![
-            Value::I64(0),              // relchecks
+            Value::I64(0),               // relchecks
             Value::Str("r".to_string()), // relkind = regular table
-            Value::I64(0),              // relhasindex (false)
-            Value::I64(0),              // relhasrules
-            Value::I64(0),              // relhastriggers
-            Value::I64(0),              // relrowsecurity (false)
-            Value::I64(0),              // relforcerowsecurity (false)
-            Value::I64(0),              // relhasoids (false)
-            Value::I64(0),              // relispartition (false)
-            Value::Str(String::new()),  // reltablespace_name
-            Value::I64(0),              // reltablespace
-            Value::Str(String::new()),  // reloftype
+            Value::I64(0),               // relhasindex (false)
+            Value::I64(0),               // relhasrules
+            Value::I64(0),               // relhastriggers
+            Value::I64(0),               // relrowsecurity (false)
+            Value::I64(0),               // relforcerowsecurity (false)
+            Value::I64(0),               // relhasoids (false)
+            Value::I64(0),               // relispartition (false)
+            Value::Str(String::new()),   // reltablespace_name
+            Value::I64(0),               // reltablespace
+            Value::Str(String::new()),   // reloftype
             Value::Str("p".to_string()), // relpersistence = permanent
         ]];
 
@@ -202,9 +223,13 @@ impl ExchangeDbHandler {
     /// Extracts column names from the SELECT clause to provide correct schema.
     fn handle_empty_catalog_query<'a>(&self, _query: &str) -> PgWireResult<Vec<Response<'a>>> {
         // Return an empty result with a single generic column
-        let field_infos = vec![
-            FieldInfo::new("?column?".to_owned(), None, None, Type::TEXT, FieldFormat::Text),
-        ];
+        let field_infos = vec![FieldInfo::new(
+            "?column?".to_owned(),
+            None,
+            None,
+            Type::TEXT,
+            FieldFormat::Text,
+        )];
         let schema = Arc::new(field_infos);
         let data_row_stream = stream::iter(Vec::new().into_iter().map(Ok));
         let response = QueryResponse::new(schema, data_row_stream);
@@ -219,8 +244,20 @@ impl ExchangeDbHandler {
             // Return empty result - psql will say "Did not find any relation"
             let field_infos = vec![
                 FieldInfo::new("oid".to_owned(), None, None, Type::INT4, FieldFormat::Text),
-                FieldInfo::new("nspname".to_owned(), None, None, Type::TEXT, FieldFormat::Text),
-                FieldInfo::new("relname".to_owned(), None, None, Type::TEXT, FieldFormat::Text),
+                FieldInfo::new(
+                    "nspname".to_owned(),
+                    None,
+                    None,
+                    Type::TEXT,
+                    FieldFormat::Text,
+                ),
+                FieldInfo::new(
+                    "relname".to_owned(),
+                    None,
+                    None,
+                    Type::TEXT,
+                    FieldFormat::Text,
+                ),
             ];
             let schema = Arc::new(field_infos);
             let data_row_stream = stream::iter(Vec::new().into_iter().map(Ok));
@@ -231,7 +268,11 @@ impl ExchangeDbHandler {
         // Use a deterministic fake OID based on the table name hash.
         let fake_oid = Self::table_name_to_oid(table_name);
 
-        let columns = vec!["oid".to_string(), "nspname".to_string(), "relname".to_string()];
+        let columns = vec![
+            "oid".to_string(),
+            "nspname".to_string(),
+            "relname".to_string(),
+        ];
         let rows = vec![vec![
             Value::I64(fake_oid),
             Value::Str("public".to_string()),
@@ -266,13 +307,14 @@ impl ExchangeDbHandler {
             ))));
         }
 
-        let meta = exchange_core::table::TableMeta::load(&table_dir.join("_meta")).map_err(|e| {
-            PgWireError::UserError(Box::new(ErrorInfo::new(
-                "ERROR".to_owned(),
-                "XX000".to_owned(),
-                e.to_string(),
-            )))
-        })?;
+        let meta =
+            exchange_core::table::TableMeta::load(&table_dir.join("_meta")).map_err(|e| {
+                PgWireError::UserError(Box::new(ErrorInfo::new(
+                    "ERROR".to_owned(),
+                    "XX000".to_owned(),
+                    e.to_string(),
+                )))
+            })?;
 
         // Match the column schema that psql expects from pg_attribute:
         // attname, format_type, pg_get_expr, attnotnull, attcollation, attidentity, attgenerated
@@ -286,18 +328,22 @@ impl ExchangeDbHandler {
             "attgenerated".to_string(),
         ];
 
-        let rows: Vec<Vec<Value>> = meta.columns.iter().map(|col| {
-            let type_name = col_type_to_pg_name(ColumnType::from(col.col_type));
-            vec![
-                Value::Str(col.name.clone()),
-                Value::Str(type_name),
-                Value::Null,                     // pg_get_expr (no default)
-                Value::Str("f".to_string()),     // attnotnull = false
-                Value::Null,                     // attcollation
-                Value::Str(String::new()),       // attidentity
-                Value::Str(String::new()),       // attgenerated
-            ]
-        }).collect();
+        let rows: Vec<Vec<Value>> = meta
+            .columns
+            .iter()
+            .map(|col| {
+                let type_name = col_type_to_pg_name(ColumnType::from(col.col_type));
+                vec![
+                    Value::Str(col.name.clone()),
+                    Value::Str(type_name),
+                    Value::Null,                 // pg_get_expr (no default)
+                    Value::Str("f".to_string()), // attnotnull = false
+                    Value::Null,                 // attcollation
+                    Value::Str(String::new()),   // attidentity
+                    Value::Str(String::new()),   // attgenerated
+                ]
+            })
+            .collect();
 
         let field_infos = infer_field_infos(&columns, &rows);
         let schema = Arc::new(field_infos);
@@ -324,9 +370,10 @@ fn extract_oid_from_query(query: &str) -> Option<i64> {
         if let Some(pos) = query.find(marker) {
             let start = pos + marker.len();
             if let Some(end) = query[start..].find('\'')
-                && let Ok(oid) = query[start..start + end].parse::<i64>() {
-                    return Some(oid);
-                }
+                && let Ok(oid) = query[start..start + end].parse::<i64>()
+            {
+                return Some(oid);
+            }
         }
     }
     None
@@ -384,48 +431,48 @@ pub(crate) fn pg_type_for_value(value: &Value) -> Type {
 /// contains data rows.
 pub fn pg_type_for_column(col_type: ColumnType) -> Type {
     match col_type {
-        ColumnType::Boolean => Type::BOOL,           // OID 16
-        ColumnType::I8 => Type::INT2,                // OID 21
-        ColumnType::I16 => Type::INT2,               // OID 21
-        ColumnType::I32 => Type::INT4,               // OID 23
-        ColumnType::I64 => Type::INT8,               // OID 20
-        ColumnType::F32 => Type::FLOAT4,             // OID 700
-        ColumnType::F64 => Type::FLOAT8,             // OID 701
-        ColumnType::Timestamp => Type::TIMESTAMPTZ,  // OID 1184
-        ColumnType::Symbol => Type::VARCHAR,         // OID 1043
-        ColumnType::Varchar => Type::TEXT,            // OID 25
-        ColumnType::Binary => Type::BYTEA,           // OID 17
-        ColumnType::Uuid => Type::UUID,              // OID 2950
-        ColumnType::Date => Type::DATE,              // OID 1082
-        ColumnType::IPv4 => Type::INET,              // OID 869
-        ColumnType::GeoHash => Type::INT8,           // OID 20
-        ColumnType::Char => Type::CHAR,              // OID 18
-        ColumnType::Long128 => Type::TEXT,           // No direct PG equivalent
-        ColumnType::Long256 => Type::TEXT,           // No direct PG equivalent
-        ColumnType::String => Type::TEXT,             // OID 25
+        ColumnType::Boolean => Type::BOOL,               // OID 16
+        ColumnType::I8 => Type::INT2,                    // OID 21
+        ColumnType::I16 => Type::INT2,                   // OID 21
+        ColumnType::I32 => Type::INT4,                   // OID 23
+        ColumnType::I64 => Type::INT8,                   // OID 20
+        ColumnType::F32 => Type::FLOAT4,                 // OID 700
+        ColumnType::F64 => Type::FLOAT8,                 // OID 701
+        ColumnType::Timestamp => Type::TIMESTAMPTZ,      // OID 1184
+        ColumnType::Symbol => Type::VARCHAR,             // OID 1043
+        ColumnType::Varchar => Type::TEXT,               // OID 25
+        ColumnType::Binary => Type::BYTEA,               // OID 17
+        ColumnType::Uuid => Type::UUID,                  // OID 2950
+        ColumnType::Date => Type::DATE,                  // OID 1082
+        ColumnType::IPv4 => Type::INET,                  // OID 869
+        ColumnType::GeoHash => Type::INT8,               // OID 20
+        ColumnType::Char => Type::CHAR,                  // OID 18
+        ColumnType::Long128 => Type::TEXT,               // No direct PG equivalent
+        ColumnType::Long256 => Type::TEXT,               // No direct PG equivalent
+        ColumnType::String => Type::TEXT,                // OID 25
         ColumnType::TimestampMicro => Type::TIMESTAMPTZ, // OID 1184
         ColumnType::TimestampMilli => Type::TIMESTAMPTZ, // OID 1184
-        ColumnType::Interval => Type::INTERVAL,      // OID 1186
-        ColumnType::Decimal8 => Type::NUMERIC,       // OID 1700
-        ColumnType::Decimal16 => Type::NUMERIC,      // OID 1700
-        ColumnType::Decimal32 => Type::NUMERIC,      // OID 1700
-        ColumnType::Decimal64 => Type::NUMERIC,      // OID 1700
-        ColumnType::Decimal128 => Type::NUMERIC,     // OID 1700
-        ColumnType::Decimal256 => Type::NUMERIC,     // OID 1700
-        ColumnType::GeoByte => Type::INT2,           // OID 21
-        ColumnType::GeoShort => Type::INT2,          // OID 21
-        ColumnType::GeoInt => Type::INT4,            // OID 23
-        ColumnType::Array => Type::BYTEA,            // OID 17
-        ColumnType::Cursor => Type::INT8,            // OID 20
-        ColumnType::Record => Type::INT8,            // OID 20
-        ColumnType::RegClass => Type::INT4,            // OID 23 (regclass as int4)
-        ColumnType::RegProcedure => Type::INT4,      // OID 23 (regprocedure as int4)
-        ColumnType::ArrayString => Type::TEXT,        // OID 25 (text[] as text fallback)
-        ColumnType::Null => Type::TEXT,              // fallback
-        ColumnType::VarArg => Type::TEXT,            // fallback
-        ColumnType::Parameter => Type::TEXT,         // fallback
-        ColumnType::VarcharSlice => Type::VARCHAR,   // OID 1043
-        ColumnType::IPv6 => Type::INET,              // OID 869
+        ColumnType::Interval => Type::INTERVAL,          // OID 1186
+        ColumnType::Decimal8 => Type::NUMERIC,           // OID 1700
+        ColumnType::Decimal16 => Type::NUMERIC,          // OID 1700
+        ColumnType::Decimal32 => Type::NUMERIC,          // OID 1700
+        ColumnType::Decimal64 => Type::NUMERIC,          // OID 1700
+        ColumnType::Decimal128 => Type::NUMERIC,         // OID 1700
+        ColumnType::Decimal256 => Type::NUMERIC,         // OID 1700
+        ColumnType::GeoByte => Type::INT2,               // OID 21
+        ColumnType::GeoShort => Type::INT2,              // OID 21
+        ColumnType::GeoInt => Type::INT4,                // OID 23
+        ColumnType::Array => Type::BYTEA,                // OID 17
+        ColumnType::Cursor => Type::INT8,                // OID 20
+        ColumnType::Record => Type::INT8,                // OID 20
+        ColumnType::RegClass => Type::INT4,              // OID 23 (regclass as int4)
+        ColumnType::RegProcedure => Type::INT4,          // OID 23 (regprocedure as int4)
+        ColumnType::ArrayString => Type::TEXT,           // OID 25 (text[] as text fallback)
+        ColumnType::Null => Type::TEXT,                  // fallback
+        ColumnType::VarArg => Type::TEXT,                // fallback
+        ColumnType::Parameter => Type::TEXT,             // fallback
+        ColumnType::VarcharSlice => Type::VARCHAR,       // OID 1043
+        ColumnType::IPv6 => Type::INET,                  // OID 869
     }
 }
 

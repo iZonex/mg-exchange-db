@@ -119,9 +119,8 @@ impl RecordCursor for UnionDistinctCursor {
                 None => break,
                 Some(b) => {
                     for r in 0..b.row_count() {
-                        let row: Vec<Value> = (0..b.columns.len())
-                            .map(|c| b.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> =
+                            (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                         let key = Self::row_key(&row);
                         if self.seen.insert(key) {
                             result.append_row(&row);
@@ -151,14 +150,10 @@ mod tests {
     fn union_all_concatenates() {
         let schema = vec![("val".to_string(), ColumnType::I64)];
 
-        let s1 = MemoryCursor::from_rows(
-            schema.clone(),
-            &[vec![Value::I64(1)], vec![Value::I64(2)]],
-        );
-        let s2 = MemoryCursor::from_rows(
-            schema.clone(),
-            &[vec![Value::I64(3)], vec![Value::I64(4)]],
-        );
+        let s1 =
+            MemoryCursor::from_rows(schema.clone(), &[vec![Value::I64(1)], vec![Value::I64(2)]]);
+        let s2 =
+            MemoryCursor::from_rows(schema.clone(), &[vec![Value::I64(3)], vec![Value::I64(4)]]);
 
         let mut cursor = UnionCursor::new(vec![Box::new(s1), Box::new(s2)]);
 
@@ -179,10 +174,7 @@ mod tests {
         let schema = vec![("val".to_string(), ColumnType::I64)];
 
         let s1 = MemoryCursor::from_rows(schema.clone(), &[]);
-        let s2 = MemoryCursor::from_rows(
-            schema.clone(),
-            &[vec![Value::I64(1)]],
-        );
+        let s2 = MemoryCursor::from_rows(schema.clone(), &[vec![Value::I64(1)]]);
         let s3 = MemoryCursor::from_rows(schema.clone(), &[]);
 
         let mut cursor = UnionCursor::new(vec![Box::new(s1), Box::new(s2), Box::new(s3)]);
@@ -205,11 +197,19 @@ mod tests {
 
         let s1 = MemoryCursor::from_rows(
             schema.clone(),
-            &[vec![Value::I64(1)], vec![Value::I64(2)], vec![Value::I64(3)]],
+            &[
+                vec![Value::I64(1)],
+                vec![Value::I64(2)],
+                vec![Value::I64(3)],
+            ],
         );
         let s2 = MemoryCursor::from_rows(
             schema.clone(),
-            &[vec![Value::I64(2)], vec![Value::I64(3)], vec![Value::I64(4)]],
+            &[
+                vec![Value::I64(2)],
+                vec![Value::I64(3)],
+                vec![Value::I64(4)],
+            ],
         );
 
         let mut cursor = UnionDistinctCursor::new(vec![Box::new(s1), Box::new(s2)]);

@@ -15,15 +15,13 @@ use tokio::net::TcpStream;
 type HmacSha256 = Hmac<Sha256>;
 
 /// Configuration for ILP TCP authentication.
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct IlpAuthConfig {
     /// Whether authentication is enabled.
     pub enabled: bool,
     /// Map of key-id to shared secret (base64 encoded).
     pub auth_keys: HashMap<String, String>,
 }
-
 
 /// Authenticator that manages challenge-response handshakes.
 pub struct IlpAuthenticator {
@@ -146,9 +144,7 @@ impl IlpAuthenticator {
             Ok(stream)
         } else {
             let mut stream = reader.into_inner();
-            stream
-                .write_all(b"error: authentication failed\n")
-                .await?;
+            stream.write_all(b"error: authentication failed\n").await?;
             Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
                 format!("authentication failed for kid={kid}"),

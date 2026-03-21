@@ -6,10 +6,10 @@
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::column::{FixedColumnReader, FixedColumnWriter};
 use exchange_core::compression::{compress_column_file, decompress_column_file};
-use exchange_core::partition::{partition_dir, PartitionManager};
+use exchange_core::partition::{PartitionManager, partition_dir};
 use exchange_core::table::{
-    list_partitions, read_partition_rows, rewrite_partition, ColumnValue, TableBuilder, TableMeta,
-    TableWriter,
+    ColumnValue, TableBuilder, TableMeta, TableWriter, list_partitions, read_partition_rows,
+    rewrite_partition,
 };
 use tempfile::tempdir;
 
@@ -265,11 +265,8 @@ mod partition_operations {
             .unwrap();
         let mut w = TableWriter::open(dir, "t").unwrap();
         for i in 0..10 {
-            w.write_row(
-                Timestamp::from_secs(1710513000 + i),
-                &[ColumnValue::I64(i)],
-            )
-            .unwrap();
+            w.write_row(Timestamp::from_secs(1710513000 + i), &[ColumnValue::I64(i)])
+                .unwrap();
         }
         w.flush().unwrap();
         drop(w);
@@ -582,7 +579,8 @@ mod partition_extra {
         let dir = tempdir().unwrap();
         let nested = dir.path().join("db/tables/trades");
         let mut mgr = PartitionManager::new(nested.clone(), PartitionBy::Day);
-        mgr.ensure_partition(Timestamp::from_secs(1710513000)).unwrap();
+        mgr.ensure_partition(Timestamp::from_secs(1710513000))
+            .unwrap();
         assert!(nested.join("2024-03-15").exists());
     }
 
@@ -619,7 +617,8 @@ mod partition_extra {
             .build(dir.path())
             .unwrap();
         let mut w = TableWriter::open(dir.path(), "t").unwrap();
-        w.write_row(Timestamp::from_secs(1710513000), &[ColumnValue::I64(1)]).unwrap();
+        w.write_row(Timestamp::from_secs(1710513000), &[ColumnValue::I64(1)])
+            .unwrap();
         w.flush().unwrap();
         drop(w);
 
@@ -628,10 +627,12 @@ mod partition_extra {
         // Rewrite with 5 rows
         let ts_base = Timestamp::from_secs(1710513000);
         let new_rows: Vec<Vec<ColumnValue>> = (0..5)
-            .map(|i| vec![
-                ColumnValue::Timestamp(Timestamp(ts_base.as_nanos() + i * 1_000_000_000)),
-                ColumnValue::I64(i * 10),
-            ])
+            .map(|i| {
+                vec![
+                    ColumnValue::Timestamp(Timestamp(ts_base.as_nanos() + i * 1_000_000_000)),
+                    ColumnValue::I64(i * 10),
+                ]
+            })
             .collect();
         let written = rewrite_partition(&part, &meta, &new_rows).unwrap();
         assert_eq!(written, 5);
@@ -650,7 +651,8 @@ mod partition_extra {
             .build(dir.path())
             .unwrap();
         let mut w = TableWriter::open(dir.path(), "t").unwrap();
-        w.write_row(Timestamp::from_secs(1710513000), &[ColumnValue::I64(1)]).unwrap();
+        w.write_row(Timestamp::from_secs(1710513000), &[ColumnValue::I64(1)])
+            .unwrap();
         w.flush().unwrap();
         let parts = list_partitions(&dir.path().join("t")).unwrap();
         assert_eq!(parts.len(), 1);
@@ -671,8 +673,13 @@ mod partition_extra {
         let mut w = TableWriter::open(dir.path(), "t").unwrap();
         w.write_row(
             Timestamp::from_secs(1710513000),
-            &[ColumnValue::I32(42), ColumnValue::F64(3.14), ColumnValue::Str("hello")],
-        ).unwrap();
+            &[
+                ColumnValue::I32(42),
+                ColumnValue::F64(3.14),
+                ColumnValue::Str("hello"),
+            ],
+        )
+        .unwrap();
         w.flush().unwrap();
         drop(w);
         let meta = TableMeta::load(&dir.path().join("t/_meta")).unwrap();

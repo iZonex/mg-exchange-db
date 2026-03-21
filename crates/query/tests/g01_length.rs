@@ -3,19 +3,31 @@
 use exchange_query::plan::Value;
 use exchange_query::scalar::evaluate_scalar;
 
-fn s(v: &str) -> Value { Value::Str(v.to_string()) }
-fn i(v: i64) -> Value { Value::I64(v) }
-fn null() -> Value { Value::Null }
-fn ev(name: &str, args: &[Value]) -> Value { evaluate_scalar(name, args).unwrap() }
+fn s(v: &str) -> Value {
+    Value::Str(v.to_string())
+}
+fn i(v: i64) -> Value {
+    Value::I64(v)
+}
+fn null() -> Value {
+    Value::Null
+}
+fn ev(name: &str, args: &[Value]) -> Value {
+    evaluate_scalar(name, args).unwrap()
+}
 
 macro_rules! len_test {
     ($name:ident, $input:expr, $expected:expr) => {
-        #[test] fn $name() { assert_eq!(ev("length", &[$input]), i($expected)); }
+        #[test]
+        fn $name() {
+            assert_eq!(ev("length", &[$input]), i($expected));
+        }
     };
 }
 
 // Strings of length 0..100 built from repeated 'a'
-mod repeat_a { use super::*;
+mod repeat_a {
+    use super::*;
     len_test!(r000, s(""), 0);
     len_test!(r001, s("a"), 1);
     len_test!(r002, s("aa"), 2);
@@ -120,7 +132,8 @@ mod repeat_a { use super::*;
 }
 
 // Strings of repeated 'x' 101..200
-mod repeat_x { use super::*;
+mod repeat_x {
+    use super::*;
     len_test!(r101, s(&"x".repeat(101)), 101);
     len_test!(r102, s(&"x".repeat(102)), 102);
     len_test!(r103, s(&"x".repeat(103)), 103);
@@ -154,7 +167,8 @@ mod repeat_x { use super::*;
 }
 
 // Specific ASCII strings
-mod ascii_strings { use super::*;
+mod ascii_strings {
+    use super::*;
     len_test!(hello, s("hello"), 5);
     len_test!(world, s("world"), 5);
     len_test!(hello_world, s("hello world"), 11);
@@ -208,7 +222,8 @@ mod ascii_strings { use super::*;
 }
 
 // Repeated different chars
-mod repeat_chars { use super::*;
+mod repeat_chars {
+    use super::*;
     len_test!(b10, s(&"b".repeat(10)), 10);
     len_test!(c10, s(&"c".repeat(10)), 10);
     len_test!(d10, s(&"d".repeat(10)), 10);
@@ -252,7 +267,8 @@ mod repeat_chars { use super::*;
 }
 
 // Repeated chars with different counts
-mod repeat_varied { use super::*;
+mod repeat_varied {
+    use super::*;
     len_test!(b5, s(&"b".repeat(5)), 5);
     len_test!(b15, s(&"b".repeat(15)), 15);
     len_test!(b20, s(&"b".repeat(20)), 20);
@@ -306,8 +322,12 @@ mod repeat_varied { use super::*;
 }
 
 // Null and int inputs
-mod null_int { use super::*;
-    #[test] fn null_in() { assert_eq!(ev("length", &[null()]), null()); }
+mod null_int {
+    use super::*;
+    #[test]
+    fn null_in() {
+        assert_eq!(ev("length", &[null()]), null());
+    }
     len_test!(int_0, Value::I64(0), 1);
     len_test!(int_1, Value::I64(1), 1);
     len_test!(int_9, Value::I64(9), 1);
@@ -330,7 +350,8 @@ mod null_int { use super::*;
 }
 
 // Pattern strings
-mod patterns { use super::*;
+mod patterns {
+    use super::*;
     len_test!(ab_5, s(&"ab".repeat(5)), 10);
     len_test!(ab_10, s(&"ab".repeat(10)), 20);
     len_test!(ab_25, s(&"ab".repeat(25)), 50);
@@ -394,7 +415,8 @@ mod patterns { use super::*;
 }
 
 // Sentence-like strings
-mod sentences { use super::*;
+mod sentences {
+    use super::*;
     len_test!(s01, s("The quick brown fox"), 19);
     len_test!(s02, s("jumps over the lazy dog"), 23);
     len_test!(s03, s("Hello World"), 11);
@@ -428,61 +450,113 @@ mod sentences { use super::*;
 }
 
 // Repeated 'M' lengths 1..100
-mod repeat_m { use super::*;
-    len_test!(m001, s(&"M".repeat(1)), 1); len_test!(m002, s(&"M".repeat(2)), 2);
-    len_test!(m003, s(&"M".repeat(3)), 3); len_test!(m004, s(&"M".repeat(4)), 4);
-    len_test!(m005, s(&"M".repeat(5)), 5); len_test!(m006, s(&"M".repeat(6)), 6);
-    len_test!(m007, s(&"M".repeat(7)), 7); len_test!(m008, s(&"M".repeat(8)), 8);
-    len_test!(m009, s(&"M".repeat(9)), 9); len_test!(m010, s(&"M".repeat(10)), 10);
-    len_test!(m011, s(&"M".repeat(11)), 11); len_test!(m012, s(&"M".repeat(12)), 12);
-    len_test!(m013, s(&"M".repeat(13)), 13); len_test!(m014, s(&"M".repeat(14)), 14);
-    len_test!(m015, s(&"M".repeat(15)), 15); len_test!(m016, s(&"M".repeat(16)), 16);
-    len_test!(m017, s(&"M".repeat(17)), 17); len_test!(m018, s(&"M".repeat(18)), 18);
-    len_test!(m019, s(&"M".repeat(19)), 19); len_test!(m020, s(&"M".repeat(20)), 20);
-    len_test!(m021, s(&"M".repeat(21)), 21); len_test!(m022, s(&"M".repeat(22)), 22);
-    len_test!(m023, s(&"M".repeat(23)), 23); len_test!(m024, s(&"M".repeat(24)), 24);
-    len_test!(m025, s(&"M".repeat(25)), 25); len_test!(m026, s(&"M".repeat(26)), 26);
-    len_test!(m027, s(&"M".repeat(27)), 27); len_test!(m028, s(&"M".repeat(28)), 28);
-    len_test!(m029, s(&"M".repeat(29)), 29); len_test!(m030, s(&"M".repeat(30)), 30);
-    len_test!(m031, s(&"M".repeat(31)), 31); len_test!(m032, s(&"M".repeat(32)), 32);
-    len_test!(m033, s(&"M".repeat(33)), 33); len_test!(m034, s(&"M".repeat(34)), 34);
-    len_test!(m035, s(&"M".repeat(35)), 35); len_test!(m036, s(&"M".repeat(36)), 36);
-    len_test!(m037, s(&"M".repeat(37)), 37); len_test!(m038, s(&"M".repeat(38)), 38);
-    len_test!(m039, s(&"M".repeat(39)), 39); len_test!(m040, s(&"M".repeat(40)), 40);
-    len_test!(m041, s(&"M".repeat(41)), 41); len_test!(m042, s(&"M".repeat(42)), 42);
-    len_test!(m043, s(&"M".repeat(43)), 43); len_test!(m044, s(&"M".repeat(44)), 44);
-    len_test!(m045, s(&"M".repeat(45)), 45); len_test!(m046, s(&"M".repeat(46)), 46);
-    len_test!(m047, s(&"M".repeat(47)), 47); len_test!(m048, s(&"M".repeat(48)), 48);
-    len_test!(m049, s(&"M".repeat(49)), 49); len_test!(m050, s(&"M".repeat(50)), 50);
-    len_test!(m051, s(&"M".repeat(51)), 51); len_test!(m052, s(&"M".repeat(52)), 52);
-    len_test!(m053, s(&"M".repeat(53)), 53); len_test!(m054, s(&"M".repeat(54)), 54);
-    len_test!(m055, s(&"M".repeat(55)), 55); len_test!(m056, s(&"M".repeat(56)), 56);
-    len_test!(m057, s(&"M".repeat(57)), 57); len_test!(m058, s(&"M".repeat(58)), 58);
-    len_test!(m059, s(&"M".repeat(59)), 59); len_test!(m060, s(&"M".repeat(60)), 60);
-    len_test!(m061, s(&"M".repeat(61)), 61); len_test!(m062, s(&"M".repeat(62)), 62);
-    len_test!(m063, s(&"M".repeat(63)), 63); len_test!(m064, s(&"M".repeat(64)), 64);
-    len_test!(m065, s(&"M".repeat(65)), 65); len_test!(m066, s(&"M".repeat(66)), 66);
-    len_test!(m067, s(&"M".repeat(67)), 67); len_test!(m068, s(&"M".repeat(68)), 68);
-    len_test!(m069, s(&"M".repeat(69)), 69); len_test!(m070, s(&"M".repeat(70)), 70);
-    len_test!(m071, s(&"M".repeat(71)), 71); len_test!(m072, s(&"M".repeat(72)), 72);
-    len_test!(m073, s(&"M".repeat(73)), 73); len_test!(m074, s(&"M".repeat(74)), 74);
-    len_test!(m075, s(&"M".repeat(75)), 75); len_test!(m076, s(&"M".repeat(76)), 76);
-    len_test!(m077, s(&"M".repeat(77)), 77); len_test!(m078, s(&"M".repeat(78)), 78);
-    len_test!(m079, s(&"M".repeat(79)), 79); len_test!(m080, s(&"M".repeat(80)), 80);
-    len_test!(m081, s(&"M".repeat(81)), 81); len_test!(m082, s(&"M".repeat(82)), 82);
-    len_test!(m083, s(&"M".repeat(83)), 83); len_test!(m084, s(&"M".repeat(84)), 84);
-    len_test!(m085, s(&"M".repeat(85)), 85); len_test!(m086, s(&"M".repeat(86)), 86);
-    len_test!(m087, s(&"M".repeat(87)), 87); len_test!(m088, s(&"M".repeat(88)), 88);
-    len_test!(m089, s(&"M".repeat(89)), 89); len_test!(m090, s(&"M".repeat(90)), 90);
-    len_test!(m091, s(&"M".repeat(91)), 91); len_test!(m092, s(&"M".repeat(92)), 92);
-    len_test!(m093, s(&"M".repeat(93)), 93); len_test!(m094, s(&"M".repeat(94)), 94);
-    len_test!(m095, s(&"M".repeat(95)), 95); len_test!(m096, s(&"M".repeat(96)), 96);
-    len_test!(m097, s(&"M".repeat(97)), 97); len_test!(m098, s(&"M".repeat(98)), 98);
-    len_test!(m099, s(&"M".repeat(99)), 99); len_test!(m100, s(&"M".repeat(100)), 100);
+mod repeat_m {
+    use super::*;
+    len_test!(m001, s(&"M".repeat(1)), 1);
+    len_test!(m002, s(&"M".repeat(2)), 2);
+    len_test!(m003, s(&"M".repeat(3)), 3);
+    len_test!(m004, s(&"M".repeat(4)), 4);
+    len_test!(m005, s(&"M".repeat(5)), 5);
+    len_test!(m006, s(&"M".repeat(6)), 6);
+    len_test!(m007, s(&"M".repeat(7)), 7);
+    len_test!(m008, s(&"M".repeat(8)), 8);
+    len_test!(m009, s(&"M".repeat(9)), 9);
+    len_test!(m010, s(&"M".repeat(10)), 10);
+    len_test!(m011, s(&"M".repeat(11)), 11);
+    len_test!(m012, s(&"M".repeat(12)), 12);
+    len_test!(m013, s(&"M".repeat(13)), 13);
+    len_test!(m014, s(&"M".repeat(14)), 14);
+    len_test!(m015, s(&"M".repeat(15)), 15);
+    len_test!(m016, s(&"M".repeat(16)), 16);
+    len_test!(m017, s(&"M".repeat(17)), 17);
+    len_test!(m018, s(&"M".repeat(18)), 18);
+    len_test!(m019, s(&"M".repeat(19)), 19);
+    len_test!(m020, s(&"M".repeat(20)), 20);
+    len_test!(m021, s(&"M".repeat(21)), 21);
+    len_test!(m022, s(&"M".repeat(22)), 22);
+    len_test!(m023, s(&"M".repeat(23)), 23);
+    len_test!(m024, s(&"M".repeat(24)), 24);
+    len_test!(m025, s(&"M".repeat(25)), 25);
+    len_test!(m026, s(&"M".repeat(26)), 26);
+    len_test!(m027, s(&"M".repeat(27)), 27);
+    len_test!(m028, s(&"M".repeat(28)), 28);
+    len_test!(m029, s(&"M".repeat(29)), 29);
+    len_test!(m030, s(&"M".repeat(30)), 30);
+    len_test!(m031, s(&"M".repeat(31)), 31);
+    len_test!(m032, s(&"M".repeat(32)), 32);
+    len_test!(m033, s(&"M".repeat(33)), 33);
+    len_test!(m034, s(&"M".repeat(34)), 34);
+    len_test!(m035, s(&"M".repeat(35)), 35);
+    len_test!(m036, s(&"M".repeat(36)), 36);
+    len_test!(m037, s(&"M".repeat(37)), 37);
+    len_test!(m038, s(&"M".repeat(38)), 38);
+    len_test!(m039, s(&"M".repeat(39)), 39);
+    len_test!(m040, s(&"M".repeat(40)), 40);
+    len_test!(m041, s(&"M".repeat(41)), 41);
+    len_test!(m042, s(&"M".repeat(42)), 42);
+    len_test!(m043, s(&"M".repeat(43)), 43);
+    len_test!(m044, s(&"M".repeat(44)), 44);
+    len_test!(m045, s(&"M".repeat(45)), 45);
+    len_test!(m046, s(&"M".repeat(46)), 46);
+    len_test!(m047, s(&"M".repeat(47)), 47);
+    len_test!(m048, s(&"M".repeat(48)), 48);
+    len_test!(m049, s(&"M".repeat(49)), 49);
+    len_test!(m050, s(&"M".repeat(50)), 50);
+    len_test!(m051, s(&"M".repeat(51)), 51);
+    len_test!(m052, s(&"M".repeat(52)), 52);
+    len_test!(m053, s(&"M".repeat(53)), 53);
+    len_test!(m054, s(&"M".repeat(54)), 54);
+    len_test!(m055, s(&"M".repeat(55)), 55);
+    len_test!(m056, s(&"M".repeat(56)), 56);
+    len_test!(m057, s(&"M".repeat(57)), 57);
+    len_test!(m058, s(&"M".repeat(58)), 58);
+    len_test!(m059, s(&"M".repeat(59)), 59);
+    len_test!(m060, s(&"M".repeat(60)), 60);
+    len_test!(m061, s(&"M".repeat(61)), 61);
+    len_test!(m062, s(&"M".repeat(62)), 62);
+    len_test!(m063, s(&"M".repeat(63)), 63);
+    len_test!(m064, s(&"M".repeat(64)), 64);
+    len_test!(m065, s(&"M".repeat(65)), 65);
+    len_test!(m066, s(&"M".repeat(66)), 66);
+    len_test!(m067, s(&"M".repeat(67)), 67);
+    len_test!(m068, s(&"M".repeat(68)), 68);
+    len_test!(m069, s(&"M".repeat(69)), 69);
+    len_test!(m070, s(&"M".repeat(70)), 70);
+    len_test!(m071, s(&"M".repeat(71)), 71);
+    len_test!(m072, s(&"M".repeat(72)), 72);
+    len_test!(m073, s(&"M".repeat(73)), 73);
+    len_test!(m074, s(&"M".repeat(74)), 74);
+    len_test!(m075, s(&"M".repeat(75)), 75);
+    len_test!(m076, s(&"M".repeat(76)), 76);
+    len_test!(m077, s(&"M".repeat(77)), 77);
+    len_test!(m078, s(&"M".repeat(78)), 78);
+    len_test!(m079, s(&"M".repeat(79)), 79);
+    len_test!(m080, s(&"M".repeat(80)), 80);
+    len_test!(m081, s(&"M".repeat(81)), 81);
+    len_test!(m082, s(&"M".repeat(82)), 82);
+    len_test!(m083, s(&"M".repeat(83)), 83);
+    len_test!(m084, s(&"M".repeat(84)), 84);
+    len_test!(m085, s(&"M".repeat(85)), 85);
+    len_test!(m086, s(&"M".repeat(86)), 86);
+    len_test!(m087, s(&"M".repeat(87)), 87);
+    len_test!(m088, s(&"M".repeat(88)), 88);
+    len_test!(m089, s(&"M".repeat(89)), 89);
+    len_test!(m090, s(&"M".repeat(90)), 90);
+    len_test!(m091, s(&"M".repeat(91)), 91);
+    len_test!(m092, s(&"M".repeat(92)), 92);
+    len_test!(m093, s(&"M".repeat(93)), 93);
+    len_test!(m094, s(&"M".repeat(94)), 94);
+    len_test!(m095, s(&"M".repeat(95)), 95);
+    len_test!(m096, s(&"M".repeat(96)), 96);
+    len_test!(m097, s(&"M".repeat(97)), 97);
+    len_test!(m098, s(&"M".repeat(98)), 98);
+    len_test!(m099, s(&"M".repeat(99)), 99);
+    len_test!(m100, s(&"M".repeat(100)), 100);
 }
 
 // Format string lengths
-mod fmt_strings { use super::*;
+mod fmt_strings {
+    use super::*;
     len_test!(fmt_01, s(&format!("v{}", 0)), 2);
     len_test!(fmt_02, s(&format!("v{}", 1)), 2);
     len_test!(fmt_03, s(&format!("v{}", 9)), 2);
@@ -506,95 +580,176 @@ mod fmt_strings { use super::*;
 }
 
 // Repeated 'Q' lengths 1..100
-mod repeat_q { use super::*;
-    len_test!(q001, s(&"Q".repeat(1)), 1); len_test!(q002, s(&"Q".repeat(2)), 2);
-    len_test!(q003, s(&"Q".repeat(3)), 3); len_test!(q004, s(&"Q".repeat(4)), 4);
-    len_test!(q005, s(&"Q".repeat(5)), 5); len_test!(q006, s(&"Q".repeat(6)), 6);
-    len_test!(q007, s(&"Q".repeat(7)), 7); len_test!(q008, s(&"Q".repeat(8)), 8);
-    len_test!(q009, s(&"Q".repeat(9)), 9); len_test!(q010, s(&"Q".repeat(10)), 10);
-    len_test!(q011, s(&"Q".repeat(11)), 11); len_test!(q012, s(&"Q".repeat(12)), 12);
-    len_test!(q013, s(&"Q".repeat(13)), 13); len_test!(q014, s(&"Q".repeat(14)), 14);
-    len_test!(q015, s(&"Q".repeat(15)), 15); len_test!(q016, s(&"Q".repeat(16)), 16);
-    len_test!(q017, s(&"Q".repeat(17)), 17); len_test!(q018, s(&"Q".repeat(18)), 18);
-    len_test!(q019, s(&"Q".repeat(19)), 19); len_test!(q020, s(&"Q".repeat(20)), 20);
-    len_test!(q021, s(&"Q".repeat(21)), 21); len_test!(q022, s(&"Q".repeat(22)), 22);
-    len_test!(q023, s(&"Q".repeat(23)), 23); len_test!(q024, s(&"Q".repeat(24)), 24);
-    len_test!(q025, s(&"Q".repeat(25)), 25); len_test!(q026, s(&"Q".repeat(26)), 26);
-    len_test!(q027, s(&"Q".repeat(27)), 27); len_test!(q028, s(&"Q".repeat(28)), 28);
-    len_test!(q029, s(&"Q".repeat(29)), 29); len_test!(q030, s(&"Q".repeat(30)), 30);
-    len_test!(q031, s(&"Q".repeat(31)), 31); len_test!(q032, s(&"Q".repeat(32)), 32);
-    len_test!(q033, s(&"Q".repeat(33)), 33); len_test!(q034, s(&"Q".repeat(34)), 34);
-    len_test!(q035, s(&"Q".repeat(35)), 35); len_test!(q036, s(&"Q".repeat(36)), 36);
-    len_test!(q037, s(&"Q".repeat(37)), 37); len_test!(q038, s(&"Q".repeat(38)), 38);
-    len_test!(q039, s(&"Q".repeat(39)), 39); len_test!(q040, s(&"Q".repeat(40)), 40);
-    len_test!(q041, s(&"Q".repeat(41)), 41); len_test!(q042, s(&"Q".repeat(42)), 42);
-    len_test!(q043, s(&"Q".repeat(43)), 43); len_test!(q044, s(&"Q".repeat(44)), 44);
-    len_test!(q045, s(&"Q".repeat(45)), 45); len_test!(q046, s(&"Q".repeat(46)), 46);
-    len_test!(q047, s(&"Q".repeat(47)), 47); len_test!(q048, s(&"Q".repeat(48)), 48);
-    len_test!(q049, s(&"Q".repeat(49)), 49); len_test!(q050, s(&"Q".repeat(50)), 50);
-    len_test!(q051, s(&"Q".repeat(51)), 51); len_test!(q052, s(&"Q".repeat(52)), 52);
-    len_test!(q053, s(&"Q".repeat(53)), 53); len_test!(q054, s(&"Q".repeat(54)), 54);
-    len_test!(q055, s(&"Q".repeat(55)), 55); len_test!(q056, s(&"Q".repeat(56)), 56);
-    len_test!(q057, s(&"Q".repeat(57)), 57); len_test!(q058, s(&"Q".repeat(58)), 58);
-    len_test!(q059, s(&"Q".repeat(59)), 59); len_test!(q060, s(&"Q".repeat(60)), 60);
-    len_test!(q061, s(&"Q".repeat(61)), 61); len_test!(q062, s(&"Q".repeat(62)), 62);
-    len_test!(q063, s(&"Q".repeat(63)), 63); len_test!(q064, s(&"Q".repeat(64)), 64);
-    len_test!(q065, s(&"Q".repeat(65)), 65); len_test!(q066, s(&"Q".repeat(66)), 66);
-    len_test!(q067, s(&"Q".repeat(67)), 67); len_test!(q068, s(&"Q".repeat(68)), 68);
-    len_test!(q069, s(&"Q".repeat(69)), 69); len_test!(q070, s(&"Q".repeat(70)), 70);
-    len_test!(q071, s(&"Q".repeat(71)), 71); len_test!(q072, s(&"Q".repeat(72)), 72);
-    len_test!(q073, s(&"Q".repeat(73)), 73); len_test!(q074, s(&"Q".repeat(74)), 74);
-    len_test!(q075, s(&"Q".repeat(75)), 75); len_test!(q076, s(&"Q".repeat(76)), 76);
-    len_test!(q077, s(&"Q".repeat(77)), 77); len_test!(q078, s(&"Q".repeat(78)), 78);
-    len_test!(q079, s(&"Q".repeat(79)), 79); len_test!(q080, s(&"Q".repeat(80)), 80);
-    len_test!(q081, s(&"Q".repeat(81)), 81); len_test!(q082, s(&"Q".repeat(82)), 82);
-    len_test!(q083, s(&"Q".repeat(83)), 83); len_test!(q084, s(&"Q".repeat(84)), 84);
-    len_test!(q085, s(&"Q".repeat(85)), 85); len_test!(q086, s(&"Q".repeat(86)), 86);
-    len_test!(q087, s(&"Q".repeat(87)), 87); len_test!(q088, s(&"Q".repeat(88)), 88);
-    len_test!(q089, s(&"Q".repeat(89)), 89); len_test!(q090, s(&"Q".repeat(90)), 90);
-    len_test!(q091, s(&"Q".repeat(91)), 91); len_test!(q092, s(&"Q".repeat(92)), 92);
-    len_test!(q093, s(&"Q".repeat(93)), 93); len_test!(q094, s(&"Q".repeat(94)), 94);
-    len_test!(q095, s(&"Q".repeat(95)), 95); len_test!(q096, s(&"Q".repeat(96)), 96);
-    len_test!(q097, s(&"Q".repeat(97)), 97); len_test!(q098, s(&"Q".repeat(98)), 98);
-    len_test!(q099, s(&"Q".repeat(99)), 99); len_test!(q100, s(&"Q".repeat(100)), 100);
+mod repeat_q {
+    use super::*;
+    len_test!(q001, s(&"Q".repeat(1)), 1);
+    len_test!(q002, s(&"Q".repeat(2)), 2);
+    len_test!(q003, s(&"Q".repeat(3)), 3);
+    len_test!(q004, s(&"Q".repeat(4)), 4);
+    len_test!(q005, s(&"Q".repeat(5)), 5);
+    len_test!(q006, s(&"Q".repeat(6)), 6);
+    len_test!(q007, s(&"Q".repeat(7)), 7);
+    len_test!(q008, s(&"Q".repeat(8)), 8);
+    len_test!(q009, s(&"Q".repeat(9)), 9);
+    len_test!(q010, s(&"Q".repeat(10)), 10);
+    len_test!(q011, s(&"Q".repeat(11)), 11);
+    len_test!(q012, s(&"Q".repeat(12)), 12);
+    len_test!(q013, s(&"Q".repeat(13)), 13);
+    len_test!(q014, s(&"Q".repeat(14)), 14);
+    len_test!(q015, s(&"Q".repeat(15)), 15);
+    len_test!(q016, s(&"Q".repeat(16)), 16);
+    len_test!(q017, s(&"Q".repeat(17)), 17);
+    len_test!(q018, s(&"Q".repeat(18)), 18);
+    len_test!(q019, s(&"Q".repeat(19)), 19);
+    len_test!(q020, s(&"Q".repeat(20)), 20);
+    len_test!(q021, s(&"Q".repeat(21)), 21);
+    len_test!(q022, s(&"Q".repeat(22)), 22);
+    len_test!(q023, s(&"Q".repeat(23)), 23);
+    len_test!(q024, s(&"Q".repeat(24)), 24);
+    len_test!(q025, s(&"Q".repeat(25)), 25);
+    len_test!(q026, s(&"Q".repeat(26)), 26);
+    len_test!(q027, s(&"Q".repeat(27)), 27);
+    len_test!(q028, s(&"Q".repeat(28)), 28);
+    len_test!(q029, s(&"Q".repeat(29)), 29);
+    len_test!(q030, s(&"Q".repeat(30)), 30);
+    len_test!(q031, s(&"Q".repeat(31)), 31);
+    len_test!(q032, s(&"Q".repeat(32)), 32);
+    len_test!(q033, s(&"Q".repeat(33)), 33);
+    len_test!(q034, s(&"Q".repeat(34)), 34);
+    len_test!(q035, s(&"Q".repeat(35)), 35);
+    len_test!(q036, s(&"Q".repeat(36)), 36);
+    len_test!(q037, s(&"Q".repeat(37)), 37);
+    len_test!(q038, s(&"Q".repeat(38)), 38);
+    len_test!(q039, s(&"Q".repeat(39)), 39);
+    len_test!(q040, s(&"Q".repeat(40)), 40);
+    len_test!(q041, s(&"Q".repeat(41)), 41);
+    len_test!(q042, s(&"Q".repeat(42)), 42);
+    len_test!(q043, s(&"Q".repeat(43)), 43);
+    len_test!(q044, s(&"Q".repeat(44)), 44);
+    len_test!(q045, s(&"Q".repeat(45)), 45);
+    len_test!(q046, s(&"Q".repeat(46)), 46);
+    len_test!(q047, s(&"Q".repeat(47)), 47);
+    len_test!(q048, s(&"Q".repeat(48)), 48);
+    len_test!(q049, s(&"Q".repeat(49)), 49);
+    len_test!(q050, s(&"Q".repeat(50)), 50);
+    len_test!(q051, s(&"Q".repeat(51)), 51);
+    len_test!(q052, s(&"Q".repeat(52)), 52);
+    len_test!(q053, s(&"Q".repeat(53)), 53);
+    len_test!(q054, s(&"Q".repeat(54)), 54);
+    len_test!(q055, s(&"Q".repeat(55)), 55);
+    len_test!(q056, s(&"Q".repeat(56)), 56);
+    len_test!(q057, s(&"Q".repeat(57)), 57);
+    len_test!(q058, s(&"Q".repeat(58)), 58);
+    len_test!(q059, s(&"Q".repeat(59)), 59);
+    len_test!(q060, s(&"Q".repeat(60)), 60);
+    len_test!(q061, s(&"Q".repeat(61)), 61);
+    len_test!(q062, s(&"Q".repeat(62)), 62);
+    len_test!(q063, s(&"Q".repeat(63)), 63);
+    len_test!(q064, s(&"Q".repeat(64)), 64);
+    len_test!(q065, s(&"Q".repeat(65)), 65);
+    len_test!(q066, s(&"Q".repeat(66)), 66);
+    len_test!(q067, s(&"Q".repeat(67)), 67);
+    len_test!(q068, s(&"Q".repeat(68)), 68);
+    len_test!(q069, s(&"Q".repeat(69)), 69);
+    len_test!(q070, s(&"Q".repeat(70)), 70);
+    len_test!(q071, s(&"Q".repeat(71)), 71);
+    len_test!(q072, s(&"Q".repeat(72)), 72);
+    len_test!(q073, s(&"Q".repeat(73)), 73);
+    len_test!(q074, s(&"Q".repeat(74)), 74);
+    len_test!(q075, s(&"Q".repeat(75)), 75);
+    len_test!(q076, s(&"Q".repeat(76)), 76);
+    len_test!(q077, s(&"Q".repeat(77)), 77);
+    len_test!(q078, s(&"Q".repeat(78)), 78);
+    len_test!(q079, s(&"Q".repeat(79)), 79);
+    len_test!(q080, s(&"Q".repeat(80)), 80);
+    len_test!(q081, s(&"Q".repeat(81)), 81);
+    len_test!(q082, s(&"Q".repeat(82)), 82);
+    len_test!(q083, s(&"Q".repeat(83)), 83);
+    len_test!(q084, s(&"Q".repeat(84)), 84);
+    len_test!(q085, s(&"Q".repeat(85)), 85);
+    len_test!(q086, s(&"Q".repeat(86)), 86);
+    len_test!(q087, s(&"Q".repeat(87)), 87);
+    len_test!(q088, s(&"Q".repeat(88)), 88);
+    len_test!(q089, s(&"Q".repeat(89)), 89);
+    len_test!(q090, s(&"Q".repeat(90)), 90);
+    len_test!(q091, s(&"Q".repeat(91)), 91);
+    len_test!(q092, s(&"Q".repeat(92)), 92);
+    len_test!(q093, s(&"Q".repeat(93)), 93);
+    len_test!(q094, s(&"Q".repeat(94)), 94);
+    len_test!(q095, s(&"Q".repeat(95)), 95);
+    len_test!(q096, s(&"Q".repeat(96)), 96);
+    len_test!(q097, s(&"Q".repeat(97)), 97);
+    len_test!(q098, s(&"Q".repeat(98)), 98);
+    len_test!(q099, s(&"Q".repeat(99)), 99);
+    len_test!(q100, s(&"Q".repeat(100)), 100);
 }
 
 // Two-char pattern lengths
-mod pattern2 { use super::*;
-    len_test!(ab1, s("ab"), 2); len_test!(ab2, s("abab"), 4); len_test!(ab3, s("ababab"), 6);
-    len_test!(ab4, s(&"ab".repeat(4)), 8); len_test!(ab5, s(&"ab".repeat(5)), 10);
-    len_test!(ab6, s(&"ab".repeat(6)), 12); len_test!(ab7, s(&"ab".repeat(7)), 14);
-    len_test!(ab8, s(&"ab".repeat(8)), 16); len_test!(ab9, s(&"ab".repeat(9)), 18);
+mod pattern2 {
+    use super::*;
+    len_test!(ab1, s("ab"), 2);
+    len_test!(ab2, s("abab"), 4);
+    len_test!(ab3, s("ababab"), 6);
+    len_test!(ab4, s(&"ab".repeat(4)), 8);
+    len_test!(ab5, s(&"ab".repeat(5)), 10);
+    len_test!(ab6, s(&"ab".repeat(6)), 12);
+    len_test!(ab7, s(&"ab".repeat(7)), 14);
+    len_test!(ab8, s(&"ab".repeat(8)), 16);
+    len_test!(ab9, s(&"ab".repeat(9)), 18);
     len_test!(ab10, s(&"ab".repeat(10)), 20);
-    len_test!(cd1, s(&"cd".repeat(1)), 2); len_test!(cd5, s(&"cd".repeat(5)), 10);
-    len_test!(cd10, s(&"cd".repeat(10)), 20); len_test!(cd20, s(&"cd".repeat(20)), 40);
+    len_test!(cd1, s(&"cd".repeat(1)), 2);
+    len_test!(cd5, s(&"cd".repeat(5)), 10);
+    len_test!(cd10, s(&"cd".repeat(10)), 20);
+    len_test!(cd20, s(&"cd".repeat(20)), 40);
     len_test!(cd50, s(&"cd".repeat(50)), 100);
-    len_test!(ef1, s(&"ef".repeat(1)), 2); len_test!(ef5, s(&"ef".repeat(5)), 10);
-    len_test!(ef10, s(&"ef".repeat(10)), 20); len_test!(ef20, s(&"ef".repeat(20)), 40);
+    len_test!(ef1, s(&"ef".repeat(1)), 2);
+    len_test!(ef5, s(&"ef".repeat(5)), 10);
+    len_test!(ef10, s(&"ef".repeat(10)), 20);
+    len_test!(ef20, s(&"ef".repeat(20)), 40);
     len_test!(ef50, s(&"ef".repeat(50)), 100);
-    len_test!(gh1, s(&"gh".repeat(1)), 2); len_test!(gh5, s(&"gh".repeat(5)), 10);
-    len_test!(gh10, s(&"gh".repeat(10)), 20); len_test!(gh20, s(&"gh".repeat(20)), 40);
+    len_test!(gh1, s(&"gh".repeat(1)), 2);
+    len_test!(gh5, s(&"gh".repeat(5)), 10);
+    len_test!(gh10, s(&"gh".repeat(10)), 20);
+    len_test!(gh20, s(&"gh".repeat(20)), 40);
     len_test!(gh50, s(&"gh".repeat(50)), 100);
-    len_test!(ij1, s(&"ij".repeat(1)), 2); len_test!(ij5, s(&"ij".repeat(5)), 10);
-    len_test!(ij10, s(&"ij".repeat(10)), 20); len_test!(ij20, s(&"ij".repeat(20)), 40);
+    len_test!(ij1, s(&"ij".repeat(1)), 2);
+    len_test!(ij5, s(&"ij".repeat(5)), 10);
+    len_test!(ij10, s(&"ij".repeat(10)), 20);
+    len_test!(ij20, s(&"ij".repeat(20)), 40);
     len_test!(ij50, s(&"ij".repeat(50)), 100);
-    len_test!(kl1, s(&"kl".repeat(1)), 2); len_test!(kl5, s(&"kl".repeat(5)), 10);
-    len_test!(kl10, s(&"kl".repeat(10)), 20); len_test!(kl20, s(&"kl".repeat(20)), 40);
+    len_test!(kl1, s(&"kl".repeat(1)), 2);
+    len_test!(kl5, s(&"kl".repeat(5)), 10);
+    len_test!(kl10, s(&"kl".repeat(10)), 20);
+    len_test!(kl20, s(&"kl".repeat(20)), 40);
     len_test!(kl50, s(&"kl".repeat(50)), 100);
-    len_test!(mn1, s(&"mn".repeat(1)), 2); len_test!(mn5, s(&"mn".repeat(5)), 10);
-    len_test!(mn10, s(&"mn".repeat(10)), 20); len_test!(mn20, s(&"mn".repeat(20)), 40);
+    len_test!(mn1, s(&"mn".repeat(1)), 2);
+    len_test!(mn5, s(&"mn".repeat(5)), 10);
+    len_test!(mn10, s(&"mn".repeat(10)), 20);
+    len_test!(mn20, s(&"mn".repeat(20)), 40);
     len_test!(mn50, s(&"mn".repeat(50)), 100);
-    len_test!(op1, s(&"op".repeat(1)), 2); len_test!(op5, s(&"op".repeat(5)), 10);
-    len_test!(op10, s(&"op".repeat(10)), 20); len_test!(op20, s(&"op".repeat(20)), 40);
+    len_test!(op1, s(&"op".repeat(1)), 2);
+    len_test!(op5, s(&"op".repeat(5)), 10);
+    len_test!(op10, s(&"op".repeat(10)), 20);
+    len_test!(op20, s(&"op".repeat(20)), 40);
     len_test!(op50, s(&"op".repeat(50)), 100);
-    len_test!(qr1, s(&"qr".repeat(1)), 2); len_test!(qr5, s(&"qr".repeat(5)), 10);
-    len_test!(qr10, s(&"qr".repeat(10)), 20); len_test!(qr20, s(&"qr".repeat(20)), 40);
-    len_test!(st1, s(&"st".repeat(1)), 2); len_test!(st5, s(&"st".repeat(5)), 10);
-    len_test!(st10, s(&"st".repeat(10)), 20); len_test!(st20, s(&"st".repeat(20)), 40);
-    len_test!(uv1, s(&"uv".repeat(1)), 2); len_test!(uv5, s(&"uv".repeat(5)), 10);
-    len_test!(uv10, s(&"uv".repeat(10)), 20); len_test!(uv20, s(&"uv".repeat(20)), 40);
-    len_test!(wx1, s(&"wx".repeat(1)), 2); len_test!(wx5, s(&"wx".repeat(5)), 10);
-    len_test!(wx10, s(&"wx".repeat(10)), 20); len_test!(wx20, s(&"wx".repeat(20)), 40);
-    len_test!(yz1, s(&"yz".repeat(1)), 2); len_test!(yz5, s(&"yz".repeat(5)), 10);
-    len_test!(yz10, s(&"yz".repeat(10)), 20); len_test!(yz20, s(&"yz".repeat(20)), 40);
+    len_test!(qr1, s(&"qr".repeat(1)), 2);
+    len_test!(qr5, s(&"qr".repeat(5)), 10);
+    len_test!(qr10, s(&"qr".repeat(10)), 20);
+    len_test!(qr20, s(&"qr".repeat(20)), 40);
+    len_test!(st1, s(&"st".repeat(1)), 2);
+    len_test!(st5, s(&"st".repeat(5)), 10);
+    len_test!(st10, s(&"st".repeat(10)), 20);
+    len_test!(st20, s(&"st".repeat(20)), 40);
+    len_test!(uv1, s(&"uv".repeat(1)), 2);
+    len_test!(uv5, s(&"uv".repeat(5)), 10);
+    len_test!(uv10, s(&"uv".repeat(10)), 20);
+    len_test!(uv20, s(&"uv".repeat(20)), 40);
+    len_test!(wx1, s(&"wx".repeat(1)), 2);
+    len_test!(wx5, s(&"wx".repeat(5)), 10);
+    len_test!(wx10, s(&"wx".repeat(10)), 20);
+    len_test!(wx20, s(&"wx".repeat(20)), 40);
+    len_test!(yz1, s(&"yz".repeat(1)), 2);
+    len_test!(yz5, s(&"yz".repeat(5)), 10);
+    len_test!(yz10, s(&"yz".repeat(10)), 20);
+    len_test!(yz20, s(&"yz".repeat(20)), 40);
 }

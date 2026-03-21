@@ -31,7 +31,11 @@ fn read_value(reader: &ColReader, row: u64) -> Value {
             ColumnType::I64 => Value::I64(r.read_i64(row)),
             ColumnType::F64 => {
                 let v = r.read_f64(row);
-                if v.is_nan() { Value::Null } else { Value::F64(v) }
+                if v.is_nan() {
+                    Value::Null
+                } else {
+                    Value::F64(v)
+                }
             }
             ColumnType::I32 | ColumnType::Symbol => Value::I64(r.read_i32(row) as i64),
             ColumnType::Timestamp => Value::Timestamp(r.read_i64(row)),
@@ -51,7 +55,11 @@ fn read_value(reader: &ColReader, row: u64) -> Value {
         },
         ColReader::Var(r, _) => {
             let s = r.read_str(row);
-            if s == "\0" { Value::Null } else { Value::Str(s.to_string()) }
+            if s == "\0" {
+                Value::Null
+            } else {
+                Value::Str(s.to_string())
+            }
         }
     }
 }
@@ -133,26 +141,50 @@ pub fn evaluate_filter(filter: &Filter, values: &[(usize, Value)], meta: &TableM
         }
         Filter::Gt(col, expected) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater)).unwrap_or(false)
+            val.as_ref()
+                .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Greater))
+                .unwrap_or(false)
         }
         Filter::Lt(col, expected) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less)).unwrap_or(false)
+            val.as_ref()
+                .map(|v| v.cmp_coerce(expected) == Some(std::cmp::Ordering::Less))
+                .unwrap_or(false)
         }
         Filter::Gte(col, expected) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))).unwrap_or(false)
+            val.as_ref()
+                .map(|v| {
+                    matches!(
+                        v.cmp_coerce(expected),
+                        Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                    )
+                })
+                .unwrap_or(false)
         }
         Filter::Lte(col, expected) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| matches!(v.cmp_coerce(expected), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal))).unwrap_or(false)
+            val.as_ref()
+                .map(|v| {
+                    matches!(
+                        v.cmp_coerce(expected),
+                        Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                    )
+                })
+                .unwrap_or(false)
         }
-        Filter::Between(col, low, high)
-        | Filter::BetweenSymmetric(col, low, high) => {
+        Filter::Between(col, low, high) | Filter::BetweenSymmetric(col, low, high) => {
             let val = get_filter_value(col, values, meta);
             val.as_ref()
-                .map(|v| matches!(v.cmp_coerce(low), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal))
-                      && matches!(v.cmp_coerce(high), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)))
+                .map(|v| {
+                    matches!(
+                        v.cmp_coerce(low),
+                        Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                    ) && matches!(
+                        v.cmp_coerce(high),
+                        Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                    )
+                })
                 .unwrap_or(false)
         }
         Filter::And(parts) => parts.iter().all(|p| evaluate_filter(p, values, meta)),
@@ -167,47 +199,58 @@ pub fn evaluate_filter(filter: &Filter, values: &[(usize, Value)], meta: &TableM
         }
         Filter::In(col, list) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| list.iter().any(|item| v.eq_coerce(item))).unwrap_or(false)
+            val.as_ref()
+                .map(|v| list.iter().any(|item| v.eq_coerce(item)))
+                .unwrap_or(false)
         }
         Filter::NotIn(col, list) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| !list.iter().any(|item| v.eq_coerce(item))).unwrap_or(true)
+            val.as_ref()
+                .map(|v| !list.iter().any(|item| v.eq_coerce(item)))
+                .unwrap_or(true)
         }
         Filter::Like(col, pattern) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| {
-                if let Value::Str(s) = v {
-                    crate::executor::like_match(s, pattern, false)
-                } else {
-                    false
-                }
-            }).unwrap_or(false)
+            val.as_ref()
+                .map(|v| {
+                    if let Value::Str(s) = v {
+                        crate::executor::like_match(s, pattern, false)
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
         }
         Filter::NotLike(col, pattern) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| {
-                if let Value::Str(s) = v {
-                    !crate::executor::like_match(s, pattern, false)
-                } else {
-                    true
-                }
-            }).unwrap_or(true)
+            val.as_ref()
+                .map(|v| {
+                    if let Value::Str(s) = v {
+                        !crate::executor::like_match(s, pattern, false)
+                    } else {
+                        true
+                    }
+                })
+                .unwrap_or(true)
         }
         Filter::ILike(col, pattern) => {
             let val = get_filter_value(col, values, meta);
-            val.as_ref().map(|v| {
-                if let Value::Str(s) = v {
-                    crate::executor::like_match(s, pattern, true)
-                } else {
-                    false
-                }
-            }).unwrap_or(false)
+            val.as_ref()
+                .map(|v| {
+                    if let Value::Str(s) = v {
+                        crate::executor::like_match(s, pattern, true)
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
         }
         Filter::Not(inner) => !evaluate_filter(inner, values, meta),
-        Filter::Subquery { .. } | Filter::InSubquery { .. } | Filter::Exists { .. }
-        | Filter::All { .. } | Filter::Any { .. } => {
-            false
-        }
+        Filter::Subquery { .. }
+        | Filter::InSubquery { .. }
+        | Filter::Exists { .. }
+        | Filter::All { .. }
+        | Filter::Any { .. } => false,
         Filter::Expression { left, op, right } => {
             let lv = eval_plan_expr_parallel(left, values, meta);
             let rv = eval_plan_expr_parallel(right, values, meta);
@@ -216,8 +259,14 @@ pub fn evaluate_filter(filter: &Filter, values: &[(usize, Value)], meta: &TableM
                 CompareOp::NotEq => !lv.eq_coerce(&rv),
                 CompareOp::Gt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Greater),
                 CompareOp::Lt => lv.cmp_coerce(&rv) == Some(std::cmp::Ordering::Less),
-                CompareOp::Gte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)),
-                CompareOp::Lte => matches!(lv.cmp_coerce(&rv), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)),
+                CompareOp::Gte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                ),
+                CompareOp::Lte => matches!(
+                    lv.cmp_coerce(&rv),
+                    Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                ),
             }
         }
     }
@@ -225,19 +274,43 @@ pub fn evaluate_filter(filter: &Filter, values: &[(usize, Value)], meta: &TableM
 
 fn eval_plan_expr_parallel(expr: &PlanExpr, values: &[(usize, Value)], meta: &TableMeta) -> Value {
     match expr {
-        PlanExpr::Column(name) => { let idx = meta.columns.iter().position(|c| c.name == *name); if let Some(idx) = idx { values.iter().find(|(i, _)| *i == idx).map(|(_, v)| v.clone()).unwrap_or(Value::Null) } else { Value::Null } },
+        PlanExpr::Column(name) => {
+            let idx = meta.columns.iter().position(|c| c.name == *name);
+            if let Some(idx) = idx {
+                values
+                    .iter()
+                    .find(|(i, _)| *i == idx)
+                    .map(|(_, v)| v.clone())
+                    .unwrap_or(Value::Null)
+            } else {
+                Value::Null
+            }
+        }
         PlanExpr::Literal(v) => v.clone(),
-        PlanExpr::BinaryOp { left, op, right } => crate::executor::apply_binary_op(&eval_plan_expr_parallel(left, values, meta), *op, &eval_plan_expr_parallel(right, values, meta)),
-        PlanExpr::UnaryOp { op, expr } => crate::executor::apply_unary_op(*op, &eval_plan_expr_parallel(expr, values, meta)),
+        PlanExpr::BinaryOp { left, op, right } => crate::executor::apply_binary_op(
+            &eval_plan_expr_parallel(left, values, meta),
+            *op,
+            &eval_plan_expr_parallel(right, values, meta),
+        ),
+        PlanExpr::UnaryOp { op, expr } => {
+            crate::executor::apply_unary_op(*op, &eval_plan_expr_parallel(expr, values, meta))
+        }
         PlanExpr::Function { name, args } => {
-            let func_args: Vec<Value> = args.iter().map(|a| eval_plan_expr_parallel(a, values, meta)).collect();
+            let func_args: Vec<Value> = args
+                .iter()
+                .map(|a| eval_plan_expr_parallel(a, values, meta))
+                .collect();
             crate::scalar::evaluate_scalar(name, &func_args).unwrap_or(Value::Null)
         }
     }
 }
 
 /// Public wrapper for `eval_plan_expr_parallel` used by vector_groupby.
-pub fn eval_plan_expr_parallel_pub(expr: &PlanExpr, values: &[(usize, Value)], meta: &TableMeta) -> Value {
+pub fn eval_plan_expr_parallel_pub(
+    expr: &PlanExpr,
+    values: &[(usize, Value)],
+    meta: &TableMeta,
+) -> Value {
     eval_plan_expr_parallel(expr, values, meta)
 }
 
@@ -268,7 +341,15 @@ fn scan_partition(
     filter: Option<&Filter>,
     table_dir: Option<&Path>,
 ) -> Result<Vec<Vec<Value>>> {
-    scan_partition_limited(partition_path, meta, all_indices, selected_cols, filter, table_dir, None)
+    scan_partition_limited(
+        partition_path,
+        meta,
+        all_indices,
+        selected_cols,
+        filter,
+        table_dir,
+        None,
+    )
 }
 
 fn scan_partition_limited(
@@ -359,9 +440,10 @@ fn scan_partition_limited(
         }
 
         if let Some(f) = filter
-            && !evaluate_filter(f, &all_values, meta) {
-                continue;
-            }
+            && !evaluate_filter(f, &all_values, meta)
+        {
+            continue;
+        }
 
         // Build result row using pre-computed positions (O(1) per column).
         let mut row = Vec::with_capacity(num_selected);
@@ -422,7 +504,14 @@ pub fn parallel_scan_partitions(
         // Fall back to sequential scanning for few partitions.
         let mut rows = Vec::new();
         for p in &partitions {
-            rows.extend(scan_partition(p, meta, &all_indices, selected_cols, filter, Some(table_dir))?);
+            rows.extend(scan_partition(
+                p,
+                meta,
+                &all_indices,
+                selected_cols,
+                filter,
+                Some(table_dir),
+            )?);
         }
         return Ok(rows);
     }
@@ -432,7 +521,16 @@ pub fn parallel_scan_partitions(
 
     let results: Vec<Result<Vec<Vec<Value>>>> = partitions
         .par_iter()
-        .map(|p| scan_partition(p, meta, &all_indices, selected_cols, filter, Some(table_dir)))
+        .map(|p| {
+            scan_partition(
+                p,
+                meta,
+                &all_indices,
+                selected_cols,
+                filter,
+                Some(table_dir),
+            )
+        })
         .collect();
 
     // Merge in partition order, propagating the first error.
@@ -498,7 +596,15 @@ pub fn parallel_scan_partitions_pruned_tiered(
         let mut rows = Vec::new();
         for p in partitions {
             let remaining = limit.saturating_sub(rows.len());
-            rows.extend(scan_partition_limited(p, meta, &all_indices, selected_cols, filter, table_dir, Some(remaining))?);
+            rows.extend(scan_partition_limited(
+                p,
+                meta,
+                &all_indices,
+                selected_cols,
+                filter,
+                table_dir,
+                Some(remaining),
+            )?);
             if rows.len() >= limit {
                 rows.truncate(limit);
                 break;
@@ -583,7 +689,10 @@ mod tests {
         for i in 0..3 {
             let ts = Timestamp(day1_base + i * 1_000_000_000);
             writer
-                .write_row(ts, &[ColumnValue::F64(10.0 + i as f64), ColumnValue::Str("a")])
+                .write_row(
+                    ts,
+                    &[ColumnValue::F64(10.0 + i as f64), ColumnValue::Str("a")],
+                )
                 .expect("write failed");
         }
 
@@ -592,7 +701,10 @@ mod tests {
         for i in 0..2 {
             let ts = Timestamp(day2_base + i * 1_000_000_000);
             writer
-                .write_row(ts, &[ColumnValue::F64(20.0 + i as f64), ColumnValue::Str("b")])
+                .write_row(
+                    ts,
+                    &[ColumnValue::F64(20.0 + i as f64), ColumnValue::Str("b")],
+                )
                 .expect("write failed");
         }
 
@@ -601,7 +713,10 @@ mod tests {
         for i in 0..4 {
             let ts = Timestamp(day3_base + i * 1_000_000_000);
             writer
-                .write_row(ts, &[ColumnValue::F64(30.0 + i as f64), ColumnValue::Str("c")])
+                .write_row(
+                    ts,
+                    &[ColumnValue::F64(30.0 + i as f64), ColumnValue::Str("c")],
+                )
                 .expect("write failed");
         }
 
@@ -669,7 +784,8 @@ mod tests {
         let mut sequential_rows = Vec::new();
         for p in &partitions {
             sequential_rows.extend(
-                scan_partition(p, &meta, &all_indices, &selected, None, None).expect("seq scan failed"),
+                scan_partition(p, &meta, &all_indices, &selected, None, None)
+                    .expect("seq scan failed"),
             );
         }
 

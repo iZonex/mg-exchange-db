@@ -274,10 +274,7 @@ mod tests {
         let data: Vec<f64> = (0..1_000_000).map(|i| i as f64 * 0.001).collect();
         let scalar: f64 = data.iter().sum();
         let simd = sum_f64(&data);
-        assert!(
-            (simd - scalar).abs() < 1e-6,
-            "simd={simd}, scalar={scalar}"
-        );
+        assert!((simd - scalar).abs() < 1e-6, "simd={simd}, scalar={scalar}");
     }
 
     #[test]

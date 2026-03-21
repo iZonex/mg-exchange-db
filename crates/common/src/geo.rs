@@ -164,12 +164,12 @@ mod tests {
     #[test]
     fn encode_decode_various_locations() {
         let locations = [
-            (0.0, 0.0),        // null island
-            (90.0, 0.0),       // north pole
-            (-90.0, 0.0),      // south pole
-            (0.0, 180.0),      // date line
-            (0.0, -180.0),     // date line
-            (51.5074, -0.1278), // London
+            (0.0, 0.0),           // null island
+            (90.0, 0.0),          // north pole
+            (-90.0, 0.0),         // south pole
+            (0.0, 180.0),         // date line
+            (0.0, -180.0),        // date line
+            (51.5074, -0.1278),   // London
             (-33.8688, 151.2093), // Sydney
         ];
         let precision = 25;
@@ -177,8 +177,14 @@ mod tests {
             let hash = encode_geohash(*lat, *lon, precision);
             let (dlat, dlon) = decode_geohash(hash, precision);
             let max_err = 180.0 / (1u64 << precision) as f64;
-            assert!((dlat - lat).abs() <= max_err, "lat mismatch for ({lat}, {lon})");
-            assert!((dlon - lon).abs() <= 2.0 * max_err, "lon mismatch for ({lat}, {lon})");
+            assert!(
+                (dlat - lat).abs() <= max_err,
+                "lat mismatch for ({lat}, {lon})"
+            );
+            assert!(
+                (dlon - lon).abs() <= 2.0 * max_err,
+                "lon mismatch for ({lat}, {lon})"
+            );
         }
     }
 

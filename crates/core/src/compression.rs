@@ -186,9 +186,8 @@ pub fn decompress_column_file(path: &Path) -> Result<u64> {
     let original_size = u64::from_le_bytes(data[4..12].try_into().unwrap());
     let compressed_payload = &data[LZ4_HEADER_SIZE..];
 
-    let decompressed = lz4_flex::decompress_size_prepended(compressed_payload).map_err(|e| {
-        ExchangeDbError::Corruption(format!("LZ4 decompression failed: {e}"))
-    })?;
+    let decompressed = lz4_flex::decompress_size_prepended(compressed_payload)
+        .map_err(|e| ExchangeDbError::Corruption(format!("LZ4 decompression failed: {e}")))?;
 
     if decompressed.len() as u64 != original_size {
         return Err(ExchangeDbError::Corruption(format!(
@@ -348,10 +347,7 @@ mod tests {
     fn rle_encode_no_runs() {
         let values = vec![1, 2, 3, 4, 5];
         let encoded = rle_encode(&values);
-        assert_eq!(
-            encoded,
-            vec![(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)]
-        );
+        assert_eq!(encoded, vec![(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)]);
         let decoded = rle_decode(&encoded);
         assert_eq!(decoded, values);
     }
@@ -383,9 +379,7 @@ mod tests {
         let path = dir.path().join("price.d");
 
         // Write some test data
-        let original_data: Vec<u8> = (0..1000u64)
-            .flat_map(|i| i.to_le_bytes())
-            .collect();
+        let original_data: Vec<u8> = (0..1000u64).flat_map(|i| i.to_le_bytes()).collect();
         fs::write(&path, &original_data).unwrap();
 
         let original_size = original_data.len() as u64;

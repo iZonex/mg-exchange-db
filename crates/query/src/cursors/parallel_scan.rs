@@ -16,10 +16,18 @@ pub struct ParallelScanCursor {
 
 impl ParallelScanCursor {
     pub fn new(children: Vec<Box<dyn RecordCursor>>) -> Self {
-        assert!(!children.is_empty(), "ParallelScanCursor needs at least one child");
+        assert!(
+            !children.is_empty(),
+            "ParallelScanCursor needs at least one child"
+        );
         let schema = children[0].schema().to_vec();
         let n = children.len();
-        Self { children, current: 0, schema, exhausted: vec![false; n] }
+        Self {
+            children,
+            current: 0,
+            schema,
+            exhausted: vec![false; n],
+        }
     }
 }
 
@@ -59,7 +67,8 @@ mod tests {
     #[test]
     fn merges_children() {
         let schema = vec![("v".to_string(), ColumnType::I64)];
-        let c1 = MemoryCursor::from_rows(schema.clone(), &[vec![Value::I64(1)], vec![Value::I64(2)]]);
+        let c1 =
+            MemoryCursor::from_rows(schema.clone(), &[vec![Value::I64(1)], vec![Value::I64(2)]]);
         let c2 = MemoryCursor::from_rows(schema, &[vec![Value::I64(3)]]);
         let mut cursor = ParallelScanCursor::new(vec![Box::new(c1), Box::new(c2)]);
         let mut total = 0;

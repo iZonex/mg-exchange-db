@@ -21,11 +21,20 @@ pub struct SpillCursor {
 impl SpillCursor {
     pub fn new(source: Box<dyn RecordCursor>, budget: usize) -> Self {
         let schema = source.schema().to_vec();
-        Self { source: Some(source), budget, materialized: None, offset: 0, schema, spilled: false }
+        Self {
+            source: Some(source),
+            budget,
+            materialized: None,
+            offset: 0,
+            schema,
+            spilled: false,
+        }
     }
 
     /// Whether data was spilled (i.e., exceeded the budget).
-    pub fn did_spill(&self) -> bool { self.spilled }
+    pub fn did_spill(&self) -> bool {
+        self.spilled
+    }
 
     fn materialize(&mut self) -> Result<()> {
         let mut source = self.source.take().unwrap();
@@ -39,29 +48,35 @@ impl SpillCursor {
                             self.spilled = true;
                             break;
                         }
-                        let row: Vec<Value> = (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
+                        let row: Vec<Value> =
+                            (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                         result.append_row(&row);
                     }
                 }
             }
         }
         // Check if source has more data.
-        if !self.spilled
-            && source.next_batch(1)?.is_some() {
-                self.spilled = true;
-            }
+        if !self.spilled && source.next_batch(1)?.is_some() {
+            self.spilled = true;
+        }
         self.materialized = Some(result);
         Ok(())
     }
 }
 
 impl RecordCursor for SpillCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
-        if self.materialized.is_none() { self.materialize()?; }
+        if self.materialized.is_none() {
+            self.materialize()?;
+        }
         let mat = self.materialized.as_ref().unwrap();
-        if self.offset >= mat.row_count() { return Ok(None); }
+        if self.offset >= mat.row_count() {
+            return Ok(None);
+        }
         let n = max_rows.min(mat.row_count() - self.offset);
         let batch = mat.slice(self.offset, n);
         self.offset += n;
@@ -81,7 +96,9 @@ mod tests {
         let source = MemoryCursor::from_rows(schema, &rows);
         let mut cursor = SpillCursor::new(Box::new(source), 10);
         let mut total = 0;
-        while let Some(b) = cursor.next_batch(100).unwrap() { total += b.row_count(); }
+        while let Some(b) = cursor.next_batch(100).unwrap() {
+            total += b.row_count();
+        }
         assert_eq!(total, 10);
         assert!(cursor.did_spill());
     }
@@ -93,7 +110,9 @@ mod tests {
         let source = MemoryCursor::from_rows(schema, &rows);
         let mut cursor = SpillCursor::new(Box::new(source), 100);
         let mut total = 0;
-        while let Some(b) = cursor.next_batch(100).unwrap() { total += b.row_count(); }
+        while let Some(b) = cursor.next_batch(100).unwrap() {
+            total += b.row_count();
+        }
         assert_eq!(total, 2);
         assert!(!cursor.did_spill());
     }

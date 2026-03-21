@@ -27,7 +27,7 @@ pub struct ResourceLimits {
 impl Default for ResourceLimits {
     fn default() -> Self {
         Self {
-            max_memory_bytes: 1024 * 1024 * 1024, // 1 GB
+            max_memory_bytes: 1024 * 1024 * 1024,     // 1 GB
             max_query_time: Duration::from_secs(300), // 5 min
             max_result_rows: 10_000_000,
             max_concurrent_queries: 64,

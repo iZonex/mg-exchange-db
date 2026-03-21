@@ -5,13 +5,13 @@
 //! transitions, stats refresh, and PITR checkpoints.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use exchange_common::error::Result;
 #[cfg(test)]
 use exchange_common::error::ExchangeDbError;
+use exchange_common::error::Result;
 
 // ---------------------------------------------------------------------------
 // Job trait and result
@@ -79,12 +79,7 @@ impl JobScheduler {
     }
 
     /// Register a job to run at the given interval.
-    pub fn register(
-        &mut self,
-        name: &str,
-        interval: Duration,
-        job: Box<dyn Job + Send + Sync>,
-    ) {
+    pub fn register(&mut self, name: &str, interval: Duration, job: Box<dyn Job + Send + Sync>) {
         self.jobs.push(ScheduledJob {
             name: name.to_string(),
             interval,
@@ -368,7 +363,11 @@ impl Job for TtlJob {
 
 /// Retention enforcement job: drops partitions that exceed retention limits.
 pub struct RetentionJob {
-    pub policies: Vec<(String, crate::retention::RetentionPolicy, exchange_common::types::PartitionBy)>,
+    pub policies: Vec<(
+        String,
+        crate::retention::RetentionPolicy,
+        exchange_common::types::PartitionBy,
+    )>,
 }
 
 impl Job for RetentionJob {
@@ -386,11 +385,8 @@ impl Job for RetentionJob {
             if !table_dir.exists() {
                 continue;
             }
-            let mgr = crate::retention::RetentionManager::new(
-                table_dir,
-                *partition_by,
-                policy.clone(),
-            );
+            let mgr =
+                crate::retention::RetentionManager::new(table_dir, *partition_by, policy.clone());
             match mgr.enforce() {
                 Ok(stats) => {
                     total_dropped += stats.partitions_dropped;
@@ -416,7 +412,11 @@ impl Job for RetentionJob {
 
 /// Tiering job: moves partitions between hot/warm/cold storage tiers.
 pub struct TieringJob {
-    pub policies: Vec<(String, crate::tiered::policy::TieringPolicy, exchange_common::types::PartitionBy)>,
+    pub policies: Vec<(
+        String,
+        crate::tiered::policy::TieringPolicy,
+        exchange_common::types::PartitionBy,
+    )>,
 }
 
 impl Job for TieringJob {
@@ -738,7 +738,10 @@ mod tests {
 
         // The job should have run at least once.
         let count = counter.load(Ordering::Relaxed);
-        assert!(count >= 1, "expected job to run at least once, ran {count} times");
+        assert!(
+            count >= 1,
+            "expected job to run at least once, ran {count} times"
+        );
 
         // Record count after stopping.
         let count_after_stop = counter.load(Ordering::Relaxed);
@@ -884,11 +887,7 @@ mod tests {
     fn failing_job_returns_error_result() {
         let dir = tempdir().unwrap();
         let mut scheduler = JobScheduler::new(dir.path().to_path_buf());
-        scheduler.register(
-            "failing_job",
-            Duration::from_secs(0),
-            Box::new(FailingJob),
-        );
+        scheduler.register("failing_job", Duration::from_secs(0), Box::new(FailingJob));
 
         let results = scheduler.run_once();
         assert_eq!(results.len(), 1);
@@ -932,7 +931,9 @@ mod tests {
         scheduler.register(
             "checkpoint",
             Duration::from_secs(0),
-            Box::new(CheckpointJob { interval: Duration::from_secs(300) }),
+            Box::new(CheckpointJob {
+                interval: Duration::from_secs(300),
+            }),
         );
         scheduler.register(
             "stats_refresh",
@@ -1007,7 +1008,11 @@ mod tests {
         let results = scheduler.run_once();
         assert_eq!(results.len(), 8);
         for result in &results {
-            assert!(result.success, "job '{}' failed: {}", result.name, result.message);
+            assert!(
+                result.success,
+                "job '{}' failed: {}",
+                result.name, result.message
+            );
         }
     }
 
@@ -1056,8 +1061,8 @@ mod tests {
             policies: vec![(
                 "trades".to_string(),
                 crate::tiered::policy::TieringPolicy {
-                    hot_retention: Duration::from_secs(1),   // 1 second
-                    warm_retention: Duration::from_secs(2),  // 2 seconds
+                    hot_retention: Duration::from_secs(1),  // 1 second
+                    warm_retention: Duration::from_secs(2), // 2 seconds
                     cold_storage_path: None,
                     auto_tier: true,
                 },
@@ -1071,8 +1076,8 @@ mod tests {
         // Check that at least the .d files are compressed.
         assert!(
             !partition_dir.join("timestamp.d").exists()
-            || partition_dir.join("timestamp.d.lz4").exists()
-            || !partition_dir.exists(),
+                || partition_dir.join("timestamp.d.lz4").exists()
+                || !partition_dir.exists(),
             "partition should have been tiered"
         );
     }
@@ -1129,9 +1134,15 @@ mod tests {
         assert!(result.success, "TTL job failed: {}", result.message);
 
         // Old partition should be deleted.
-        assert!(!old_partition.exists(), "old partition should have been deleted");
+        assert!(
+            !old_partition.exists(),
+            "old partition should have been deleted"
+        );
         // Recent partition should remain.
-        assert!(recent_partition.exists(), "recent partition should still exist");
+        assert!(
+            recent_partition.exists(),
+            "recent partition should still exist"
+        );
     }
 
     #[test]
@@ -1172,7 +1183,8 @@ mod tests {
         std::fs::write(
             table_dir.join("_downsampling").join("trades_1m.json"),
             r#"{"source_table":"trades","interval":"1m"}"#,
-        ).unwrap();
+        )
+        .unwrap();
 
         let job = DownsamplingRefreshJob;
         let result = job.run(db_root).unwrap();

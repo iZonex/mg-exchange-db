@@ -137,7 +137,8 @@ mod tests {
 
     #[test]
     fn parse_basic_line() {
-        let line = "cpu,host=server01,region=us-east usage_idle=98.5,usage_user=1.2 1609459200000000000";
+        let line =
+            "cpu,host=server01,region=us-east usage_idle=98.5,usage_user=1.2 1609459200000000000";
         let row = parse_tsbs_line(line).unwrap();
 
         assert_eq!(row.measurement, "cpu");
@@ -150,10 +151,7 @@ mod tests {
         );
         assert_eq!(
             row.fields,
-            vec![
-                ("usage_idle".into(), 98.5),
-                ("usage_user".into(), 1.2),
-            ]
+            vec![("usage_idle".into(), 98.5), ("usage_user".into(), 1.2),]
         );
         assert_eq!(row.timestamp, 1609459200000000000);
     }
@@ -174,7 +172,10 @@ mod tests {
         let line = "disk,host=server01 reads=100i,writes=50i 1609459200000000000";
         let row = parse_tsbs_line(line).unwrap();
 
-        assert_eq!(row.fields, vec![("reads".into(), 100.0), ("writes".into(), 50.0)]);
+        assert_eq!(
+            row.fields,
+            vec![("reads".into(), 100.0), ("writes".into(), 50.0)]
+        );
     }
 
     #[test]

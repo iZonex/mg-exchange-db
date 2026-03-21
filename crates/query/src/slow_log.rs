@@ -121,10 +121,11 @@ impl SlowQueryLog {
 
         // Write to file if configured.
         if let Some(ref file) = self.log_file
-            && let Ok(mut writer) = file.lock() {
-                let _ = writer.write_all(line.as_bytes());
-                let _ = writer.flush();
-            }
+            && let Ok(mut writer) = file.lock()
+        {
+            let _ = writer.write_all(line.as_bytes());
+            let _ = writer.flush();
+        }
     }
 
     /// Returns the configured threshold.
@@ -217,11 +218,7 @@ mod tests {
         let log = SlowQueryLog::new(Duration::from_secs(1), Some(&log_path));
 
         // This query is fast (10ms < 1s threshold).
-        log.maybe_log(
-            "SELECT 1",
-            Duration::from_millis(10),
-            1,
-        );
+        log.maybe_log("SELECT 1", Duration::from_millis(10), 1);
 
         // File should not exist or be empty.
         let exists = log_path.exists();

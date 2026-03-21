@@ -506,9 +506,7 @@ mod int_type {
     fn int_multiple_rows() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v INT)");
-        let values: Vec<String> = (0..20)
-            .map(|i| format!("({}, {})", ts(i), i))
-            .collect();
+        let values: Vec<String> = (0..20).map(|i| format!("({}, {})", ts(i), i)).collect();
         db.exec_ok(&format!("INSERT INTO t VALUES {}", values.join(", ")));
         assert_eq!(db.query_scalar("SELECT count(*) FROM t"), Value::I64(20));
     }
@@ -742,7 +740,10 @@ mod varchar_type {
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'a')", ts(0)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'b')", ts(1)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'a')", ts(2)));
-        assert_eq!(db.query_scalar("SELECT count_distinct(v) FROM t"), Value::I64(2));
+        assert_eq!(
+            db.query_scalar("SELECT count_distinct(v) FROM t"),
+            Value::I64(2)
+        );
     }
 
     #[test]
@@ -752,8 +753,14 @@ mod varchar_type {
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'first')", ts(0)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'middle')", ts(1)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'last')", ts(2)));
-        assert_eq!(db.query_scalar("SELECT first(v) FROM t"), Value::Str("first".to_string()));
-        assert_eq!(db.query_scalar("SELECT last(v) FROM t"), Value::Str("last".to_string()));
+        assert_eq!(
+            db.query_scalar("SELECT first(v) FROM t"),
+            Value::Str("first".to_string())
+        );
+        assert_eq!(
+            db.query_scalar("SELECT last(v) FROM t"),
+            Value::Str("last".to_string())
+        );
     }
 
     #[test]
@@ -1075,7 +1082,10 @@ mod mixed_types {
     fn null_in_each_type() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, d DOUBLE, i BIGINT, s VARCHAR)");
-        db.exec_ok(&format!("INSERT INTO t VALUES ({}, NULL, NULL, NULL)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t VALUES ({}, NULL, NULL, NULL)",
+            ts(0)
+        ));
         let (_, rows) = db.query("SELECT * FROM t");
         assert_eq!(rows.len(), 1);
     }

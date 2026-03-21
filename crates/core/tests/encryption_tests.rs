@@ -5,8 +5,8 @@
 //! encryption (ChaCha20-Poly1305).
 
 use exchange_core::encryption::{
-    decrypt_buffer, decrypt_file, encrypt_buffer, encrypt_file,
-    EncryptionAlgorithm, EncryptionConfig,
+    EncryptionAlgorithm, EncryptionConfig, decrypt_buffer, decrypt_file, encrypt_buffer,
+    encrypt_file,
 };
 use std::fs;
 use tempfile::TempDir;
@@ -157,8 +157,7 @@ mod buffer {
 
     #[test]
     fn aes256_gcm_roundtrip() {
-        let config =
-            EncryptionConfig::new(EncryptionAlgorithm::Aes256Gcm, vec![0x42; 32]).unwrap();
+        let config = EncryptionConfig::new(EncryptionAlgorithm::Aes256Gcm, vec![0x42; 32]).unwrap();
         let plain = b"GCM mode test data";
         let enc = encrypt_buffer(plain, &config).unwrap();
         let dec = decrypt_buffer(&enc, &config).unwrap();
@@ -174,8 +173,7 @@ mod buffer {
 
     #[test]
     fn header_contains_algorithm_gcm() {
-        let config =
-            EncryptionConfig::new(EncryptionAlgorithm::Aes256Gcm, vec![0x42; 32]).unwrap();
+        let config = EncryptionConfig::new(EncryptionAlgorithm::Aes256Gcm, vec![0x42; 32]).unwrap();
         let enc = encrypt_buffer(b"test", &config).unwrap();
         assert_eq!(enc[4], 2); // GCM = 2
     }

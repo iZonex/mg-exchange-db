@@ -251,8 +251,7 @@ mod write_lock_concurrency {
     #[test]
     fn acquire_timeout_succeeds_when_free() {
         let dir = tempdir().unwrap();
-        let lock =
-            TableWriteLock::acquire_timeout(dir.path(), Duration::from_millis(100));
+        let lock = TableWriteLock::acquire_timeout(dir.path(), Duration::from_millis(100));
         assert!(lock.is_ok());
     }
 
@@ -310,9 +309,7 @@ mod write_lock_concurrency {
         }
         // At least one should have succeeded; due to thread timing,
         // some threads may finish before others try, so multiple may succeed
-        assert!(
-            success_count.load(std::sync::atomic::Ordering::SeqCst) >= 1,
-        );
+        assert!(success_count.load(std::sync::atomic::Ordering::SeqCst) >= 1,);
     }
 }
 

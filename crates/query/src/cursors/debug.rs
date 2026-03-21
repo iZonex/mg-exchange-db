@@ -18,26 +18,44 @@ pub struct DebugCursor {
 
 impl DebugCursor {
     pub fn new(source: Box<dyn RecordCursor>, label: &str) -> Self {
-        Self { source, label: label.to_string(), batch_count: 0, row_count: 0, log: Vec::new() }
+        Self {
+            source,
+            label: label.to_string(),
+            batch_count: 0,
+            row_count: 0,
+            log: Vec::new(),
+        }
     }
 
     /// Returns all logged messages.
-    pub fn log(&self) -> &[String] { &self.log }
+    pub fn log(&self) -> &[String] {
+        &self.log
+    }
 }
 
 impl RecordCursor for DebugCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { self.source.schema() }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        self.source.schema()
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
         match self.source.next_batch(max_rows)? {
             None => {
-                self.log.push(format!("[{}] exhausted after {} batches, {} rows", self.label, self.batch_count, self.row_count));
+                self.log.push(format!(
+                    "[{}] exhausted after {} batches, {} rows",
+                    self.label, self.batch_count, self.row_count
+                ));
                 Ok(None)
             }
             Some(b) => {
                 self.batch_count += 1;
                 self.row_count += b.row_count();
-                self.log.push(format!("[{}] batch #{}: {} rows", self.label, self.batch_count, b.row_count()));
+                self.log.push(format!(
+                    "[{}] batch #{}: {} rows",
+                    self.label,
+                    self.batch_count,
+                    b.row_count()
+                ));
                 Ok(Some(b))
             }
         }

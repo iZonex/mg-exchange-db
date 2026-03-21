@@ -29,8 +29,9 @@ fn multi_row_insert_writes_all_rows() {
         "INSERT INTO trades (timestamp, price) VALUES \
          (1710513000000000000, 100.0), \
          (1710513001000000000, 200.0), \
-         (1710513002000000000, 300.0)"
-    ).unwrap();
+         (1710513002000000000, 300.0)",
+    )
+    .unwrap();
 
     let result = execute(db_root, &plan).unwrap();
     match result {
@@ -62,9 +63,9 @@ fn single_row_insert_still_works() {
         .build(db_root)
         .unwrap();
 
-    let plan = plan_query(
-        "INSERT INTO orders (timestamp, amount) VALUES (1710513000000000000, 42)"
-    ).unwrap();
+    let plan =
+        plan_query("INSERT INTO orders (timestamp, amount) VALUES (1710513000000000000, 42)")
+            .unwrap();
 
     let result = execute(db_root, &plan).unwrap();
     match result {
@@ -80,9 +81,8 @@ fn insert_into_nonexistent_table_fails() {
     let dir = tempdir().unwrap();
     let db_root = dir.path();
 
-    let plan = plan_query(
-        "INSERT INTO phantom (timestamp, x) VALUES (1710513000000000000, 1)"
-    ).unwrap();
+    let plan =
+        plan_query("INSERT INTO phantom (timestamp, x) VALUES (1710513000000000000, 1)").unwrap();
 
     let result = execute(db_root, &plan);
     assert!(result.is_err(), "insert into nonexistent table should fail");

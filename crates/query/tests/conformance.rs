@@ -41,18 +41,15 @@ fn conformance_select_with_limit() {
 #[test]
 fn conformance_where_and_or() {
     let db = TestDb::with_trades(30);
-    let (_, rows) = db.query(
-        "SELECT * FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy'",
-    );
+    let (_, rows) = db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy'");
     // All returned rows must match both conditions.
     for row in &rows {
         assert_eq!(row[1], Value::Str("BTC/USD".into()));
         assert_eq!(row[4], Value::Str("buy".into()));
     }
 
-    let (_, rows2) = db.query(
-        "SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'ETH/USD'",
-    );
+    let (_, rows2) =
+        db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'ETH/USD'");
     for row in &rows2 {
         let sym = &row[1];
         assert!(
@@ -116,9 +113,7 @@ fn conformance_null_not_equal() {
 fn conformance_group_by_null() {
     let db = TestDb::with_trades(20);
     // NULLs in volume should form their own group.
-    let (_, rows) = db.query(
-        "SELECT volume, count(*) FROM trades GROUP BY volume ORDER BY volume",
-    );
+    let (_, rows) = db.query("SELECT volume, count(*) FROM trades GROUP BY volume ORDER BY volume");
     assert!(!rows.is_empty());
     // NULL handling in GROUP BY varies -- some engines group NULLs, others skip.
     // Just verify the query produces results without crashing.
@@ -131,9 +126,7 @@ fn conformance_group_by_null() {
 #[test]
 fn conformance_order_by_null() {
     let db = TestDb::with_trades(20);
-    let (_, rows) = db.query(
-        "SELECT volume FROM trades ORDER BY volume",
-    );
+    let (_, rows) = db.query("SELECT volume FROM trades ORDER BY volume");
     // NULLs should sort to a consistent position (typically first or last).
     assert_eq!(rows.len(), 20);
 }
@@ -224,9 +217,7 @@ fn conformance_between_inclusive() {
 #[test]
 fn conformance_like_escape() {
     let db = TestDb::with_trades(30);
-    let (_, rows) = db.query(
-        "SELECT symbol FROM trades WHERE symbol LIKE 'BTC%'",
-    );
+    let (_, rows) = db.query("SELECT symbol FROM trades WHERE symbol LIKE 'BTC%'");
     for row in &rows {
         let s = match &row[0] {
             Value::Str(s) => s.as_str(),
@@ -251,9 +242,7 @@ fn conformance_order_by_alias() {
         }
         Err(_) => {
             // If alias ordering is not supported, fall back to direct column.
-            let (_, rows) = db.query(
-                "SELECT price FROM trades ORDER BY price LIMIT 5",
-            );
+            let (_, rows) = db.query("SELECT price FROM trades ORDER BY price LIMIT 5");
             assert_eq!(rows.len(), 5);
             for i in 1..rows.len() {
                 let prev = match &rows[i - 1][0] {
@@ -333,9 +322,7 @@ fn conformance_case_when_null() {
     db.exec_ok("INSERT INTO t (timestamp, a) VALUES (2000000000000, NULL)");
     db.exec_ok("INSERT INTO t (timestamp, a) VALUES (3000000000000, 3.0)");
 
-    let result = db.exec(
-        "SELECT CASE WHEN a IS NULL THEN 0 ELSE a END FROM t ORDER BY timestamp",
-    );
+    let result = db.exec("SELECT CASE WHEN a IS NULL THEN 0 ELSE a END FROM t ORDER BY timestamp");
     match result {
         Ok(exchange_query::QueryResult::Rows { rows, .. }) => {
             assert_eq!(rows.len(), 3);
@@ -411,9 +398,7 @@ fn conformance_join_null_keys() {
     db.exec_ok("INSERT INTO b (timestamp, k, other) VALUES (2000000000000, NULL, 20.0)");
 
     // INNER JOIN on k: NULL keys should NOT match in standard SQL.
-    let result = db.exec(
-        "SELECT a.k, a.val, b.other FROM a INNER JOIN b ON a.k = b.k",
-    );
+    let result = db.exec("SELECT a.k, a.val, b.other FROM a INNER JOIN b ON a.k = b.k");
     match result {
         Ok(exchange_query::QueryResult::Rows { rows, .. }) => {
             // Standard SQL: only 'x' = 'x' should match (1 row).
@@ -436,9 +421,7 @@ fn conformance_having_without_group_by() {
     let db = TestDb::with_trades(10);
     // HAVING without GROUP BY is unusual. In standard SQL it should either
     // error or treat the entire table as one group.
-    let result = db.exec(
-        "SELECT count(*) FROM trades HAVING count(*) > 5",
-    );
+    let result = db.exec("SELECT count(*) FROM trades HAVING count(*) > 5");
     // We accept either a valid result or an error -- both are conformant
     // behavior depending on the SQL dialect.
     match result {
@@ -523,9 +506,7 @@ fn conformance_order_by_desc() {
 #[test]
 fn conformance_multiple_aggregates() {
     let db = TestDb::with_trades(10);
-    let (cols, rows) = db.query(
-        "SELECT count(*), min(price), max(price) FROM trades",
-    );
+    let (cols, rows) = db.query("SELECT count(*), min(price), max(price) FROM trades");
     assert_eq!(cols.len(), 3);
     assert_eq!(rows.len(), 1);
 }
@@ -537,9 +518,7 @@ fn conformance_multiple_aggregates() {
 #[test]
 fn conformance_group_by_multiple() {
     let db = TestDb::with_trades(30);
-    let (cols, rows) = db.query(
-        "SELECT symbol, side, count(*) FROM trades GROUP BY symbol, side",
-    );
+    let (cols, rows) = db.query("SELECT symbol, side, count(*) FROM trades GROUP BY symbol, side");
     assert_eq!(cols.len(), 3);
     // 3 symbols x 2 sides = up to 6 groups.
     assert!(rows.len() <= 6);
@@ -570,9 +549,7 @@ fn conformance_select_expression() {
 #[test]
 fn conformance_empty_where() {
     let db = TestDb::with_trades(10);
-    let (_, rows) = db.query(
-        "SELECT * FROM trades WHERE symbol = 'NONEXISTENT'",
-    );
+    let (_, rows) = db.query("SELECT * FROM trades WHERE symbol = 'NONEXISTENT'");
     assert_eq!(rows.len(), 0);
 }
 
@@ -627,9 +604,7 @@ fn conformance_type_coercion_comparison() {
 fn conformance_sample_by_empty_buckets() {
     let db = TestDb::with_trades(30);
     // SAMPLE BY groups by time buckets.
-    let result = db.exec(
-        "SELECT symbol, avg(price) FROM trades SAMPLE BY 1d",
-    );
+    let result = db.exec("SELECT symbol, avg(price) FROM trades SAMPLE BY 1d");
     // We accept either a valid result or a parse error if the syntax
     // is more restrictive. The point is no panics or crashes.
     match result {
@@ -650,9 +625,7 @@ fn conformance_sample_by_empty_buckets() {
 #[test]
 fn conformance_latest_on_null_partition() {
     let db = TestDb::with_trades(30);
-    let result = db.exec(
-        "SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol",
-    );
+    let result = db.exec("SELECT * FROM trades LATEST ON timestamp PARTITION BY symbol");
     match result {
         Ok(exchange_query::QueryResult::Rows { rows, .. }) => {
             // Should return one row per distinct symbol.
@@ -676,9 +649,7 @@ fn conformance_larger_dataset() {
     let count = db.query_scalar("SELECT count(*) FROM trades");
     assert_eq!(count, Value::I64(100));
 
-    let (_, rows) = db.query(
-        "SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol",
-    );
+    let (_, rows) = db.query("SELECT symbol, count(*) FROM trades GROUP BY symbol ORDER BY symbol");
     assert!(!rows.is_empty());
 }
 

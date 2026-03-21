@@ -121,7 +121,7 @@ pub fn execute_system_function(columns: &[SelectColumn]) -> Result<QueryResult> 
                 other => {
                     return Err(ExchangeDbError::Query(format!(
                         "unknown system function: {other}"
-                    )))
+                    )));
                 }
             };
             Ok(QueryResult::Rows {
@@ -227,9 +227,10 @@ fn list_user_tables(db_root: &Path) -> Vec<String> {
         if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
             let meta_path = entry.path().join("_meta");
             if meta_path.exists()
-                && let Some(name) = entry.file_name().to_str() {
-                    names.push(name.to_string());
-                }
+                && let Some(name) = entry.file_name().to_str()
+            {
+                names.push(name.to_string());
+            }
         }
     }
     names.sort();
@@ -263,10 +264,7 @@ fn project(
                 }
             }
             SelectColumn::Name(n) => {
-                if let Some(i) = all_col_names
-                    .iter()
-                    .position(|c| c.eq_ignore_ascii_case(n))
-                {
+                if let Some(i) = all_col_names.iter().position(|c| c.eq_ignore_ascii_case(n)) {
                     indices.push(i);
                     out_names.push(n.clone());
                 }
@@ -311,18 +309,61 @@ fn catalog_pg_type(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &["oid", "typname", "typnamespace", "typlen"];
 
     let all_rows = vec![
-        vec![Value::I64(OID_BOOL), Value::Str("bool".into()), Value::I64(NS_PG_CATALOG), Value::I64(1)],
-        vec![Value::I64(OID_INT8), Value::Str("int8".into()), Value::I64(NS_PG_CATALOG), Value::I64(8)],
-        vec![Value::I64(OID_INT4), Value::Str("int4".into()), Value::I64(NS_PG_CATALOG), Value::I64(4)],
-        vec![Value::I64(OID_TEXT), Value::Str("text".into()), Value::I64(NS_PG_CATALOG), Value::I64(-1)],
-        vec![Value::I64(OID_FLOAT4), Value::Str("float4".into()), Value::I64(NS_PG_CATALOG), Value::I64(4)],
-        vec![Value::I64(OID_FLOAT8), Value::Str("float8".into()), Value::I64(NS_PG_CATALOG), Value::I64(8)],
-        vec![Value::I64(OID_TIMESTAMP), Value::Str("timestamptz".into()), Value::I64(NS_PG_CATALOG), Value::I64(8)],
-        vec![Value::I64(OID_VARCHAR), Value::Str("varchar".into()), Value::I64(NS_PG_CATALOG), Value::I64(-1)],
+        vec![
+            Value::I64(OID_BOOL),
+            Value::Str("bool".into()),
+            Value::I64(NS_PG_CATALOG),
+            Value::I64(1),
+        ],
+        vec![
+            Value::I64(OID_INT8),
+            Value::Str("int8".into()),
+            Value::I64(NS_PG_CATALOG),
+            Value::I64(8),
+        ],
+        vec![
+            Value::I64(OID_INT4),
+            Value::Str("int4".into()),
+            Value::I64(NS_PG_CATALOG),
+            Value::I64(4),
+        ],
+        vec![
+            Value::I64(OID_TEXT),
+            Value::Str("text".into()),
+            Value::I64(NS_PG_CATALOG),
+            Value::I64(-1),
+        ],
+        vec![
+            Value::I64(OID_FLOAT4),
+            Value::Str("float4".into()),
+            Value::I64(NS_PG_CATALOG),
+            Value::I64(4),
+        ],
+        vec![
+            Value::I64(OID_FLOAT8),
+            Value::Str("float8".into()),
+            Value::I64(NS_PG_CATALOG),
+            Value::I64(8),
+        ],
+        vec![
+            Value::I64(OID_TIMESTAMP),
+            Value::Str("timestamptz".into()),
+            Value::I64(NS_PG_CATALOG),
+            Value::I64(8),
+        ],
+        vec![
+            Value::I64(OID_VARCHAR),
+            Value::Str("varchar".into()),
+            Value::I64(NS_PG_CATALOG),
+            Value::I64(-1),
+        ],
     ];
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_class(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -340,7 +381,10 @@ fn catalog_pg_class(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryRes
     }
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_namespace(columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -352,7 +396,10 @@ fn catalog_pg_namespace(columns: &[SelectColumn]) -> Result<QueryResult> {
     ];
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_attribute(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -377,7 +424,10 @@ fn catalog_pg_attribute(db_root: &Path, columns: &[SelectColumn]) -> Result<Quer
     }
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_database(columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -391,16 +441,14 @@ fn catalog_pg_database(columns: &[SelectColumn]) -> Result<QueryResult> {
     ]];
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_info_tables(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryResult> {
-    let all_cols: &[&str] = &[
-        "table_catalog",
-        "table_schema",
-        "table_name",
-        "table_type",
-    ];
+    let all_cols: &[&str] = &["table_catalog", "table_schema", "table_name", "table_type"];
 
     let tables = list_user_tables(db_root);
     let mut all_rows = Vec::new();
@@ -414,7 +462,10 @@ fn catalog_info_tables(db_root: &Path, columns: &[SelectColumn]) -> Result<Query
     }
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_info_columns(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -447,7 +498,10 @@ fn catalog_info_columns(db_root: &Path, columns: &[SelectColumn]) -> Result<Quer
     }
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 // ── Additional pg_catalog tables ─────────────────────────────────────────
@@ -515,13 +569,22 @@ fn catalog_pg_settings(columns: &[SelectColumn]) -> Result<QueryResult> {
     ];
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_roles(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "oid", "rolname", "rolsuper", "rolinherit", "rolcreaterole",
-        "rolcreatedb", "rolcanlogin", "rolreplication",
+        "oid",
+        "rolname",
+        "rolsuper",
+        "rolinherit",
+        "rolcreaterole",
+        "rolcreatedb",
+        "rolcanlogin",
+        "rolreplication",
     ];
 
     let all_rows = vec![vec![
@@ -536,13 +599,22 @@ fn catalog_pg_roles(columns: &[SelectColumn]) -> Result<QueryResult> {
     ]];
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_stat_activity(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "datid", "datname", "pid", "usename", "application_name",
-        "client_addr", "state", "query",
+        "datid",
+        "datname",
+        "pid",
+        "usename",
+        "application_name",
+        "client_addr",
+        "state",
+        "query",
     ];
 
     // Return one row representing the current connection.
@@ -558,7 +630,10 @@ fn catalog_pg_stat_activity(columns: &[SelectColumn]) -> Result<QueryResult> {
     ]];
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_indexes(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -571,10 +646,7 @@ fn catalog_pg_indexes(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryR
             for col_def in &meta.columns {
                 if col_def.indexed {
                     let idx_name = format!("{tbl}_{}_idx", col_def.name);
-                    let idx_def = format!(
-                        "CREATE INDEX {idx_name} ON {tbl} ({})",
-                        col_def.name
-                    );
+                    let idx_def = format!("CREATE INDEX {idx_name} ON {tbl} ({})", col_def.name);
                     all_rows.push(vec![
                         Value::Str("public".into()),
                         Value::Str(tbl.clone()),
@@ -587,7 +659,10 @@ fn catalog_pg_indexes(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryR
     }
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_views(columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -595,7 +670,10 @@ fn catalog_pg_views(columns: &[SelectColumn]) -> Result<QueryResult> {
     // ExchangeDB does not support views yet; return empty.
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_matviews(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -605,25 +683,29 @@ fn catalog_pg_matviews(db_root: &Path, columns: &[SelectColumn]) -> Result<Query
     // Check for materialized view metadata files.
     let matview_dir = db_root.join("_matviews");
     if matview_dir.exists()
-        && let Ok(entries) = std::fs::read_dir(&matview_dir) {
-            for entry in entries.flatten() {
-                if let Some(name) = entry.file_name().to_str()
-                    && name.ends_with(".sql") {
-                        let view_name = name.trim_end_matches(".sql");
-                        let definition = std::fs::read_to_string(entry.path())
-                            .unwrap_or_default();
-                        all_rows.push(vec![
-                            Value::Str("public".into()),
-                            Value::Str(view_name.to_string()),
-                            Value::Str("exchangedb".into()),
-                            Value::Str(definition),
-                        ]);
-                    }
+        && let Ok(entries) = std::fs::read_dir(&matview_dir)
+    {
+        for entry in entries.flatten() {
+            if let Some(name) = entry.file_name().to_str()
+                && name.ends_with(".sql")
+            {
+                let view_name = name.trim_end_matches(".sql");
+                let definition = std::fs::read_to_string(entry.path()).unwrap_or_default();
+                all_rows.push(vec![
+                    Value::Str("public".into()),
+                    Value::Str(view_name.to_string()),
+                    Value::Str("exchangedb".into()),
+                    Value::Str(definition),
+                ]);
             }
         }
+    }
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_tables(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -646,7 +728,10 @@ fn catalog_pg_tables(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryRe
     }
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_description(columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -654,7 +739,10 @@ fn catalog_pg_description(columns: &[SelectColumn]) -> Result<QueryResult> {
     // Return empty — no descriptions stored yet.
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 // ── Additional empty pg_catalog tables for client compatibility ──────────
@@ -683,15 +771,28 @@ fn catalog_pg_am(columns: &[SelectColumn]) -> Result<QueryResult> {
         ],
     ];
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_operator(columns: &[SelectColumn]) -> Result<QueryResult> {
-    let all_cols: &[&str] = &["oid", "oprname", "oprnamespace", "oprleft", "oprright", "oprresult"];
+    let all_cols: &[&str] = &[
+        "oid",
+        "oprname",
+        "oprnamespace",
+        "oprleft",
+        "oprright",
+        "oprresult",
+    ];
     // Return empty — ExchangeDB does not expose operator metadata.
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_proc(columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -699,7 +800,10 @@ fn catalog_pg_proc(columns: &[SelectColumn]) -> Result<QueryResult> {
     // Return empty — no user-defined functions yet.
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_constraint(columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -707,15 +811,29 @@ fn catalog_pg_constraint(columns: &[SelectColumn]) -> Result<QueryResult> {
     // Return empty — ExchangeDB does not support constraints yet.
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_depend(columns: &[SelectColumn]) -> Result<QueryResult> {
-    let all_cols: &[&str] = &["classid", "objid", "objsubid", "refclassid", "refobjid", "refobjsubid", "deptype"];
+    let all_cols: &[&str] = &[
+        "classid",
+        "objid",
+        "objsubid",
+        "refclassid",
+        "refobjid",
+        "refobjsubid",
+        "deptype",
+    ];
     // Return empty — no dependency tracking.
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_enum(columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -723,7 +841,10 @@ fn catalog_pg_enum(columns: &[SelectColumn]) -> Result<QueryResult> {
     // Return empty — no enum types.
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_collation(columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -736,17 +857,32 @@ fn catalog_pg_collation(columns: &[SelectColumn]) -> Result<QueryResult> {
         Value::I64(-1), // all encodings
     ]];
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 // ── Additional pg_catalog tables (batch 2) ──────────────────────────────
 
 fn catalog_pg_stat_user_tables(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "relid", "schemaname", "relname", "seq_scan", "seq_tup_read",
-        "idx_scan", "idx_tup_fetch", "n_tup_ins", "n_tup_upd", "n_tup_del",
-        "n_live_tup", "n_dead_tup", "last_vacuum", "last_autovacuum",
-        "last_analyze", "last_autoanalyze",
+        "relid",
+        "schemaname",
+        "relname",
+        "seq_scan",
+        "seq_tup_read",
+        "idx_scan",
+        "idx_tup_fetch",
+        "n_tup_ins",
+        "n_tup_upd",
+        "n_tup_del",
+        "n_live_tup",
+        "n_dead_tup",
+        "last_vacuum",
+        "last_autovacuum",
+        "last_analyze",
+        "last_autoanalyze",
     ];
 
     let tables = list_user_tables(db_root);
@@ -773,13 +909,22 @@ fn catalog_pg_stat_user_tables(db_root: &Path, columns: &[SelectColumn]) -> Resu
     }
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_stat_user_indexes(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "relid", "indexrelid", "schemaname", "relname", "indexrelname",
-        "idx_scan", "idx_tup_read", "idx_tup_fetch",
+        "relid",
+        "indexrelid",
+        "schemaname",
+        "relname",
+        "indexrelname",
+        "idx_scan",
+        "idx_tup_read",
+        "idx_tup_fetch",
     ];
 
     let tables = list_user_tables(db_root);
@@ -805,15 +950,23 @@ fn catalog_pg_stat_user_indexes(db_root: &Path, columns: &[SelectColumn]) -> Res
     }
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_statio_user_tables(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "relid", "schemaname", "relname",
-        "heap_blks_read", "heap_blks_hit",
-        "idx_blks_read", "idx_blks_hit",
-        "toast_blks_read", "toast_blks_hit",
+        "relid",
+        "schemaname",
+        "relname",
+        "heap_blks_read",
+        "heap_blks_hit",
+        "idx_blks_read",
+        "idx_blks_hit",
+        "toast_blks_read",
+        "toast_blks_hit",
     ];
 
     let tables = list_user_tables(db_root);
@@ -833,45 +986,79 @@ fn catalog_pg_statio_user_tables(db_root: &Path, columns: &[SelectColumn]) -> Re
     }
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_locks(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "locktype", "database", "relation", "page", "tuple",
-        "virtualxid", "transactionid", "classid", "objid", "objsubid",
-        "virtualtransaction", "pid", "mode", "granted", "fastpath",
+        "locktype",
+        "database",
+        "relation",
+        "page",
+        "tuple",
+        "virtualxid",
+        "transactionid",
+        "classid",
+        "objid",
+        "objsubid",
+        "virtualtransaction",
+        "pid",
+        "mode",
+        "granted",
+        "fastpath",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_prepared_statements(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "name", "statement", "prepare_time", "parameter_types", "from_sql",
+        "name",
+        "statement",
+        "prepare_time",
+        "parameter_types",
+        "from_sql",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_cursors(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "name", "statement", "is_holdable", "is_binary", "is_scrollable", "creation_time",
+        "name",
+        "statement",
+        "is_holdable",
+        "is_binary",
+        "is_scrollable",
+        "creation_time",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_available_extensions(columns: &[SelectColumn]) -> Result<QueryResult> {
-    let all_cols: &[&str] = &[
-        "name", "default_version", "installed_version", "comment",
-    ];
+    let all_cols: &[&str] = &["name", "default_version", "installed_version", "comment"];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_timezone_names(columns: &[SelectColumn]) -> Result<QueryResult> {
@@ -911,176 +1098,332 @@ fn catalog_pg_timezone_names(columns: &[SelectColumn]) -> Result<QueryResult> {
     ];
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_timezone_abbrevs(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &["abbrev", "utc_offset", "is_dst"];
 
     let all_rows = vec![
-        vec![Value::Str("UTC".into()), Value::Str("00:00:00".into()), Value::I64(0)],
-        vec![Value::Str("EST".into()), Value::Str("-05:00:00".into()), Value::I64(0)],
-        vec![Value::Str("PST".into()), Value::Str("-08:00:00".into()), Value::I64(0)],
-        vec![Value::Str("GMT".into()), Value::Str("00:00:00".into()), Value::I64(0)],
-        vec![Value::Str("JST".into()), Value::Str("09:00:00".into()), Value::I64(0)],
-        vec![Value::Str("CET".into()), Value::Str("01:00:00".into()), Value::I64(0)],
+        vec![
+            Value::Str("UTC".into()),
+            Value::Str("00:00:00".into()),
+            Value::I64(0),
+        ],
+        vec![
+            Value::Str("EST".into()),
+            Value::Str("-05:00:00".into()),
+            Value::I64(0),
+        ],
+        vec![
+            Value::Str("PST".into()),
+            Value::Str("-08:00:00".into()),
+            Value::I64(0),
+        ],
+        vec![
+            Value::Str("GMT".into()),
+            Value::Str("00:00:00".into()),
+            Value::I64(0),
+        ],
+        vec![
+            Value::Str("JST".into()),
+            Value::Str("09:00:00".into()),
+            Value::I64(0),
+        ],
+        vec![
+            Value::Str("CET".into()),
+            Value::Str("01:00:00".into()),
+            Value::I64(0),
+        ],
     ];
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_file_settings(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "sourcefile", "sourceline", "seqno", "name", "setting", "applied", "error",
+        "sourcefile",
+        "sourceline",
+        "seqno",
+        "name",
+        "setting",
+        "applied",
+        "error",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_hba_file_rules(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "line_number", "type", "database", "user_name", "address", "netmask",
-        "auth_method", "options", "error",
+        "line_number",
+        "type",
+        "database",
+        "user_name",
+        "address",
+        "netmask",
+        "auth_method",
+        "options",
+        "error",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_replication_slots(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "slot_name", "plugin", "slot_type", "datoid", "database",
-        "temporary", "active", "active_pid", "xmin", "catalog_xmin",
-        "restart_lsn", "confirmed_flush_lsn",
+        "slot_name",
+        "plugin",
+        "slot_type",
+        "datoid",
+        "database",
+        "temporary",
+        "active",
+        "active_pid",
+        "xmin",
+        "catalog_xmin",
+        "restart_lsn",
+        "confirmed_flush_lsn",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_publication(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "oid", "pubname", "pubowner", "puballtables", "pubinsert",
-        "pubupdate", "pubdelete", "pubtruncate",
+        "oid",
+        "pubname",
+        "pubowner",
+        "puballtables",
+        "pubinsert",
+        "pubupdate",
+        "pubdelete",
+        "pubtruncate",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_subscription(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "oid", "subdbid", "subname", "subowner", "subenabled",
-        "subconninfo", "subslotname", "subsynccommit", "subpublications",
+        "oid",
+        "subdbid",
+        "subname",
+        "subowner",
+        "subenabled",
+        "subconninfo",
+        "subslotname",
+        "subsynccommit",
+        "subpublications",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_sequences(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "schemaname", "sequencename", "sequenceowner", "data_type",
-        "start_value", "min_value", "max_value", "increment_by",
-        "cycle", "cache_size", "last_value",
+        "schemaname",
+        "sequencename",
+        "sequenceowner",
+        "data_type",
+        "start_value",
+        "min_value",
+        "max_value",
+        "increment_by",
+        "cycle",
+        "cache_size",
+        "last_value",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_largeobject(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &["loid", "pageno", "data"];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_shdescription(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &["objoid", "classoid", "description"];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_seclabel(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &["objoid", "classoid", "objsubid", "provider", "label"];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_event_trigger(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "oid", "evtname", "evtevent", "evtowner", "evtfoid", "evtenabled", "evttags",
+        "oid",
+        "evtname",
+        "evtevent",
+        "evtowner",
+        "evtfoid",
+        "evtenabled",
+        "evttags",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_trigger(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "oid", "tgrelid", "tgname", "tgfoid", "tgtype",
-        "tgenabled", "tgisinternal", "tgconstrrelid",
+        "oid",
+        "tgrelid",
+        "tgname",
+        "tgfoid",
+        "tgtype",
+        "tgenabled",
+        "tgisinternal",
+        "tgconstrrelid",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_cast(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &["oid", "castsource", "casttarget", "castfunc", "castcontext"];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_conversion(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "oid", "conname", "connamespace", "conowner",
-        "conforencoding", "contoencoding", "conproc", "condefault",
+        "oid",
+        "conname",
+        "connamespace",
+        "conowner",
+        "conforencoding",
+        "contoencoding",
+        "conproc",
+        "condefault",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_opclass(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "oid", "opcmethod", "opcname", "opcnamespace", "opcowner",
-        "opcfamily", "opcintype", "opcdefault", "opckeytype",
+        "oid",
+        "opcmethod",
+        "opcname",
+        "opcnamespace",
+        "opcowner",
+        "opcfamily",
+        "opcintype",
+        "opcdefault",
+        "opckeytype",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_opfamily(columns: &[SelectColumn]) -> Result<QueryResult> {
-    let all_cols: &[&str] = &[
-        "oid", "opfmethod", "opfname", "opfnamespace", "opfowner",
-    ];
+    let all_cols: &[&str] = &["oid", "opfmethod", "opfname", "opfnamespace", "opfowner"];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_aggregate(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "aggfnoid", "aggkind", "aggnumdirectargs", "aggtransfn",
-        "aggfinalfn", "aggcombinefn", "aggtranstype", "agginitval",
+        "aggfnoid",
+        "aggkind",
+        "aggnumdirectargs",
+        "aggtransfn",
+        "aggfinalfn",
+        "aggcombinefn",
+        "aggtranstype",
+        "agginitval",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_language(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "oid", "lanname", "lanowner", "lanispl", "lanpltrusted",
-        "lanplcallfoid", "laninline", "lanvalidator",
+        "oid",
+        "lanname",
+        "lanowner",
+        "lanispl",
+        "lanpltrusted",
+        "lanplcallfoid",
+        "laninline",
+        "lanvalidator",
     ];
 
     let all_rows = vec![
@@ -1117,30 +1460,48 @@ fn catalog_pg_language(columns: &[SelectColumn]) -> Result<QueryResult> {
     ];
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_foreign_server(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &[
-        "oid", "srvname", "srvowner", "srvfdw", "srvtype", "srvversion", "srvoptions",
+        "oid",
+        "srvname",
+        "srvowner",
+        "srvfdw",
+        "srvtype",
+        "srvversion",
+        "srvoptions",
     ];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_foreign_table(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &["ftrelid", "ftserver", "ftoptions"];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 fn catalog_pg_user_mapping(columns: &[SelectColumn]) -> Result<QueryResult> {
     let all_cols: &[&str] = &["oid", "umuser", "umserver", "umoptions"];
     let all_rows: Vec<Vec<Value>> = Vec::new();
     let (col_names, rows) = project(all_cols, &all_rows, columns);
-    Ok(QueryResult::Rows { columns: col_names, rows })
+    Ok(QueryResult::Rows {
+        columns: col_names,
+        rows,
+    })
 }
 
 // ── Type mapping helpers ────────────────────────────────────────────────
@@ -1152,16 +1513,33 @@ fn col_type_to_pg_oid(ct: &exchange_core::table::ColumnTypeSerializable) -> i64 
         CT::I8 | CT::I16 | CT::I32 => OID_INT4,
         CT::I64 | CT::Long128 | CT::Long256 => OID_INT8,
         CT::F32 => OID_FLOAT4,
-        CT::F64 | CT::Decimal8 | CT::Decimal16 | CT::Decimal32
-            | CT::Decimal64 | CT::Decimal128 | CT::Decimal256 => OID_FLOAT8,
+        CT::F64
+        | CT::Decimal8
+        | CT::Decimal16
+        | CT::Decimal32
+        | CT::Decimal64
+        | CT::Decimal128
+        | CT::Decimal256 => OID_FLOAT8,
         CT::Timestamp | CT::TimestampMicro | CT::TimestampMilli | CT::Date => OID_TIMESTAMP,
         CT::Symbol | CT::Varchar | CT::Char | CT::String | CT::ArrayString => OID_TEXT,
-        CT::Binary | CT::Uuid | CT::IPv4 | CT::GeoHash
-            | CT::GeoByte | CT::GeoShort | CT::GeoInt => OID_TEXT,
+        CT::Binary
+        | CT::Uuid
+        | CT::IPv4
+        | CT::GeoHash
+        | CT::GeoByte
+        | CT::GeoShort
+        | CT::GeoInt => OID_TEXT,
         CT::Interval => OID_TEXT,
-        CT::Array | CT::Cursor | CT::Record | CT::RegClass
-            | CT::RegProcedure | CT::Null | CT::VarArg | CT::Parameter
-            | CT::VarcharSlice | CT::IPv6 => OID_TEXT,
+        CT::Array
+        | CT::Cursor
+        | CT::Record
+        | CT::RegClass
+        | CT::RegProcedure
+        | CT::Null
+        | CT::VarArg
+        | CT::Parameter
+        | CT::VarcharSlice
+        | CT::IPv6 => OID_TEXT,
     }
 }
 
@@ -1175,7 +1553,9 @@ fn col_type_to_pg_name(ct: &exchange_core::table::ColumnTypeSerializable) -> Str
         CT::I64 => "bigint".into(),
         CT::F32 => "real".into(),
         CT::F64 => "double precision".into(),
-        CT::Timestamp | CT::TimestampMicro | CT::TimestampMilli => "timestamp with time zone".into(),
+        CT::Timestamp | CT::TimestampMicro | CT::TimestampMilli => {
+            "timestamp with time zone".into()
+        }
         CT::Symbol => "text".into(),
         CT::String | CT::ArrayString => "text".into(),
         CT::Varchar => "character varying".into(),
@@ -1188,8 +1568,12 @@ fn col_type_to_pg_name(ct: &exchange_core::table::ColumnTypeSerializable) -> Str
         CT::Long256 => "numeric".into(),
         CT::GeoHash | CT::GeoByte | CT::GeoShort | CT::GeoInt => "text".into(),
         CT::Interval => "interval".into(),
-        CT::Decimal8 | CT::Decimal16 | CT::Decimal32
-            | CT::Decimal64 | CT::Decimal128 | CT::Decimal256 => "numeric".into(),
+        CT::Decimal8
+        | CT::Decimal16
+        | CT::Decimal32
+        | CT::Decimal64
+        | CT::Decimal128
+        | CT::Decimal256 => "numeric".into(),
         CT::Array => "anyarray".into(),
         CT::Cursor => "refcursor".into(),
         CT::Record => "record".into(),
@@ -1204,9 +1588,9 @@ fn col_type_to_pg_name(ct: &exchange_core::table::ColumnTypeSerializable) -> Str
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use exchange_common::types::{ColumnType, PartitionBy};
     use exchange_core::table::TableBuilder;
+    use tempfile::tempdir;
 
     fn setup_test_db(db_root: &Path) {
         // Create a "trades" table.
@@ -1254,7 +1638,9 @@ mod tests {
             assert_eq!(text_row.unwrap()[0], Value::I64(25));
 
             // Check that timestamptz is present with OID 1184.
-            let ts_row = rows.iter().find(|r| r[1] == Value::Str("timestamptz".into()));
+            let ts_row = rows
+                .iter()
+                .find(|r| r[1] == Value::Str("timestamptz".into()));
             assert!(ts_row.is_some());
             assert_eq!(ts_row.unwrap()[0], Value::I64(1184));
 
@@ -1436,8 +1822,13 @@ mod tests {
             assert!(columns.contains(&"name".to_string()));
             assert!(columns.contains(&"setting".to_string()));
             // Find the server_version setting.
-            let sv_row = rows.iter().find(|r| r[0] == Value::Str("server_version".into()));
-            assert!(sv_row.is_some(), "pg_settings should contain server_version");
+            let sv_row = rows
+                .iter()
+                .find(|r| r[0] == Value::Str("server_version".into()));
+            assert!(
+                sv_row.is_some(),
+                "pg_settings should contain server_version"
+            );
             assert_eq!(sv_row.unwrap()[1], Value::Str("0.1.0".into()));
         } else {
             panic!("expected Rows result");

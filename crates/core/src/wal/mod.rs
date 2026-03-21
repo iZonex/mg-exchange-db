@@ -35,7 +35,7 @@ pub mod writer;
 pub use event::{EventType, WalEvent};
 pub use merge::{MergeStats, WalMergeJob};
 pub use reader::WalReader;
-pub use row_codec::{decode_row, encode_row, OwnedColumnValue};
+pub use row_codec::{OwnedColumnValue, decode_row, encode_row};
 pub use segment::WalSegment;
 pub use sequencer::Sequencer;
 pub use writer::{CommitMode, WalWriter, WalWriterConfig};

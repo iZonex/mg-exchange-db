@@ -17,7 +17,11 @@ pub struct FilteredScanCursor {
 
 impl FilteredScanCursor {
     pub fn new(source: Box<dyn RecordCursor>, col_idx: usize, expected: Value) -> Self {
-        Self { source, col_idx, expected }
+        Self {
+            source,
+            col_idx,
+            expected,
+        }
     }
 }
 
@@ -39,13 +43,19 @@ impl RecordCursor for FilteredScanCursor {
                             let row: Vec<Value> =
                                 (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                             result.append_row(&row);
-                            if result.row_count() >= max_rows { break; }
+                            if result.row_count() >= max_rows {
+                                break;
+                            }
                         }
                     }
                 }
             }
         }
-        if result.row_count() == 0 { Ok(None) } else { Ok(Some(result)) }
+        if result.row_count() == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(result))
+        }
     }
 }
 
@@ -56,7 +66,10 @@ mod tests {
 
     #[test]
     fn filters_during_scan() {
-        let schema = vec![("k".to_string(), ColumnType::I64), ("v".to_string(), ColumnType::I64)];
+        let schema = vec![
+            ("k".to_string(), ColumnType::I64),
+            ("v".to_string(), ColumnType::I64),
+        ];
         let rows = vec![
             vec![Value::I64(1), Value::I64(10)],
             vec![Value::I64(2), Value::I64(20)],

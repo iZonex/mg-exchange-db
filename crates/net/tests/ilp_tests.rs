@@ -14,7 +14,7 @@
 //! - ILP authentication (challenge, verify, expired, wrong sig)
 
 use exchange_net::ilp::{
-    parse_ilp_batch, parse_ilp_line, IlpLine, IlpParseError, IlpValue, IlpVersion,
+    IlpLine, IlpParseError, IlpValue, IlpVersion, parse_ilp_batch, parse_ilp_line,
 };
 use std::collections::BTreeMap;
 
@@ -40,28 +40,19 @@ mod ilp_parser {
         let parsed = parse_ilp_line(line).unwrap();
         assert_eq!(parsed.measurement, "cpu");
         assert_eq!(parsed.tags.get("host").unwrap(), "server01");
-        assert_eq!(
-            parsed.fields.get("usage"),
-            Some(&IlpValue::Float(0.64))
-        );
+        assert_eq!(parsed.fields.get("usage"), Some(&IlpValue::Float(0.64)));
     }
 
     #[test]
     fn integer_field() {
         let parsed = parse_ilp_line("mem,host=h1 total=16384i 1000").unwrap();
-        assert_eq!(
-            parsed.fields.get("total"),
-            Some(&IlpValue::Integer(16384))
-        );
+        assert_eq!(parsed.fields.get("total"), Some(&IlpValue::Integer(16384)));
     }
 
     #[test]
     fn negative_integer_field() {
         let parsed = parse_ilp_line("sensor,id=1 temp=-42i 1000").unwrap();
-        assert_eq!(
-            parsed.fields.get("temp"),
-            Some(&IlpValue::Integer(-42))
-        );
+        assert_eq!(parsed.fields.get("temp"), Some(&IlpValue::Integer(-42)));
     }
 
     #[test]
@@ -79,19 +70,13 @@ mod ilp_parser {
     #[test]
     fn float_field_negative() {
         let parsed = parse_ilp_line("sensor temp=-3.14 1000").unwrap();
-        assert_eq!(
-            parsed.fields.get("temp"),
-            Some(&IlpValue::Float(-3.14))
-        );
+        assert_eq!(parsed.fields.get("temp"), Some(&IlpValue::Float(-3.14)));
     }
 
     #[test]
     fn float_field_scientific() {
         let parsed = parse_ilp_line("sensor val=1e10 1000").unwrap();
-        assert_eq!(
-            parsed.fields.get("val"),
-            Some(&IlpValue::Float(1e10))
-        );
+        assert_eq!(parsed.fields.get("val"), Some(&IlpValue::Float(1e10)));
     }
 
     #[test]
@@ -114,8 +99,7 @@ mod ilp_parser {
 
     #[test]
     fn string_field_with_escaped_quote() {
-        let parsed =
-            parse_ilp_line(r#"logs message="say \"hello\"" 1000"#).unwrap();
+        let parsed = parse_ilp_line(r#"logs message="say \"hello\"" 1000"#).unwrap();
         assert_eq!(
             parsed.fields.get("message"),
             Some(&IlpValue::String("say \"hello\"".into()))
@@ -134,19 +118,13 @@ mod ilp_parser {
     #[test]
     fn boolean_true_lowercase() {
         let parsed = parse_ilp_line("status alive=true 1000").unwrap();
-        assert_eq!(
-            parsed.fields.get("alive"),
-            Some(&IlpValue::Boolean(true))
-        );
+        assert_eq!(parsed.fields.get("alive"), Some(&IlpValue::Boolean(true)));
     }
 
     #[test]
     fn boolean_false_lowercase() {
         let parsed = parse_ilp_line("status dead=false 1000").unwrap();
-        assert_eq!(
-            parsed.fields.get("dead"),
-            Some(&IlpValue::Boolean(false))
-        );
+        assert_eq!(parsed.fields.get("dead"), Some(&IlpValue::Boolean(false)));
     }
 
     #[test]
@@ -190,8 +168,7 @@ mod ilp_parser {
     #[test]
     fn two_tags_two_fields() {
         let parsed =
-            parse_ilp_line("weather,city=nyc,state=ny temp=72.5,humidity=65i 999")
-                .unwrap();
+            parse_ilp_line("weather,city=nyc,state=ny temp=72.5,humidity=65i 999").unwrap();
         assert_eq!(parsed.tags.len(), 2);
         assert_eq!(parsed.tags.get("city").unwrap(), "nyc");
         assert_eq!(parsed.tags.get("state").unwrap(), "ny");
@@ -200,10 +177,9 @@ mod ilp_parser {
 
     #[test]
     fn three_tags() {
-        let parsed = parse_ilp_line(
-            "trades,exchange=binance,pair=btcusd,side=buy price=65000.0 1000",
-        )
-        .unwrap();
+        let parsed =
+            parse_ilp_line("trades,exchange=binance,pair=btcusd,side=buy price=65000.0 1000")
+                .unwrap();
         assert_eq!(parsed.tags.len(), 3);
         assert_eq!(parsed.tags.get("exchange").unwrap(), "binance");
         assert_eq!(parsed.tags.get("pair").unwrap(), "btcusd");
@@ -212,10 +188,7 @@ mod ilp_parser {
 
     #[test]
     fn five_fields() {
-        let parsed = parse_ilp_line(
-            "data a=1i,b=2.0,c=\"hi\",d=true,e=false 1000",
-        )
-        .unwrap();
+        let parsed = parse_ilp_line("data a=1i,b=2.0,c=\"hi\",d=true,e=false 1000").unwrap();
         assert_eq!(parsed.fields.len(), 5);
     }
 
@@ -257,10 +230,7 @@ mod ilp_parser {
 
     #[test]
     fn comment_line_is_error() {
-        assert_eq!(
-            parse_ilp_line("# comment"),
-            Err(IlpParseError::EmptyInput)
-        );
+        assert_eq!(parse_ilp_line("# comment"), Err(IlpParseError::EmptyInput));
     }
 
     #[test]
@@ -296,20 +266,14 @@ mod ilp_parser {
     #[test]
     fn large_integer_value() {
         let parsed = parse_ilp_line("m val=9223372036854775807i 1000").unwrap();
-        assert_eq!(
-            parsed.fields.get("val"),
-            Some(&IlpValue::Integer(i64::MAX))
-        );
+        assert_eq!(parsed.fields.get("val"), Some(&IlpValue::Integer(i64::MAX)));
     }
 
     #[test]
     fn large_negative_integer() {
         let line = format!("m val={}i 1000", i64::MIN);
         let parsed = parse_ilp_line(&line).unwrap();
-        assert_eq!(
-            parsed.fields.get("val"),
-            Some(&IlpValue::Integer(i64::MIN))
-        );
+        assert_eq!(parsed.fields.get("val"), Some(&IlpValue::Integer(i64::MIN)));
     }
 
     #[test]
@@ -325,10 +289,7 @@ mod ilp_parser {
         let value = "x".repeat(10_000);
         let line = format!("m val=\"{}\" 1000", value);
         let parsed = parse_ilp_line(&line).unwrap();
-        assert_eq!(
-            parsed.fields.get("val"),
-            Some(&IlpValue::String(value))
-        );
+        assert_eq!(parsed.fields.get("val"), Some(&IlpValue::String(value)));
     }
 
     #[test]
@@ -385,8 +346,7 @@ mod ilp_parser {
 
     #[test]
     fn unicode_in_string_field() {
-        let parsed =
-            parse_ilp_line(r#"logs message="hello 世界 🌍" 1000"#).unwrap();
+        let parsed = parse_ilp_line(r#"logs message="hello 世界 🌍" 1000"#).unwrap();
         assert_eq!(
             parsed.fields.get("message"),
             Some(&IlpValue::String("hello 世界 🌍".into()))
@@ -403,8 +363,7 @@ mod ilp_parser {
 
     #[test]
     fn batch_two_lines() {
-        let input =
-            "cpu,host=a usage=0.5 1000\nmem,host=b total=8i 2000\n";
+        let input = "cpu,host=a usage=0.5 1000\nmem,host=b total=8i 2000\n";
         let lines = parse_ilp_batch(input).unwrap();
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0].measurement, "cpu");
@@ -457,8 +416,7 @@ mod ilp_parser {
 
     #[test]
     fn v2_timestamp_field() {
-        let parsed =
-            parse_ilp_line("trades ts=1609459200000000000t 1000").unwrap();
+        let parsed = parse_ilp_line("trades ts=1609459200000000000t 1000").unwrap();
         assert_eq!(
             parsed.fields.get("ts"),
             Some(&IlpValue::Timestamp(1609459200000000000))
@@ -476,8 +434,7 @@ mod ilp_parser {
 
     #[test]
     fn v2_long256_field() {
-        let parsed =
-            parse_ilp_line("tx hash=0xdeadbeef01234567n 1000").unwrap();
+        let parsed = parse_ilp_line("tx hash=0xdeadbeef01234567n 1000").unwrap();
         assert_eq!(
             parsed.fields.get("hash"),
             Some(&IlpValue::Long256("deadbeef01234567".into()))
@@ -486,27 +443,17 @@ mod ilp_parser {
 
     #[test]
     fn v2_mixed_typed_fields() {
-        let parsed = parse_ilp_line(
-            "data,tag=v2 price=100.5,count=42i,sym=ETH$,ts=999t,hash=0xabn 1000",
-        )
-        .unwrap();
+        let parsed =
+            parse_ilp_line("data,tag=v2 price=100.5,count=42i,sym=ETH$,ts=999t,hash=0xabn 1000")
+                .unwrap();
         assert_eq!(parsed.fields.len(), 5);
-        assert_eq!(
-            parsed.fields.get("price"),
-            Some(&IlpValue::Float(100.5))
-        );
-        assert_eq!(
-            parsed.fields.get("count"),
-            Some(&IlpValue::Integer(42))
-        );
+        assert_eq!(parsed.fields.get("price"), Some(&IlpValue::Float(100.5)));
+        assert_eq!(parsed.fields.get("count"), Some(&IlpValue::Integer(42)));
         assert_eq!(
             parsed.fields.get("sym"),
             Some(&IlpValue::Symbol("ETH".into()))
         );
-        assert_eq!(
-            parsed.fields.get("ts"),
-            Some(&IlpValue::Timestamp(999))
-        );
+        assert_eq!(parsed.fields.get("ts"), Some(&IlpValue::Timestamp(999)));
         assert_eq!(
             parsed.fields.get("hash"),
             Some(&IlpValue::Long256("ab".into()))
@@ -516,19 +463,13 @@ mod ilp_parser {
     #[test]
     fn v2_negative_timestamp_field() {
         let parsed = parse_ilp_line("m ts=-1000t 1000").unwrap();
-        assert_eq!(
-            parsed.fields.get("ts"),
-            Some(&IlpValue::Timestamp(-1000))
-        );
+        assert_eq!(parsed.fields.get("ts"), Some(&IlpValue::Timestamp(-1000)));
     }
 
     #[test]
     fn v2_symbol_single_char() {
         let parsed = parse_ilp_line("m s=X$ 1000").unwrap();
-        assert_eq!(
-            parsed.fields.get("s"),
-            Some(&IlpValue::Symbol("X".into()))
-        );
+        assert_eq!(parsed.fields.get("s"), Some(&IlpValue::Symbol("X".into())));
     }
 
     #[test]
@@ -552,18 +493,12 @@ mod ilp_parser {
 
     #[test]
     fn detect_v1_integer() {
-        assert_eq!(
-            IlpVersion::detect("m val=42i 1000"),
-            IlpVersion::V1
-        );
+        assert_eq!(IlpVersion::detect("m val=42i 1000"), IlpVersion::V1);
     }
 
     #[test]
     fn detect_v1_string() {
-        assert_eq!(
-            IlpVersion::detect(r#"m val="hello" 1000"#),
-            IlpVersion::V1
-        );
+        assert_eq!(IlpVersion::detect(r#"m val="hello" 1000"#), IlpVersion::V1);
     }
 
     #[test]
@@ -599,10 +534,7 @@ mod ilp_parser {
     #[test]
     fn detect_v1_boolean_t_is_not_v2_timestamp() {
         // "t" alone is boolean true, not a timestamp suffix
-        assert_eq!(
-            IlpVersion::detect("m val=t 1000"),
-            IlpVersion::V1
-        );
+        assert_eq!(IlpVersion::detect("m val=t 1000"), IlpVersion::V1);
     }
 
     // -- Malformed input (should error, not panic) --
@@ -666,16 +598,12 @@ mod ilp_parser {
     #[test]
     fn timestamp_zero() {
         let parsed = parse_ilp_line("m val=1i 0").unwrap();
-        assert_eq!(
-            parsed.timestamp,
-            Some(exchange_common::types::Timestamp(0))
-        );
+        assert_eq!(parsed.timestamp, Some(exchange_common::types::Timestamp(0)));
     }
 
     #[test]
     fn tags_are_sorted_by_key() {
-        let parsed =
-            parse_ilp_line("m,z=1,a=2,m=3 val=1i 1000").unwrap();
+        let parsed = parse_ilp_line("m,z=1,a=2,m=3 val=1i 1000").unwrap();
         let keys: Vec<&String> = parsed.tags.keys().collect();
         assert_eq!(keys, vec!["a", "m", "z"]);
     }
@@ -699,15 +627,14 @@ mod ilp_parser {
 // ---------------------------------------------------------------------------
 
 mod ilp_auth {
-    use exchange_net::ilp::auth::{IlpAuthConfig, IlpAuthenticator};
     use base64::Engine as _;
+    use exchange_net::ilp::auth::{IlpAuthConfig, IlpAuthenticator};
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
     use std::collections::HashMap;
 
     type HmacSha256 = Hmac<Sha256>;
-    const B64: base64::engine::GeneralPurpose =
-        base64::engine::general_purpose::STANDARD;
+    const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
     fn make_config() -> IlpAuthConfig {
         let secret = B64.encode(b"test-secret-key!");
@@ -848,10 +775,7 @@ mod ilp_auth {
         let config = make_config();
         let auth = IlpAuthenticator::new(config.clone());
         let large_challenge = vec![0xBB; 4096];
-        let sig = sign(
-            config.auth_keys.get("testkey").unwrap(),
-            &large_challenge,
-        );
+        let sig = sign(config.auth_keys.get("testkey").unwrap(), &large_challenge);
         assert!(auth.verify_response("testkey", &large_challenge, &sig));
     }
 

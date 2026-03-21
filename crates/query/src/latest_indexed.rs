@@ -54,11 +54,7 @@ where
 /// Returns true when the partition column has a bitmap index and the
 /// number of distinct values is significantly smaller than the total
 /// row count (making index lookup worthwhile).
-pub fn should_use_indexed_latest(
-    has_index: bool,
-    distinct_count: u64,
-    total_rows: u64,
-) -> bool {
+pub fn should_use_indexed_latest(has_index: bool, distinct_count: u64, total_rows: u64) -> bool {
     if !has_index || distinct_count == 0 {
         return false;
     }
@@ -99,11 +95,7 @@ mod tests {
         // key 0 (BTC): rows [0, 3, 6]
         // key 1 (ETH): rows [1, 4, 7]
         // key 2 (SOL): rows [2, 5]
-        let index_data: Vec<Vec<u64>> = vec![
-            vec![0, 3, 6],
-            vec![1, 4, 7],
-            vec![2, 5],
-        ];
+        let index_data: Vec<Vec<u64>> = vec![vec![0, 3, 6], vec![1, 4, 7], vec![2, 5]];
 
         let result = latest_by_index(2, |key| {
             index_data.get(key as usize).cloned().unwrap_or_default()
@@ -115,13 +107,7 @@ mod tests {
 
     #[test]
     fn latest_by_index_single_key() {
-        let result = latest_by_index(0, |key| {
-            if key == 0 {
-                vec![0, 1, 2, 3]
-            } else {
-                vec![]
-            }
-        });
+        let result = latest_by_index(0, |key| if key == 0 { vec![0, 1, 2, 3] } else { vec![] });
         assert_eq!(result.row_ids, vec![3]);
         assert_eq!(result.key_ids, vec![0]);
     }
@@ -176,10 +162,7 @@ mod tests {
 
     #[test]
     fn extract_rows_out_of_bounds() {
-        let rows = vec![
-            vec![Value::I64(0)],
-            vec![Value::I64(1)],
-        ];
+        let rows = vec![vec![Value::I64(0)], vec![Value::I64(1)]];
         let result = extract_rows_by_ids(&[0, 5, 1], &rows);
         // ID 5 is out of bounds and skipped.
         assert_eq!(result.len(), 2);

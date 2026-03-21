@@ -57,19 +57,11 @@ impl ScalarFunction for BarAlignFn {
         let ts = match &args[0] {
             Value::I64(v) => *v,
             Value::Null => return Ok(Value::Null),
-            _ => {
-                return Err(
-                    "ohlcv_bar_align: first argument must be integer timestamp".into(),
-                )
-            }
+            _ => return Err("ohlcv_bar_align: first argument must be integer timestamp".into()),
         };
         let interval = match &args[1] {
             Value::Str(s) => s.as_str(),
-            _ => {
-                return Err(
-                    "ohlcv_bar_align: second argument must be interval string".into(),
-                )
-            }
+            _ => return Err("ohlcv_bar_align: second argument must be interval string".into()),
         };
         let tf = parse_timeframe(interval)
             .ok_or_else(|| format!("ohlcv_bar_align: unknown interval '{interval}'"))?;
@@ -91,11 +83,7 @@ impl ScalarFunction for IntervalNanosFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         let interval = match &args[0] {
             Value::Str(s) => s.as_str(),
-            _ => {
-                return Err(
-                    "ohlcv_interval_nanos: argument must be interval string".into(),
-                )
-            }
+            _ => return Err("ohlcv_interval_nanos: argument must be interval string".into()),
         };
         let tf = parse_timeframe(interval)
             .ok_or_else(|| format!("ohlcv_interval_nanos: unknown interval '{interval}'"))?;
@@ -265,11 +253,7 @@ impl ScalarFunction for TickDeltaEncodeFn {
         let prices_json = match &args[0] {
             Value::Str(s) => s.as_str(),
             Value::Null => return Ok(Value::Null),
-            _ => {
-                return Err(
-                    "tick_delta_encode: first argument must be JSON array string".into(),
-                )
-            }
+            _ => return Err("tick_delta_encode: first argument must be JSON array string".into()),
         };
         let decimals = match &args[1] {
             Value::I64(v) => *v as u32,
@@ -298,11 +282,7 @@ impl ScalarFunction for TickDeltaDecodeFn {
         let encoded_json = match &args[0] {
             Value::Str(s) => s.as_str(),
             Value::Null => return Ok(Value::Null),
-            _ => {
-                return Err(
-                    "tick_delta_decode: first argument must be JSON string".into(),
-                )
-            }
+            _ => return Err("tick_delta_decode: first argument must be JSON string".into()),
         };
         let decimals = match &args[1] {
             Value::I64(v) => *v as u32,
@@ -368,15 +348,13 @@ mod tests {
 
     #[test]
     fn test_vwap() {
-        let result =
-            evaluate_scalar("vwap", &[Value::F64(1050.0), Value::F64(10.0)]).unwrap();
+        let result = evaluate_scalar("vwap", &[Value::F64(1050.0), Value::F64(10.0)]).unwrap();
         assert_eq!(result, Value::F64(105.0));
     }
 
     #[test]
     fn test_vwap_zero_volume() {
-        let result =
-            evaluate_scalar("vwap", &[Value::F64(100.0), Value::F64(0.0)]).unwrap();
+        let result = evaluate_scalar("vwap", &[Value::F64(100.0), Value::F64(0.0)]).unwrap();
         assert_eq!(result, Value::Null);
     }
 
@@ -388,8 +366,7 @@ mod tests {
 
     #[test]
     fn test_vwap_integer_args() {
-        let result =
-            evaluate_scalar("vwap", &[Value::I64(1000), Value::I64(10)]).unwrap();
+        let result = evaluate_scalar("vwap", &[Value::I64(1000), Value::I64(10)]).unwrap();
         assert_eq!(result, Value::F64(100.0));
     }
 
@@ -407,11 +384,8 @@ mod tests {
     #[test]
     fn test_bar_align_1s() {
         let ts = 1_500_000_000i64;
-        let result = evaluate_scalar(
-            "bar_align",
-            &[Value::I64(ts), Value::Str("1s".into())],
-        )
-        .unwrap();
+        let result =
+            evaluate_scalar("bar_align", &[Value::I64(ts), Value::Str("1s".into())]).unwrap();
         assert_eq!(result, Value::I64(1_000_000_000));
     }
 
@@ -428,15 +402,13 @@ mod tests {
 
     #[test]
     fn test_interval_nanos() {
-        let result =
-            evaluate_scalar("ohlcv_interval_nanos", &[Value::Str("1m".into())]).unwrap();
+        let result = evaluate_scalar("ohlcv_interval_nanos", &[Value::Str("1m".into())]).unwrap();
         assert_eq!(result, Value::I64(60_000_000_000));
     }
 
     #[test]
     fn test_interval_nanos_1h() {
-        let result =
-            evaluate_scalar("ohlcv_interval_nanos", &[Value::Str("1h".into())]).unwrap();
+        let result = evaluate_scalar("ohlcv_interval_nanos", &[Value::Str("1h".into())]).unwrap();
         assert_eq!(result, Value::I64(3_600_000_000_000));
     }
 
@@ -608,8 +580,7 @@ mod tests {
 
     #[test]
     fn test_ohlcv_vwap_alias() {
-        let result =
-            evaluate_scalar("ohlcv_vwap", &[Value::F64(500.0), Value::F64(5.0)]).unwrap();
+        let result = evaluate_scalar("ohlcv_vwap", &[Value::F64(500.0), Value::F64(5.0)]).unwrap();
         assert_eq!(result, Value::F64(100.0));
     }
 }

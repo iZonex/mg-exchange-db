@@ -2,7 +2,7 @@ use crate::mmap::MmapFile;
 use exchange_common::error::{ExchangeDbError, Result};
 use std::path::{Path, PathBuf};
 
-use super::event::{WalEvent, EVENT_HEADER_SIZE, EVENT_OVERHEAD};
+use super::event::{EVENT_HEADER_SIZE, EVENT_OVERHEAD, WalEvent};
 
 /// Default initial capacity for a WAL segment file (1 MB).
 const SEGMENT_INITIAL_CAPACITY: u64 = 1024 * 1024;
@@ -170,9 +170,7 @@ impl WalSegment {
         let file_len = self.mmap.len();
 
         if offset + EVENT_HEADER_SIZE as u64 > file_len {
-            return Err(ExchangeDbError::Wal(
-                "read past end of WAL segment".into(),
-            ));
+            return Err(ExchangeDbError::Wal("read past end of WAL segment".into()));
         }
 
         // Read header to determine payload length.

@@ -708,13 +708,11 @@ mod tests {
         use super::super::apache_writer::ApacheParquetWriter;
 
         let writer = ApacheParquetWriter::new();
-        let columns_schema = vec![
-            ParquetSchemaColumn {
-                name: "id".to_string(),
-                physical_type: PhysicalType::Int64,
-                repetition: Repetition::Required,
-            },
-        ];
+        let columns_schema = vec![ParquetSchemaColumn {
+            name: "id".to_string(),
+            physical_type: PhysicalType::Int64,
+            repetition: Repetition::Required,
+        }];
 
         // 10 i64 values
         let data: Vec<u8> = (0..10i64).flat_map(|i| i.to_le_bytes()).collect();

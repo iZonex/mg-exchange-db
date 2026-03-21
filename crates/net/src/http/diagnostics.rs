@@ -5,9 +5,9 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::State;
 use axum::response::IntoResponse;
-use axum::Json;
 use serde::Serialize;
 
 use super::handlers::AppState;
@@ -101,14 +101,34 @@ pub async fn diagnostics(State(state): State<Arc<AppState>>) -> impl IntoRespons
             total_rows,
         },
         connections: ConnectionInfo {
-            http: state.metrics.connections_http.load(std::sync::atomic::Ordering::Relaxed) as u64,
-            pgwire: state.metrics.connections_pg.load(std::sync::atomic::Ordering::Relaxed) as u64,
-            ilp: state.metrics.connections_ilp.load(std::sync::atomic::Ordering::Relaxed) as u64,
+            http: state
+                .metrics
+                .connections_http
+                .load(std::sync::atomic::Ordering::Relaxed) as u64,
+            pgwire: state
+                .metrics
+                .connections_pg
+                .load(std::sync::atomic::Ordering::Relaxed) as u64,
+            ilp: state
+                .metrics
+                .connections_ilp
+                .load(std::sync::atomic::Ordering::Relaxed) as u64,
         },
         wal: WalInfo {
-            pending_segments: state.metrics.wal_segments_total.load(std::sync::atomic::Ordering::Relaxed)
-                .saturating_sub(state.metrics.wal_segments_applied.load(std::sync::atomic::Ordering::Relaxed)),
-            applied_segments: state.metrics.wal_segments_applied.load(std::sync::atomic::Ordering::Relaxed),
+            pending_segments: state
+                .metrics
+                .wal_segments_total
+                .load(std::sync::atomic::Ordering::Relaxed)
+                .saturating_sub(
+                    state
+                        .metrics
+                        .wal_segments_applied
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                ),
+            applied_segments: state
+                .metrics
+                .wal_segments_applied
+                .load(std::sync::atomic::Ordering::Relaxed),
         },
         config: ConfigInfo {
             http_port: 9000,

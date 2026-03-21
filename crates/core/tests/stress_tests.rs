@@ -3,9 +3,9 @@
 
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::compression::{
-    compress_column_file, compression_stats, decompress_column_file, delta_decode_i64,
-    delta_decode_i64_nonempty, delta_encode_i64, rle_decode, rle_encode, CompressionStats,
-    DeltaEncoded,
+    CompressionStats, DeltaEncoded, compress_column_file, compression_stats,
+    decompress_column_file, delta_decode_i64, delta_decode_i64_nonempty, delta_encode_i64,
+    rle_decode, rle_encode,
 };
 use exchange_core::engine::Engine;
 use exchange_core::table::{ColumnValue, TableBuilder, TableMeta, TableWriter};
@@ -45,7 +45,9 @@ fn write_1000_rows_single_partition() {
 
     let partition_dir = dir.path().join("trades").join("2024-03-15");
     assert!(partition_dir.exists());
-    let ts_size = fs::metadata(partition_dir.join("timestamp.d")).unwrap().len();
+    let ts_size = fs::metadata(partition_dir.join("timestamp.d"))
+        .unwrap()
+        .len();
     assert!(ts_size >= 1000 * 8); // 8 bytes per i64 timestamp, mmap may pre-allocate
 }
 
@@ -76,7 +78,9 @@ fn write_5000_rows_single_partition() {
     drop(handle);
 
     let partition_dir = dir.path().join("t").join("2024-03-15");
-    let ts_size = fs::metadata(partition_dir.join("timestamp.d")).unwrap().len();
+    let ts_size = fs::metadata(partition_dir.join("timestamp.d"))
+        .unwrap()
+        .len();
     assert!(ts_size >= 5000 * 8);
 }
 
@@ -319,7 +323,11 @@ delta_test!(delta_step_100, 100, |i: i64| (i / 10) * 100);
 delta_test!(delta_step_1k, 1_000, |i: i64| (i / 10) * 100);
 delta_test!(delta_negative_100, 100, |i: i64| -i * 5);
 delta_test!(delta_negative_1k, 1_000, |i: i64| -i * 5);
-delta_test!(delta_mixed_sign, 100, |i: i64| if i % 2 == 0 { i } else { -i });
+delta_test!(delta_mixed_sign, 100, |i: i64| if i % 2 == 0 {
+    i
+} else {
+    -i
+});
 
 // =============================================================================
 // 3. RLE stress tests
@@ -394,7 +402,11 @@ rle_test!(rle_mod3, 1_000, |i: i32| i % 3);
 rle_test!(rle_mod10, 1_000, |i: i32| i % 10);
 rle_test!(rle_constant_zero, 5_000, |_i: i32| 0);
 rle_test!(rle_constant_max, 5_000, |_i: i32| i32::MAX);
-rle_test!(rle_two_values, 10_000, |i: i32| if i < 5000 { 0 } else { 1 });
+rle_test!(rle_two_values, 10_000, |i: i32| if i < 5000 {
+    0
+} else {
+    1
+});
 
 // =============================================================================
 // 4. LZ4 compression stress tests
@@ -504,7 +516,8 @@ lz4_roundtrip_test!(lz4_zeros_10k, 10_000usize, |_i| 0u8);
 lz4_roundtrip_test!(lz4_zeros_100k, 100_000usize, |_i| 0u8);
 lz4_roundtrip_test!(lz4_sequential_1k, 1_000usize, |i: usize| (i % 256) as u8);
 lz4_roundtrip_test!(lz4_sequential_10k, 10_000usize, |i: usize| (i % 256) as u8);
-lz4_roundtrip_test!(lz4_sequential_100k, 100_000usize, |i: usize| (i % 256) as u8);
+lz4_roundtrip_test!(lz4_sequential_100k, 100_000usize, |i: usize| (i % 256)
+    as u8);
 lz4_roundtrip_test!(lz4_pattern_1k, 1_000usize, |i: usize| (i % 4) as u8);
 lz4_roundtrip_test!(lz4_pattern_10k, 10_000usize, |i: usize| (i % 4) as u8);
 
@@ -663,7 +676,8 @@ fn add_100_columns() {
     let mut meta = TableMeta::load(&table_dir.join("_meta")).unwrap();
 
     for i in 0..100 {
-        meta.add_column(&format!("col_{i}"), ColumnType::F64).unwrap();
+        meta.add_column(&format!("col_{i}"), ColumnType::F64)
+            .unwrap();
     }
     meta.save(&table_dir.join("_meta")).unwrap();
 
@@ -828,8 +842,8 @@ fn write_monthly_partitions() {
     let mut handle = engine.get_writer("monthly").unwrap();
     // 12 months of 2024
     let month_starts = [
-        1704067200, 1706745600, 1709251200, 1711929600, 1714521600, 1717200000,
-        1719792000, 1722470400, 1725148800, 1727740800, 1730419200, 1733011200,
+        1704067200, 1706745600, 1709251200, 1711929600, 1714521600, 1717200000, 1719792000,
+        1722470400, 1725148800, 1727740800, 1730419200, 1733011200,
     ];
     for &ts_secs in &month_starts {
         let ts = Timestamp::from_secs(ts_secs);
@@ -1289,7 +1303,11 @@ write_type_test!(write_i64_stress, ColumnType::I64, ColumnValue::I64(42));
 write_type_test!(write_f64_stress, ColumnType::F64, ColumnValue::F64(3.14));
 write_type_test!(write_i32_stress, ColumnType::I32, ColumnValue::I32(100));
 write_type_test!(write_symbol_stress, ColumnType::Symbol, ColumnValue::I32(0));
-write_type_test!(write_varchar_stress, ColumnType::Varchar, ColumnValue::Str("test"));
+write_type_test!(
+    write_varchar_stress,
+    ColumnType::Varchar,
+    ColumnValue::Str("test")
+);
 
 // =============================================================================
 // 21. Parametric delta encode/decode sizes
@@ -1449,7 +1467,10 @@ macro_rules! partition_by_test {
                 .unwrap();
             let mut handle = engine.get_writer("t").unwrap();
             let ts = Timestamp::from_secs(1710513000);
-            handle.writer().write_row(ts, &[ColumnValue::F64(1.0)]).unwrap();
+            handle
+                .writer()
+                .write_row(ts, &[ColumnValue::F64(1.0)])
+                .unwrap();
             handle.writer().flush().unwrap();
         }
     };
@@ -1526,9 +1547,7 @@ macro_rules! rle_str_test {
     ($name:ident, $n:expr, $mod_val:expr) => {
         #[test]
         fn $name() {
-            let values: Vec<String> = (0..$n)
-                .map(|i| format!("sym_{}", i % $mod_val))
-                .collect();
+            let values: Vec<String> = (0..$n).map(|i| format!("sym_{}", i % $mod_val)).collect();
             let encoded = rle_encode(&values);
             let decoded = rle_decode(&encoded);
             assert_eq!(decoded, values);
@@ -1598,7 +1617,10 @@ macro_rules! write_count_test {
             let mut handle = engine.get_writer("t").unwrap();
             for i in 0..$rows {
                 let ts = Timestamp::from_secs(1710513000 + i as i64);
-                handle.writer().write_row(ts, &[ColumnValue::F64(i as f64)]).unwrap();
+                handle
+                    .writer()
+                    .write_row(ts, &[ColumnValue::F64(i as f64)])
+                    .unwrap();
             }
             handle.writer().flush().unwrap();
         }
@@ -1926,19 +1948,23 @@ macro_rules! engine_cycle_test {
         fn $name() {
             let dir = tempdir().unwrap();
             let engine = Engine::open(dir.path()).unwrap();
-            engine.create_table(
-                TableBuilder::new("t")
-                    .column("timestamp", ColumnType::Timestamp)
-                    .column("v", ColumnType::F64)
-                    .timestamp("timestamp")
-                    .partition_by(PartitionBy::Day),
-            ).unwrap();
+            engine
+                .create_table(
+                    TableBuilder::new("t")
+                        .column("timestamp", ColumnType::Timestamp)
+                        .column("v", ColumnType::F64)
+                        .timestamp("timestamp")
+                        .partition_by(PartitionBy::Day),
+                )
+                .unwrap();
 
             {
                 let mut h = engine.get_writer("t").unwrap();
                 for i in 0..$nrows {
                     let ts = Timestamp::from_secs(1710513000 + i as i64);
-                    h.writer().write_row(ts, &[ColumnValue::F64(i as f64)]).unwrap();
+                    h.writer()
+                        .write_row(ts, &[ColumnValue::F64(i as f64)])
+                        .unwrap();
                 }
                 h.writer().flush().unwrap();
             }
@@ -1968,13 +1994,15 @@ macro_rules! multi_day_test {
         fn $name() {
             let dir = tempdir().unwrap();
             let engine = Engine::open(dir.path()).unwrap();
-            engine.create_table(
-                TableBuilder::new("t")
-                    .column("timestamp", ColumnType::Timestamp)
-                    .column("v", ColumnType::F64)
-                    .timestamp("timestamp")
-                    .partition_by(PartitionBy::Day),
-            ).unwrap();
+            engine
+                .create_table(
+                    TableBuilder::new("t")
+                        .column("timestamp", ColumnType::Timestamp)
+                        .column("v", ColumnType::F64)
+                        .timestamp("timestamp")
+                        .partition_by(PartitionBy::Day),
+                )
+                .unwrap();
             let mut h = engine.get_writer("t").unwrap();
             for day in 0..$n_days {
                 let ts = Timestamp::from_secs(1710513000 + day as i64 * 86400 + 3600);
@@ -2029,7 +2057,9 @@ macro_rules! rle_twoval_test {
     ($name:ident, $n:expr, $run:expr) => {
         #[test]
         fn $name() {
-            let values: Vec<i32> = (0..$n).map(|i| if (i / $run) % 2 == 0 { 0 } else { 1 }).collect();
+            let values: Vec<i32> = (0..$n)
+                .map(|i| if (i / $run) % 2 == 0 { 0 } else { 1 })
+                .collect();
             let encoded = rle_encode(&values);
             let decoded = rle_decode(&encoded);
             assert_eq!(decoded, values);

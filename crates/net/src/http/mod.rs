@@ -9,12 +9,12 @@ pub mod response;
 use std::net::IpAddr;
 use std::sync::Arc;
 
+use axum::Router;
 use axum::extract::State;
-use axum::http::{header, Method, StatusCode};
+use axum::http::{Method, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use axum::Router;
 use tower_http::cors::CorsLayer;
 
 use handlers::AppState;

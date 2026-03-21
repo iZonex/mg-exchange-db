@@ -43,11 +43,7 @@ impl SortCursor {
         let col_indices: Vec<Option<usize>> = self
             .order_by
             .iter()
-            .map(|ob| {
-                self.schema
-                    .iter()
-                    .position(|(name, _)| name == &ob.column)
-            })
+            .map(|ob| self.schema.iter().position(|(name, _)| name == &ob.column))
             .collect();
 
         // For large datasets, use parallel sort via the parallel_sort module.

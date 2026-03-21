@@ -69,9 +69,7 @@ impl FillCursor {
                 Some(batch) => {
                     let ncols = batch.columns.len();
                     for r in 0..batch.row_count() {
-                        let row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> = (0..ncols).map(|c| batch.get_value(r, c)).collect();
                         rows.push(row);
                     }
                 }
@@ -102,7 +100,14 @@ impl FillCursor {
                         if col == self.ts_col {
                             fill_row.push(Value::Timestamp(ts));
                         } else {
-                            fill_row.push(self.fill_value(col, &rows[i], &rows[i + 1], curr_ts, next_ts, ts));
+                            fill_row.push(self.fill_value(
+                                col,
+                                &rows[i],
+                                &rows[i + 1],
+                                curr_ts,
+                                next_ts,
+                                ts,
+                            ));
                         }
                     }
                     result.append_row(&fill_row);
@@ -239,6 +244,9 @@ mod tests {
         }
 
         // ts=100 -> 10.0, ts=200 -> 10.0 (prev), ts=300 -> 30.0
-        assert_eq!(all, vec![Value::F64(10.0), Value::F64(10.0), Value::F64(30.0)]);
+        assert_eq!(
+            all,
+            vec![Value::F64(10.0), Value::F64(10.0), Value::F64(30.0)]
+        );
     }
 }

@@ -112,9 +112,8 @@ impl TenantManager {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) == Some("json") {
                 let data = fs::read_to_string(&path)?;
-                let tenant: Tenant = serde_json::from_str(&data).map_err(|e| {
-                    ExchangeDbError::Corruption(format!("deserialize tenant: {e}"))
-                })?;
+                let tenant: Tenant = serde_json::from_str(&data)
+                    .map_err(|e| ExchangeDbError::Corruption(format!("deserialize tenant: {e}")))?;
                 tenants.push(tenant);
             }
         }

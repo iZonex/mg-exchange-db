@@ -227,11 +227,7 @@ mod rle {
 
     #[test]
     fn string_values() {
-        let values = vec![
-            "buy".to_string(),
-            "buy".to_string(),
-            "sell".to_string(),
-        ];
+        let values = vec!["buy".to_string(), "buy".to_string(), "sell".to_string()];
         let encoded = rle_encode(&values);
         assert_eq!(encoded.len(), 2);
         assert_eq!(rle_decode(&encoded), values);
@@ -326,9 +322,7 @@ mod lz4 {
     fn large_data_10mb() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("large.d");
-        let data: Vec<u8> = (0..10_000_000u32)
-            .map(|i| (i % 256) as u8)
-            .collect();
+        let data: Vec<u8> = (0..10_000_000u32).map(|i| (i % 256) as u8).collect();
         std::fs::write(&path, &data).unwrap();
         compress_column_file(&path).unwrap();
         let size = decompress_column_file(&path).unwrap();

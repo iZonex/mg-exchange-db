@@ -8,11 +8,11 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use futures::sink::Sink;
-use pgwire::api::copy::CopyHandler;
 use pgwire::api::ClientInfo;
+use pgwire::api::copy::CopyHandler;
 use pgwire::error::{ErrorInfo, PgWireError, PgWireResult};
-use pgwire::messages::copy::{CopyData, CopyDone, CopyFail};
 use pgwire::messages::PgWireBackendMessage;
+use pgwire::messages::copy::{CopyData, CopyDone, CopyFail};
 
 use exchange_common::types::Timestamp;
 use exchange_core::table::{ColumnValue, TableMeta, TableWriter};
@@ -61,7 +61,10 @@ impl CopyInOptions {
             // Look for DELIMITER
             if let Some(delim_pos) = upper_options.find("DELIMITER") {
                 let after = &options_part[delim_pos + 9..];
-                let after = after.trim().trim_start_matches('\'').trim_start_matches('"');
+                let after = after
+                    .trim()
+                    .trim_start_matches('\'')
+                    .trim_start_matches('"');
                 if let Some(ch) = after.chars().next() {
                     delimiter = ch;
                 }
@@ -311,8 +314,7 @@ mod tests {
     #[test]
     fn test_parse_copy_command_with_options() {
         let opts =
-            CopyInOptions::parse("COPY trades FROM STDIN WITH (FORMAT csv, HEADER true)")
-                .unwrap();
+            CopyInOptions::parse("COPY trades FROM STDIN WITH (FORMAT csv, HEADER true)").unwrap();
         assert_eq!(opts.table, "trades");
         assert!(opts.header);
     }

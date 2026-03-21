@@ -48,10 +48,7 @@ mod chrono_lite {
 
     impl From<SystemTime> for DateTime {
         fn from(st: SystemTime) -> Self {
-            let secs = st
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let secs = st.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
 
             // Days since epoch
             let days = (secs / 86400) as i64;
@@ -113,11 +110,17 @@ fn partition_bounds(ts_nanos: i64, partition_by: PartitionBy) -> (i64, i64) {
         PartitionBy::None => (i64::MIN, i64::MAX),
         PartitionBy::Hour => {
             let hour_start_secs = secs.div_euclid(SECS_PER_HOUR) * SECS_PER_HOUR;
-            (hour_start_secs * NANOS_PER_SEC, (hour_start_secs + SECS_PER_HOUR) * NANOS_PER_SEC)
+            (
+                hour_start_secs * NANOS_PER_SEC,
+                (hour_start_secs + SECS_PER_HOUR) * NANOS_PER_SEC,
+            )
         }
         PartitionBy::Day => {
             let day_start_secs = days_since_epoch * SECS_PER_DAY;
-            (day_start_secs * NANOS_PER_SEC, (day_start_secs + SECS_PER_DAY) * NANOS_PER_SEC)
+            (
+                day_start_secs * NANOS_PER_SEC,
+                (day_start_secs + SECS_PER_DAY) * NANOS_PER_SEC,
+            )
         }
         PartitionBy::Week => {
             // ISO weeks: epoch (1970-01-01) was a Thursday (day 4).
@@ -125,7 +128,10 @@ fn partition_bounds(ts_nanos: i64, partition_by: PartitionBy) -> (i64, i64) {
             let dow = (days_since_epoch + 3).rem_euclid(7); // 0 = Monday
             let week_start_days = days_since_epoch - dow;
             let week_start_secs = week_start_days * SECS_PER_DAY;
-            (week_start_secs * NANOS_PER_SEC, (week_start_secs + 7 * SECS_PER_DAY) * NANOS_PER_SEC)
+            (
+                week_start_secs * NANOS_PER_SEC,
+                (week_start_secs + 7 * SECS_PER_DAY) * NANOS_PER_SEC,
+            )
         }
         PartitionBy::Month => {
             // Use the chrono_lite algorithm to get year/month, then compute start of month and next month.
@@ -143,7 +149,10 @@ fn partition_bounds(ts_nanos: i64, partition_by: PartitionBy) -> (i64, i64) {
             let (ny, nm) = if m == 12 { (y + 1, 1) } else { (y, m + 1) };
             let next_month_start = civil_to_days(ny, nm, 1);
 
-            (month_start * SECS_PER_DAY * NANOS_PER_SEC, next_month_start * SECS_PER_DAY * NANOS_PER_SEC)
+            (
+                month_start * SECS_PER_DAY * NANOS_PER_SEC,
+                next_month_start * SECS_PER_DAY * NANOS_PER_SEC,
+            )
         }
         PartitionBy::Year => {
             let z = days_since_epoch + 719468;
@@ -158,7 +167,10 @@ fn partition_bounds(ts_nanos: i64, partition_by: PartitionBy) -> (i64, i64) {
 
             let year_start = civil_to_days(y, 1, 1);
             let next_year_start = civil_to_days(y + 1, 1, 1);
-            (year_start * SECS_PER_DAY * NANOS_PER_SEC, next_year_start * SECS_PER_DAY * NANOS_PER_SEC)
+            (
+                year_start * SECS_PER_DAY * NANOS_PER_SEC,
+                next_year_start * SECS_PER_DAY * NANOS_PER_SEC,
+            )
         }
     }
 }

@@ -26,7 +26,10 @@ mod insert_basic {
     fn single_row() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            ts(0)
+        ));
         let (_, rows) = db.query("SELECT v FROM t");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], Value::F64(1.0));
@@ -36,8 +39,14 @@ mod insert_basic {
     fn two_rows_separate_inserts() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", ts(0)));
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 2.0)", ts(1)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            ts(0)
+        ));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 2.0)",
+            ts(1)
+        ));
         let (_, rows) = db.query("SELECT v FROM t ORDER BY v");
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0][0], Value::F64(1.0));
@@ -50,7 +59,9 @@ mod insert_basic {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!(
             "INSERT INTO t (timestamp, v) VALUES ({}, 10.0), ({}, 20.0), ({}, 30.0)",
-            ts(0), ts(1), ts(2)
+            ts(0),
+            ts(1),
+            ts(2)
         ));
         let (_, rows) = db.query("SELECT * FROM t");
         assert_eq!(rows.len(), 3);
@@ -60,10 +71,11 @@ mod insert_basic {
     fn multi_row_10_values() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let values: Vec<String> = (0..10)
-            .map(|i| format!("({}, {}.0)", ts(i), i))
-            .collect();
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES {}", values.join(", ")));
+        let values: Vec<String> = (0..10).map(|i| format!("({}, {}.0)", ts(i), i)).collect();
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES {}",
+            values.join(", ")
+        ));
         let (_, rows) = db.query("SELECT count(*) FROM t");
         assert_eq!(rows[0][0], Value::I64(10));
     }
@@ -72,10 +84,11 @@ mod insert_basic {
     fn multi_row_100_values() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let values: Vec<String> = (0..100)
-            .map(|i| format!("({}, {}.0)", ts(i), i))
-            .collect();
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES {}", values.join(", ")));
+        let values: Vec<String> = (0..100).map(|i| format!("({}, {}.0)", ts(i), i)).collect();
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES {}",
+            values.join(", ")
+        ));
         let (_, rows) = db.query("SELECT count(*) FROM t");
         assert_eq!(rows[0][0], Value::I64(100));
     }
@@ -86,7 +99,11 @@ mod insert_basic {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         // Insert in reverse order
         for i in (0..5).rev() {
-            db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, {}.0)", ts(i), i));
+            db.exec_ok(&format!(
+                "INSERT INTO t (timestamp, v) VALUES ({}, {}.0)",
+                ts(i),
+                i
+            ));
         }
         let (_, rows) = db.query("SELECT v FROM t ORDER BY timestamp");
         for i in 0..5 {
@@ -99,7 +116,8 @@ mod insert_basic {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, a DOUBLE, b VARCHAR)");
         db.exec_ok(&format!(
-            "INSERT INTO t (timestamp, a, b) VALUES ({}, 42.0, 'hello')", ts(0)
+            "INSERT INTO t (timestamp, a, b) VALUES ({}, 42.0, 'hello')",
+            ts(0)
         ));
         let (_, rows) = db.query("SELECT a, b FROM t");
         assert_eq!(rows[0][0], Value::F64(42.0));
@@ -111,7 +129,8 @@ mod insert_basic {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, a DOUBLE, b VARCHAR)");
         db.exec_ok(&format!(
-            "INSERT INTO t (b, timestamp, a) VALUES ('world', {}, 99.0)", ts(0)
+            "INSERT INTO t (b, timestamp, a) VALUES ('world', {}, 99.0)",
+            ts(0)
         ));
         let (_, rows) = db.query("SELECT a, b FROM t");
         assert_eq!(rows[0][0], Value::F64(99.0));
@@ -138,7 +157,9 @@ mod insert_basic {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         let affected = db.exec_ok(&format!(
-            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0), ({}, 2.0)", ts(0), ts(1)
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0), ({}, 2.0)",
+            ts(0),
+            ts(1)
         ));
         // affected rows should be 2 (or possibly returned as row count)
         assert!(affected >= 0); // just ensure no error
@@ -148,8 +169,14 @@ mod insert_basic {
     fn insert_same_timestamp_different_values() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", ts(0)));
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 2.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            ts(0)
+        ));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 2.0)",
+            ts(0)
+        ));
         let (_, rows) = db.query("SELECT count(*) FROM t");
         // Both rows should exist (same timestamp is allowed)
         let count = match &rows[0][0] {
@@ -164,7 +191,11 @@ mod insert_basic {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..20 {
-            db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, {}.0)", ts(i), i));
+            db.exec_ok(&format!(
+                "INSERT INTO t (timestamp, v) VALUES ({}, {}.0)",
+                ts(i),
+                i
+            ));
             let (_, rows) = db.query("SELECT count(*) FROM t");
             assert_eq!(rows[0][0], Value::I64(i + 1));
         }
@@ -174,7 +205,10 @@ mod insert_basic {
     fn insert_negative_double() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, -42.5)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, -42.5)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         assert_eq!(val, Value::F64(-42.5));
     }
@@ -183,7 +217,10 @@ mod insert_basic {
     fn insert_zero_double() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 0.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 0.0)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         assert_eq!(val, Value::F64(0.0));
     }
@@ -192,7 +229,10 @@ mod insert_basic {
     fn insert_very_large_double() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1e18)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1e18)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         assert_eq!(val, Value::F64(1e18));
     }
@@ -201,7 +241,10 @@ mod insert_basic {
     fn insert_very_small_double() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1e-15)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1e-15)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         match val {
             Value::F64(v) => assert!((v - 1e-15).abs() < 1e-20),
@@ -234,10 +277,13 @@ mod insert_select {
         assert!(!rows.is_empty());
         // All rows should be BTC/USD
         let (_, btc_count) = db.query("SELECT count(*) FROM trades WHERE symbol = 'BTC/USD'");
-        assert_eq!(rows.len() as i64, match &btc_count[0][0] {
-            Value::I64(n) => *n,
-            other => panic!("expected I64, got {other:?}"),
-        });
+        assert_eq!(
+            rows.len() as i64,
+            match &btc_count[0][0] {
+                Value::I64(n) => *n,
+                other => panic!("expected I64, got {other:?}"),
+            }
+        );
     }
 
     #[test]
@@ -294,7 +340,10 @@ mod insert_select {
     fn insert_select_self_table() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            ts(0)
+        ));
         // Insert from self - doubles the data each time
         db.exec_ok("INSERT INTO t SELECT * FROM t");
         let (_, rows) = db.query("SELECT count(*) FROM t");
@@ -321,8 +370,14 @@ mod insert_upsert {
     fn duplicate_timestamp_both_kept() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", ts(0)));
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 2.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            ts(0)
+        ));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 2.0)",
+            ts(0)
+        ));
         let (_, rows) = db.query("SELECT * FROM t");
         assert!(rows.len() >= 1);
     }
@@ -331,8 +386,14 @@ mod insert_upsert {
     fn duplicate_all_columns_same() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", ts(0)));
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            ts(0)
+        ));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            ts(0)
+        ));
         let (_, rows) = db.query("SELECT * FROM t");
         assert!(rows.len() >= 1);
     }
@@ -342,7 +403,11 @@ mod insert_upsert {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..10 {
-            db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, {}.0)", ts(0), i));
+            db.exec_ok(&format!(
+                "INSERT INTO t (timestamp, v) VALUES ({}, {}.0)",
+                ts(0),
+                i
+            ));
         }
         let (_, rows) = db.query("SELECT count(*) FROM t");
         let count = match &rows[0][0] {
@@ -368,9 +433,15 @@ mod insert_upsert {
     fn insert_after_delete_same_timestamp() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            ts(0)
+        ));
         db.exec_ok("DELETE FROM t WHERE v = 1.0");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 2.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 2.0)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         assert_eq!(val, Value::F64(2.0));
     }
@@ -386,7 +457,10 @@ mod insert_types {
     fn insert_double_column() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 3.14)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 3.14)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         match val {
             Value::F64(v) => assert!((v - 3.14).abs() < 0.001),
@@ -398,7 +472,10 @@ mod insert_types {
     fn insert_integer_into_double() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 42)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 42)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         assert!(val.eq_coerce(&Value::F64(42.0)) || val.eq_coerce(&Value::I64(42)));
     }
@@ -407,7 +484,10 @@ mod insert_types {
     fn insert_varchar_column() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, s VARCHAR)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, s) VALUES ({}, 'hello world')", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, s) VALUES ({}, 'hello world')",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT s FROM t");
         assert_eq!(val, Value::Str("hello world".to_string()));
     }
@@ -416,7 +496,10 @@ mod insert_types {
     fn insert_empty_string() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, s VARCHAR)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, s) VALUES ({}, '')", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, s) VALUES ({}, '')",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT s FROM t");
         assert_eq!(val, Value::Str("".to_string()));
     }
@@ -426,7 +509,11 @@ mod insert_types {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, s VARCHAR)");
         let long_str = "x".repeat(10000);
-        db.exec_ok(&format!("INSERT INTO t (timestamp, s) VALUES ({}, '{}')", ts(0), long_str));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, s) VALUES ({}, '{}')",
+            ts(0),
+            long_str
+        ));
         let val = db.query_scalar("SELECT s FROM t");
         match val {
             Value::Str(s) => assert_eq!(s.len(), 10000),
@@ -439,7 +526,10 @@ mod insert_types {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         let my_ts = ts(100);
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", my_ts));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            my_ts
+        ));
         let (_, rows) = db.query("SELECT timestamp FROM t");
         assert_eq!(rows.len(), 1);
         match &rows[0][0] {
@@ -452,7 +542,10 @@ mod insert_types {
     fn insert_null_double() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, NULL)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, NULL)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         assert_eq!(val, Value::Null);
     }
@@ -461,7 +554,10 @@ mod insert_types {
     fn insert_null_varchar() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, s VARCHAR)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, s) VALUES ({}, NULL)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, s) VALUES ({}, NULL)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT s FROM t");
         assert_eq!(val, Value::Null);
     }
@@ -470,7 +566,10 @@ mod insert_types {
     fn insert_multiple_nulls() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, a DOUBLE, b VARCHAR)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, a, b) VALUES ({}, NULL, NULL)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, a, b) VALUES ({}, NULL, NULL)",
+            ts(0)
+        ));
         let (_, rows) = db.query("SELECT a, b FROM t");
         assert_eq!(rows[0][0], Value::Null);
         assert_eq!(rows[0][1], Value::Null);
@@ -480,8 +579,14 @@ mod insert_types {
     fn insert_mix_null_and_nonnull() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, a DOUBLE, b VARCHAR)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, a, b) VALUES ({}, 1.0, NULL)", ts(0)));
-        db.exec_ok(&format!("INSERT INTO t (timestamp, a, b) VALUES ({}, NULL, 'x')", ts(1)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, a, b) VALUES ({}, 1.0, NULL)",
+            ts(0)
+        ));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, a, b) VALUES ({}, NULL, 'x')",
+            ts(1)
+        ));
         let (_, rows) = db.query("SELECT a, b FROM t ORDER BY timestamp");
         assert_eq!(rows[0][0], Value::F64(1.0));
         assert_eq!(rows[0][1], Value::Null);
@@ -493,7 +598,10 @@ mod insert_types {
     fn insert_integer_literal() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 100)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 100)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         // Should be coerced to F64(100.0) or kept as I64(100)
         assert!(val.eq_coerce(&Value::F64(100.0)) || val.eq_coerce(&Value::I64(100)));
@@ -503,7 +611,10 @@ mod insert_types {
     fn insert_negative_integer() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, -999)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, -999)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         assert!(val.eq_coerce(&Value::F64(-999.0)) || val.eq_coerce(&Value::I64(-999)));
     }
@@ -512,7 +623,10 @@ mod insert_types {
     fn insert_string_with_spaces() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, s VARCHAR)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, s) VALUES ({}, '  spaces  ')", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, s) VALUES ({}, '  spaces  ')",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT s FROM t");
         assert_eq!(val, Value::Str("  spaces  ".to_string()));
     }
@@ -521,7 +635,10 @@ mod insert_types {
     fn insert_string_with_numbers() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, s VARCHAR)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, s) VALUES ({}, '12345')", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, s) VALUES ({}, '12345')",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT s FROM t");
         assert_eq!(val, Value::Str("12345".to_string()));
     }
@@ -543,7 +660,10 @@ mod insert_types {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         let big_ts = 2000000000_000_000_000i64; // ~year 2033
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", big_ts));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            big_ts
+        ));
         let (_, rows) = db.query("SELECT timestamp FROM t");
         match &rows[0][0] {
             Value::Timestamp(t) => assert_eq!(*t, big_ts),
@@ -562,7 +682,8 @@ mod insert_edge_cases {
     fn insert_into_nonexistent_table() {
         let db = TestDb::new();
         let _err = db.exec_err(&format!(
-            "INSERT INTO no_table (timestamp, v) VALUES ({}, 1.0)", ts(0)
+            "INSERT INTO no_table (timestamp, v) VALUES ({}, 1.0)",
+            ts(0)
         ));
     }
 
@@ -571,7 +692,8 @@ mod insert_edge_cases {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         let result = db.exec(&format!(
-            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0, 2.0)", ts(0)
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0, 2.0)",
+            ts(0)
         ));
         assert!(result.is_err(), "too many values should error");
     }
@@ -581,7 +703,8 @@ mod insert_edge_cases {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, a DOUBLE, b DOUBLE)");
         let result = db.exec(&format!(
-            "INSERT INTO t (timestamp, a, b) VALUES ({}, 1.0)", ts(0)
+            "INSERT INTO t (timestamp, a, b) VALUES ({}, 1.0)",
+            ts(0)
         ));
         assert!(result.is_err(), "too few values should error");
     }
@@ -591,7 +714,8 @@ mod insert_edge_cases {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         let result = db.exec(&format!(
-            "INSERT INTO t (timestamp, no_col) VALUES ({}, 1.0)", ts(0)
+            "INSERT INTO t (timestamp, no_col) VALUES ({}, 1.0)",
+            ts(0)
         ));
         assert!(result.is_err(), "nonexistent column should error");
     }
@@ -607,7 +731,10 @@ mod insert_edge_cases {
                     format!("({}, {}.0)", ts(idx), idx)
                 })
                 .collect();
-            db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES {}", values.join(", ")));
+            db.exec_ok(&format!(
+                "INSERT INTO t (timestamp, v) VALUES {}",
+                values.join(", ")
+            ));
         }
         let (_, rows) = db.query("SELECT count(*) FROM t");
         assert_eq!(rows[0][0], Value::I64(100));
@@ -617,10 +744,16 @@ mod insert_edge_cases {
     fn insert_after_drop_recreate() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            ts(0)
+        ));
         db.exec_ok("DROP TABLE t");
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 2.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 2.0)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         assert_eq!(val, Value::F64(2.0));
     }
@@ -629,11 +762,17 @@ mod insert_edge_cases {
     fn insert_after_truncate() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 1.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 1.0)",
+            ts(0)
+        ));
         db.exec_ok("TRUNCATE TABLE t");
         let (_, rows) = db.query("SELECT count(*) FROM t");
         assert_eq!(rows[0][0], Value::I64(0));
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, 2.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES ({}, 2.0)",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT v FROM t");
         assert_eq!(val, Value::F64(2.0));
     }
@@ -642,10 +781,11 @@ mod insert_edge_cases {
     fn insert_1000_rows_performance() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let values: Vec<String> = (0..1000)
-            .map(|i| format!("({}, {}.0)", ts(i), i))
-            .collect();
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES {}", values.join(", ")));
+        let values: Vec<String> = (0..1000).map(|i| format!("({}, {}.0)", ts(i), i)).collect();
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES {}",
+            values.join(", ")
+        ));
         let (_, rows) = db.query("SELECT count(*) FROM t");
         assert_eq!(rows[0][0], Value::I64(1000));
     }
@@ -658,7 +798,11 @@ mod insert_edge_cases {
         for day in 0..3i64 {
             for hour in 0..24i64 {
                 let t = ts(day * 86400 + hour * 3600);
-                db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES ({}, {}.0)", t, day * 24 + hour));
+                db.exec_ok(&format!(
+                    "INSERT INTO t (timestamp, v) VALUES ({}, {}.0)",
+                    t,
+                    day * 24 + hour
+                ));
             }
         }
         let (_, rows) = db.query("SELECT count(*) FROM t");
@@ -671,7 +815,10 @@ mod insert_edge_cases {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", ts(0)));
         db.exec_ok("ALTER TABLE t ADD COLUMN s VARCHAR");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v, s) VALUES ({}, 2.0, 'new')", ts(1)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v, s) VALUES ({}, 2.0, 'new')",
+            ts(1)
+        ));
         let (_, rows) = db.query("SELECT count(*) FROM t");
         assert_eq!(rows[0][0], Value::I64(2));
     }
@@ -680,7 +827,10 @@ mod insert_edge_cases {
     fn insert_partial_columns() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, a DOUBLE, b DOUBLE, c VARCHAR)");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, a) VALUES ({}, 1.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, a) VALUES ({}, 1.0)",
+            ts(0)
+        ));
         let (_, rows) = db.query("SELECT b, c FROM t");
         assert_eq!(rows[0][0], Value::Null);
         assert_eq!(rows[0][1], Value::Null);
@@ -699,9 +849,7 @@ mod insert_edge_cases {
     fn insert_verify_sum_after_batch() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let values: Vec<String> = (1..=10)
-            .map(|i| format!("({}, {}.0)", ts(i), i))
-            .collect();
+        let values: Vec<String> = (1..=10).map(|i| format!("({}, {}.0)", ts(i), i)).collect();
         db.exec_ok(&format!("INSERT INTO t VALUES {}", values.join(", ")));
         let val = db.query_scalar("SELECT sum(v) FROM t");
         assert_eq!(val, Value::F64(55.0));
@@ -711,9 +859,7 @@ mod insert_edge_cases {
     fn insert_verify_min_max_after_batch() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let values: Vec<String> = (1..=20)
-            .map(|i| format!("({}, {}.0)", ts(i), i))
-            .collect();
+        let values: Vec<String> = (1..=20).map(|i| format!("({}, {}.0)", ts(i), i)).collect();
         db.exec_ok(&format!("INSERT INTO t VALUES {}", values.join(", ")));
         assert_eq!(db.query_scalar("SELECT min(v) FROM t"), Value::F64(1.0));
         assert_eq!(db.query_scalar("SELECT max(v) FROM t"), Value::F64(20.0));
@@ -749,19 +895,38 @@ mod insert_edge_cases {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, grp VARCHAR, v DOUBLE)");
         for i in 0..12 {
-            let grp = if i % 3 == 0 { "A" } else if i % 3 == 1 { "B" } else { "C" };
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, '{}', {}.0)", ts(i), grp, i));
+            let grp = if i % 3 == 0 {
+                "A"
+            } else if i % 3 == 1 {
+                "B"
+            } else {
+                "C"
+            };
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, '{}', {}.0)",
+                ts(i),
+                grp,
+                i
+            ));
         }
         let (_, rows) = db.query("SELECT grp, count(*) FROM t GROUP BY grp");
         assert_eq!(rows.len(), 3);
-        let total: i64 = rows.iter().map(|r| match &r[1] { Value::I64(n) => *n, other => panic!("{other:?}") }).sum();
+        let total: i64 = rows
+            .iter()
+            .map(|r| match &r[1] {
+                Value::I64(n) => *n,
+                other => panic!("{other:?}"),
+            })
+            .sum();
         assert_eq!(total, 12);
     }
 
     #[test]
     fn insert_select_with_alias() {
         let db = TestDb::with_trades(10);
-        db.exec_ok("CREATE TABLE t2 (timestamp TIMESTAMP, sym VARCHAR, p DOUBLE, vol DOUBLE, s VARCHAR)");
+        db.exec_ok(
+            "CREATE TABLE t2 (timestamp TIMESTAMP, sym VARCHAR, p DOUBLE, vol DOUBLE, s VARCHAR)",
+        );
         db.exec_ok("INSERT INTO t2 SELECT * FROM trades");
         let (_, rows) = db.query("SELECT count(*) FROM t2");
         assert_eq!(rows[0][0], Value::I64(10));
@@ -773,7 +938,12 @@ mod insert_edge_cases {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, grp VARCHAR, v DOUBLE)");
         for i in 0..20 {
             let grp = format!("G{}", i % 4);
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, '{}', {}.0)", ts(i), grp, i));
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, '{}', {}.0)",
+                ts(i),
+                grp,
+                i
+            ));
         }
         let val = db.query_scalar("SELECT count(DISTINCT grp) FROM t");
         assert_eq!(val, Value::I64(4));
@@ -797,7 +967,12 @@ mod insert_edge_cases {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, grp VARCHAR, v DOUBLE)");
         for i in 0..15 {
             let grp = format!("G{}", i % 3);
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, '{}', {}.0)", ts(i), grp, i));
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, '{}', {}.0)",
+                ts(i),
+                grp,
+                i
+            ));
         }
         let (_, rows) = db.query("SELECT grp, count(*) AS c FROM t GROUP BY grp HAVING c >= 5");
         assert_eq!(rows.len(), 3);
@@ -820,7 +995,12 @@ mod insert_edge_cases {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, sym VARCHAR, v DOUBLE)");
         for i in 0..10 {
             let sym = if i % 2 == 0 { "A" } else { "B" };
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, '{}', {}.0)", ts(i), sym, i));
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, '{}', {}.0)",
+                ts(i),
+                sym,
+                i
+            ));
         }
         let (_, rows) = db.query("SELECT * FROM t LATEST ON timestamp PARTITION BY sym");
         assert_eq!(rows.len(), 2);
@@ -833,9 +1013,7 @@ mod insert_edge_cases {
         for i in 1..=5 {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i));
         }
-        let (_, rows) = db.query(
-            "SELECT v, row_number() OVER (ORDER BY v) AS rn FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, row_number() OVER (ORDER BY v) AS rn FROM t");
         assert_eq!(rows.len(), 5);
     }
 
@@ -865,7 +1043,9 @@ mod insert_edge_cases {
     fn insert_select_with_where_and_order() {
         let db = TestDb::with_trades(20);
         db.exec_ok("CREATE TABLE t2 (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE, volume DOUBLE, side VARCHAR)");
-        db.exec_ok("INSERT INTO t2 SELECT * FROM trades WHERE side = 'buy' ORDER BY price DESC LIMIT 5");
+        db.exec_ok(
+            "INSERT INTO t2 SELECT * FROM trades WHERE side = 'buy' ORDER BY price DESC LIMIT 5",
+        );
         let (_, rows) = db.query("SELECT count(*) FROM t2");
         assert_eq!(rows[0][0], Value::I64(5));
     }

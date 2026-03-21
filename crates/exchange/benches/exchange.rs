@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
 use exchange_exchange::ohlcv::{OhlcvAggregator, TimeFrame};
 use exchange_exchange::orderbook::{BookSide, DeltaAction, OrderBookDelta, OrderBookStore};
 use exchange_exchange::tick::{delta_decode_prices, delta_encode_prices};
@@ -27,7 +27,10 @@ fn ohlcv_aggregation(c: &mut Criterion) {
             let mut agg = OhlcvAggregator::new(TimeFrame::S1);
             let mut bar_count = 0u64;
             for &(price, volume, ts) in &ticks {
-                if agg.update(black_box(price), black_box(volume), black_box(ts)).is_some() {
+                if agg
+                    .update(black_box(price), black_box(volume), black_box(ts))
+                    .is_some()
+                {
                     bar_count += 1;
                 }
             }

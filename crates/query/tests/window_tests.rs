@@ -16,7 +16,7 @@ fn ts(offset_secs: i64) -> i64 {
 fn setup_window_db() -> TestDb {
     let db = TestDb::new();
     db.exec_ok(
-        "CREATE TABLE prices (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE, volume DOUBLE)"
+        "CREATE TABLE prices (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE, volume DOUBLE)",
     );
 
     let data = [
@@ -40,7 +40,10 @@ fn setup_window_db() -> TestDb {
     for (i, symbol, price, volume) in data {
         db.exec_ok(&format!(
             "INSERT INTO prices VALUES ({}, '{}', {}, {})",
-            ts(i), symbol, price, volume
+            ts(i),
+            symbol,
+            price,
+            volume
         ));
     }
 
@@ -54,16 +57,19 @@ fn setup_rank_db() -> TestDb {
     let data = [
         (0, "Alice", 95.0),
         (1, "Bob", 90.0),
-        (2, "Charlie", 95.0),  // tie with Alice
+        (2, "Charlie", 95.0), // tie with Alice
         (3, "Diana", 85.0),
-        (4, "Eve", 90.0),      // tie with Bob
+        (4, "Eve", 90.0), // tie with Bob
         (5, "Frank", 80.0),
-        (6, "Grace", 95.0),    // tie with Alice and Charlie
+        (6, "Grace", 95.0), // tie with Alice and Charlie
         (7, "Hank", 70.0),
     ];
     for (i, name, score) in data {
         db.exec_ok(&format!(
-            "INSERT INTO scores VALUES ({}, '{}', {})", ts(i), name, score
+            "INSERT INTO scores VALUES ({}, '{}', {})",
+            ts(i),
+            name,
+            score
         ));
     }
     db
@@ -78,9 +84,8 @@ mod row_number {
     #[test]
     fn basic_row_number() {
         let db = setup_window_db();
-        let (_, rows) = db.query(
-            "SELECT price, row_number() OVER (ORDER BY price) AS rn FROM prices"
-        );
+        let (_, rows) =
+            db.query("SELECT price, row_number() OVER (ORDER BY price) AS rn FROM prices");
         assert_eq!(rows.len(), 15);
         // Row numbers should be 1..15
         for (i, row) in rows.iter().enumerate() {
@@ -97,7 +102,10 @@ mod row_number {
         assert_eq!(rows.len(), 15);
         // Within each symbol partition, row numbers should be 1..5
         for row in &rows {
-            let rn = match &row[2] { Value::I64(n) => *n, other => panic!("{other:?}") };
+            let rn = match &row[2] {
+                Value::I64(n) => *n,
+                other => panic!("{other:?}"),
+            };
             assert!(rn >= 1 && rn <= 5);
         }
     }
@@ -105,22 +113,25 @@ mod row_number {
     #[test]
     fn row_number_desc_order() {
         let db = setup_window_db();
-        let (_, rows) = db.query(
-            "SELECT price, row_number() OVER (ORDER BY price DESC) AS rn FROM prices"
-        );
+        let (_, rows) =
+            db.query("SELECT price, row_number() OVER (ORDER BY price DESC) AS rn FROM prices");
         assert_eq!(rows[0][1], Value::I64(1));
         // First row should have highest price
-        let first_price = match &rows[0][0] { Value::F64(p) => *p, other => panic!("{other:?}") };
-        let last_price = match &rows[14][0] { Value::F64(p) => *p, other => panic!("{other:?}") };
+        let first_price = match &rows[0][0] {
+            Value::F64(p) => *p,
+            other => panic!("{other:?}"),
+        };
+        let last_price = match &rows[14][0] {
+            Value::F64(p) => *p,
+            other => panic!("{other:?}"),
+        };
         assert!(first_price >= last_price);
     }
 
     #[test]
     fn row_number_no_order() {
         let db = setup_window_db();
-        let (_, rows) = db.query(
-            "SELECT price, row_number() OVER () AS rn FROM prices"
-        );
+        let (_, rows) = db.query("SELECT price, row_number() OVER () AS rn FROM prices");
         assert_eq!(rows.len(), 15);
         // Should still assign sequential numbers
         for (i, row) in rows.iter().enumerate() {
@@ -135,7 +146,10 @@ mod row_number {
             "SELECT symbol, timestamp, row_number() OVER (PARTITION BY symbol ORDER BY timestamp) AS rn FROM prices"
         );
         // Each partition: 5 rows numbered 1-5
-        let btc_rows: Vec<_> = rows.iter().filter(|r| r[0] == Value::Str("BTC".to_string())).collect();
+        let btc_rows: Vec<_> = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("BTC".to_string()))
+            .collect();
         assert_eq!(btc_rows.len(), 5);
         for (i, row) in btc_rows.iter().enumerate() {
             assert_eq!(row[2], Value::I64((i + 1) as i64));
@@ -147,9 +161,7 @@ mod row_number {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", ts(0)));
-        let (_, rows) = db.query(
-            "SELECT v, row_number() OVER (ORDER BY v) AS rn FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, row_number() OVER (ORDER BY v) AS rn FROM t");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][1], Value::I64(1));
     }
@@ -158,9 +170,7 @@ mod row_number {
     fn row_number_empty_table() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let (_, rows) = db.query(
-            "SELECT v, row_number() OVER (ORDER BY v) AS rn FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, row_number() OVER (ORDER BY v) AS rn FROM t");
         assert_eq!(rows.len(), 0);
     }
 
@@ -179,9 +189,8 @@ mod row_number {
     #[test]
     fn row_number_with_limit() {
         let db = setup_window_db();
-        let (_, rows) = db.query(
-            "SELECT price, row_number() OVER (ORDER BY price) AS rn FROM prices LIMIT 5"
-        );
+        let (_, rows) =
+            db.query("SELECT price, row_number() OVER (ORDER BY price) AS rn FROM prices LIMIT 5");
         assert_eq!(rows.len(), 5);
     }
 }
@@ -195,22 +204,24 @@ mod rank {
     #[test]
     fn basic_rank() {
         let db = setup_rank_db();
-        let (_, rows) = db.query(
-            "SELECT name, score, rank() OVER (ORDER BY score DESC) AS rnk FROM scores"
-        );
+        let (_, rows) =
+            db.query("SELECT name, score, rank() OVER (ORDER BY score DESC) AS rnk FROM scores");
         assert_eq!(rows.len(), 8);
     }
 
     #[test]
     fn rank_with_ties() {
         let db = setup_rank_db();
-        let (_, rows) = db.query(
-            "SELECT score, rank() OVER (ORDER BY score DESC) AS rnk FROM scores"
-        );
+        let (_, rows) =
+            db.query("SELECT score, rank() OVER (ORDER BY score DESC) AS rnk FROM scores");
         // Score 95 appears 3 times -> rank 1,1,1 then next is 4
-        let score95_ranks: Vec<i64> = rows.iter()
+        let score95_ranks: Vec<i64> = rows
+            .iter()
             .filter(|r| r[0] == Value::F64(95.0))
-            .map(|r| match &r[1] { Value::I64(n) => *n, other => panic!("{other:?}") })
+            .map(|r| match &r[1] {
+                Value::I64(n) => *n,
+                other => panic!("{other:?}"),
+            })
             .collect();
         assert_eq!(score95_ranks.len(), 3);
         for r in &score95_ranks {
@@ -222,12 +233,15 @@ mod rank {
     fn rank_gap_after_ties() {
         let db = setup_rank_db();
         let (_, rows) = db.query(
-            "SELECT score, rank() OVER (ORDER BY score DESC) AS rnk FROM scores ORDER BY rnk"
+            "SELECT score, rank() OVER (ORDER BY score DESC) AS rnk FROM scores ORDER BY rnk",
         );
         // After 3 ties at rank 1, next should be rank 4 (not 2)
         let rank4_rows: Vec<_> = rows.iter().filter(|r| r[1] == Value::I64(4)).collect();
         if !rank4_rows.is_empty() {
-            let score = match &rank4_rows[0][0] { Value::F64(s) => *s, other => panic!("{other:?}") };
+            let score = match &rank4_rows[0][0] {
+                Value::F64(s) => *s,
+                other => panic!("{other:?}"),
+            };
             assert_eq!(score, 90.0);
         }
     }
@@ -248,9 +262,7 @@ mod rank {
         for i in 0..5 {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i));
         }
-        let (_, rows) = db.query(
-            "SELECT v, rank() OVER (ORDER BY v) AS rnk FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, rank() OVER (ORDER BY v) AS rnk FROM t");
         // No ties: rank should equal row_number
         for (i, row) in rows.iter().enumerate() {
             assert_eq!(row[1], Value::I64((i + 1) as i64));
@@ -264,9 +276,7 @@ mod rank {
         for i in 0..5 {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", ts(i)));
         }
-        let (_, rows) = db.query(
-            "SELECT v, rank() OVER (ORDER BY v) AS rnk FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, rank() OVER (ORDER BY v) AS rnk FROM t");
         // All same -> all rank 1
         for row in &rows {
             assert_eq!(row[1], Value::I64(1));
@@ -278,9 +288,7 @@ mod rank {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", ts(0)));
-        let (_, rows) = db.query(
-            "SELECT v, rank() OVER (ORDER BY v) AS rnk FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, rank() OVER (ORDER BY v) AS rnk FROM t");
         assert_eq!(rows[0][1], Value::I64(1));
     }
 }
@@ -294,9 +302,8 @@ mod dense_rank {
     #[test]
     fn basic_dense_rank() {
         let db = setup_rank_db();
-        let (_, rows) = db.query(
-            "SELECT score, dense_rank() OVER (ORDER BY score DESC) AS drnk FROM scores"
-        );
+        let (_, rows) =
+            db.query("SELECT score, dense_rank() OVER (ORDER BY score DESC) AS drnk FROM scores");
         assert_eq!(rows.len(), 8);
     }
 
@@ -308,8 +315,12 @@ mod dense_rank {
         );
         // Scores: 95(x3), 90(x2), 85(x1), 80(x1), 70(x1)
         // Dense ranks: 1,1,1, 2,2, 3, 4, 5
-        let max_rank = rows.iter()
-            .map(|r| match &r[1] { Value::I64(n) => *n, other => panic!("{other:?}") })
+        let max_rank = rows
+            .iter()
+            .map(|r| match &r[1] {
+                Value::I64(n) => *n,
+                other => panic!("{other:?}"),
+            })
             .max()
             .unwrap();
         assert_eq!(max_rank, 5); // No gaps: 5 distinct values -> max dense_rank = 5
@@ -318,12 +329,9 @@ mod dense_rank {
     #[test]
     fn dense_rank_ties() {
         let db = setup_rank_db();
-        let (_, rows) = db.query(
-            "SELECT score, dense_rank() OVER (ORDER BY score DESC) AS drnk FROM scores"
-        );
-        let rank1_count = rows.iter()
-            .filter(|r| r[1] == Value::I64(1))
-            .count();
+        let (_, rows) =
+            db.query("SELECT score, dense_rank() OVER (ORDER BY score DESC) AS drnk FROM scores");
+        let rank1_count = rows.iter().filter(|r| r[1] == Value::I64(1)).count();
         assert_eq!(rank1_count, 3); // 3 rows with score 95
     }
 
@@ -343,9 +351,7 @@ mod dense_rank {
         for i in 0..5 {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i));
         }
-        let (_, rows) = db.query(
-            "SELECT v, dense_rank() OVER (ORDER BY v) AS drnk FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, dense_rank() OVER (ORDER BY v) AS drnk FROM t");
         for (i, row) in rows.iter().enumerate() {
             assert_eq!(row[1], Value::I64((i + 1) as i64));
         }
@@ -358,9 +364,7 @@ mod dense_rank {
         for i in 0..4 {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, 5.0)", ts(i)));
         }
-        let (_, rows) = db.query(
-            "SELECT v, dense_rank() OVER (ORDER BY v) AS drnk FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, dense_rank() OVER (ORDER BY v) AS drnk FROM t");
         for row in &rows {
             assert_eq!(row[1], Value::I64(1));
         }
@@ -374,8 +378,14 @@ mod dense_rank {
                     dense_rank() OVER (ORDER BY score DESC) AS drnk FROM scores ORDER BY score DESC"
         );
         // rank has gaps, dense_rank does not
-        let last_rank = match &rows.last().unwrap()[1] { Value::I64(n) => *n, other => panic!("{other:?}") };
-        let last_dense = match &rows.last().unwrap()[2] { Value::I64(n) => *n, other => panic!("{other:?}") };
+        let last_rank = match &rows.last().unwrap()[1] {
+            Value::I64(n) => *n,
+            other => panic!("{other:?}"),
+        };
+        let last_dense = match &rows.last().unwrap()[2] {
+            Value::I64(n) => *n,
+            other => panic!("{other:?}"),
+        };
         assert!(last_rank >= last_dense);
     }
 }
@@ -438,7 +448,10 @@ mod lag_lead {
         );
         assert_eq!(rows.len(), 15);
         // First row of each partition should be NULL
-        let btc_rows: Vec<_> = rows.iter().filter(|r| r[0] == Value::Str("BTC".to_string())).collect();
+        let btc_rows: Vec<_> = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("BTC".to_string()))
+            .collect();
         assert_eq!(btc_rows[0][2], Value::Null);
     }
 
@@ -448,7 +461,10 @@ mod lag_lead {
         let (_, rows) = db.query(
             "SELECT symbol, price, lead(price, 1) OVER (PARTITION BY symbol ORDER BY timestamp) AS nxt FROM prices"
         );
-        let btc_rows: Vec<_> = rows.iter().filter(|r| r[0] == Value::Str("BTC".to_string())).collect();
+        let btc_rows: Vec<_> = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("BTC".to_string()))
+            .collect();
         // Last BTC row should have NULL lead
         assert_eq!(btc_rows.last().unwrap()[2], Value::Null);
     }
@@ -468,9 +484,7 @@ mod lag_lead {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", ts(0)));
-        let (_, rows) = db.query(
-            "SELECT v, lag(v, 1) OVER (ORDER BY timestamp) AS prev FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, lag(v, 1) OVER (ORDER BY timestamp) AS prev FROM t");
         assert_eq!(rows[0][1], Value::Null);
     }
 
@@ -479,9 +493,7 @@ mod lag_lead {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", ts(0)));
-        let (_, rows) = db.query(
-            "SELECT v, lead(v, 1) OVER (ORDER BY timestamp) AS nxt FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, lead(v, 1) OVER (ORDER BY timestamp) AS nxt FROM t");
         assert_eq!(rows[0][1], Value::Null);
     }
 
@@ -490,11 +502,13 @@ mod lag_lead {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..5 {
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), (i + 1) * 10));
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, {}.0)",
+                ts(i),
+                (i + 1) * 10
+            ));
         }
-        let (_, rows) = db.query(
-            "SELECT v, lag(v, 1) OVER (ORDER BY timestamp) AS prev FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, lag(v, 1) OVER (ORDER BY timestamp) AS prev FROM t");
         // row 1: v=20, prev=10
         assert_eq!(rows[1][0], Value::F64(20.0));
         assert_eq!(rows[1][1], Value::F64(10.0));
@@ -508,11 +522,13 @@ mod lag_lead {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for i in 0..5 {
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), (i + 1) * 10));
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, {}.0)",
+                ts(i),
+                (i + 1) * 10
+            ));
         }
-        let (_, rows) = db.query(
-            "SELECT v, lead(v, 1) OVER (ORDER BY timestamp) AS nxt FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, lead(v, 1) OVER (ORDER BY timestamp) AS nxt FROM t");
         // row 0: v=10, nxt=20
         assert_eq!(rows[0][0], Value::F64(10.0));
         assert_eq!(rows[0][1], Value::F64(20.0));
@@ -528,9 +544,7 @@ mod lag_lead {
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'a')", ts(0)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'b')", ts(1)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'c')", ts(2)));
-        let (_, rows) = db.query(
-            "SELECT s, lag(s, 1) OVER (ORDER BY timestamp) AS prev FROM t"
-        );
+        let (_, rows) = db.query("SELECT s, lag(s, 1) OVER (ORDER BY timestamp) AS prev FROM t");
         assert_eq!(rows[0][1], Value::Null);
         assert_eq!(rows[1][1], Value::Str("a".to_string()));
         assert_eq!(rows[2][1], Value::Str("b".to_string()));
@@ -558,7 +572,11 @@ mod running_agg {
         let expected_sums = [1.0, 3.0, 6.0, 10.0, 15.0];
         for (i, row) in rows.iter().enumerate() {
             match &row[1] {
-                Value::F64(s) => assert!((*s - expected_sums[i]).abs() < 0.01, "row {i}: expected {}, got {s}", expected_sums[i]),
+                Value::F64(s) => assert!(
+                    (*s - expected_sums[i]).abs() < 0.01,
+                    "row {i}: expected {}, got {s}",
+                    expected_sums[i]
+                ),
                 Value::I64(s) => assert_eq!(*s, expected_sums[i] as i64),
                 other => panic!("{other:?}"),
             }
@@ -612,9 +630,8 @@ mod running_agg {
     #[test]
     fn windowed_count_with_partition() {
         let db = setup_window_db();
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) OVER (PARTITION BY symbol) AS part_count FROM prices"
-        );
+        let (_, rows) = db
+            .query("SELECT symbol, count(*) OVER (PARTITION BY symbol) AS part_count FROM prices");
         // Each partition has 5 rows
         for row in &rows {
             assert_eq!(row[1], Value::I64(5));
@@ -625,9 +642,7 @@ mod running_agg {
     fn sum_over_empty() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let (_, rows) = db.query(
-            "SELECT v, sum(v) OVER (ORDER BY timestamp) AS s FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, sum(v) OVER (ORDER BY timestamp) AS s FROM t");
         assert_eq!(rows.len(), 0);
     }
 
@@ -648,7 +663,7 @@ mod running_agg {
         let db = setup_window_db();
         let (_, rows) = db.query(
             "SELECT symbol, min(price) OVER (PARTITION BY symbol) AS min_p, \
-                    max(price) OVER (PARTITION BY symbol) AS max_p FROM prices"
+                    max(price) OVER (PARTITION BY symbol) AS max_p FROM prices",
         );
         assert_eq!(rows.len(), 15);
         // Within each partition, min < max
@@ -671,9 +686,7 @@ mod first_last_value {
         for i in 1..=5 {
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(i), i * 10));
         }
-        let (_, rows) = db.query(
-            "SELECT v, first_value(v) OVER (ORDER BY timestamp) AS fv FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, first_value(v) OVER (ORDER BY timestamp) AS fv FROM t");
         // First value should always be 10.0
         for row in &rows {
             assert_eq!(row[1], Value::F64(10.0));
@@ -702,7 +715,10 @@ mod first_last_value {
         let (_, rows) = db.query(
             "SELECT symbol, price, first_value(price) OVER (PARTITION BY symbol ORDER BY timestamp) AS fv FROM prices"
         );
-        let btc_rows: Vec<_> = rows.iter().filter(|r| r[0] == Value::Str("BTC".to_string())).collect();
+        let btc_rows: Vec<_> = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("BTC".to_string()))
+            .collect();
         // First BTC price is 100.0
         for row in &btc_rows {
             assert_eq!(row[2], Value::F64(100.0));
@@ -715,7 +731,10 @@ mod first_last_value {
         let (_, rows) = db.query(
             "SELECT symbol, price, last_value(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS lv FROM prices"
         );
-        let btc_rows: Vec<_> = rows.iter().filter(|r| r[0] == Value::Str("BTC".to_string())).collect();
+        let btc_rows: Vec<_> = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("BTC".to_string()))
+            .collect();
         // Last BTC price is 103.0
         for row in &btc_rows {
             assert_eq!(row[2], Value::F64(103.0));
@@ -727,9 +746,7 @@ mod first_last_value {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 42.0)", ts(0)));
-        let (_, rows) = db.query(
-            "SELECT v, first_value(v) OVER (ORDER BY timestamp) AS fv FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, first_value(v) OVER (ORDER BY timestamp) AS fv FROM t");
         assert_eq!(rows[0][1], Value::F64(42.0));
     }
 
@@ -748,9 +765,7 @@ mod first_last_value {
     fn first_value_empty_table() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let (_, rows) = db.query(
-            "SELECT v, first_value(v) OVER (ORDER BY timestamp) AS fv FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, first_value(v) OVER (ORDER BY timestamp) AS fv FROM t");
         assert_eq!(rows.len(), 0);
     }
 
@@ -804,7 +819,7 @@ mod window_extra {
             "SELECT price, \
                     row_number() OVER (ORDER BY price) AS rn, \
                     rank() OVER (ORDER BY price) AS rnk \
-             FROM prices WHERE symbol = 'BTC'"
+             FROM prices WHERE symbol = 'BTC'",
         );
         assert_eq!(rows.len(), 5);
         for (i, row) in rows.iter().enumerate() {
@@ -823,7 +838,7 @@ mod window_extra {
             "SELECT v, \
                     row_number() OVER (ORDER BY timestamp) AS rn, \
                     lag(v, 1) OVER (ORDER BY timestamp) AS prev \
-             FROM t"
+             FROM t",
         );
         assert_eq!(rows.len(), 5);
         assert_eq!(rows[0][2], Value::Null);
@@ -842,12 +857,10 @@ mod window_extra {
     #[test]
     fn dense_rank_asc_vs_desc() {
         let db = setup_rank_db();
-        let (_, rows_asc) = db.query(
-            "SELECT score, dense_rank() OVER (ORDER BY score ASC) AS dr FROM scores"
-        );
-        let (_, rows_desc) = db.query(
-            "SELECT score, dense_rank() OVER (ORDER BY score DESC) AS dr FROM scores"
-        );
+        let (_, rows_asc) =
+            db.query("SELECT score, dense_rank() OVER (ORDER BY score ASC) AS dr FROM scores");
+        let (_, rows_desc) =
+            db.query("SELECT score, dense_rank() OVER (ORDER BY score DESC) AS dr FROM scores");
         // Both should have 8 rows
         assert_eq!(rows_asc.len(), 8);
         assert_eq!(rows_desc.len(), 8);
@@ -874,7 +887,7 @@ mod window_extra {
         let db = setup_window_db();
         let (_, rows) = db.query(
             "SELECT price, rank() OVER (ORDER BY price DESC) AS rnk \
-             FROM prices WHERE symbol = 'ETH'"
+             FROM prices WHERE symbol = 'ETH'",
         );
         assert_eq!(rows.len(), 5);
     }
@@ -886,7 +899,10 @@ mod window_extra {
             "SELECT symbol, price, lead(price, 1) OVER (PARTITION BY symbol ORDER BY timestamp) AS nxt FROM prices"
         );
         // Last row of each partition should have NULL lead
-        let eth_rows: Vec<_> = rows.iter().filter(|r| r[0] == Value::Str("ETH".to_string())).collect();
+        let eth_rows: Vec<_> = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("ETH".to_string()))
+            .collect();
         assert_eq!(eth_rows.last().unwrap()[2], Value::Null);
     }
 
@@ -896,7 +912,10 @@ mod window_extra {
         let (_, rows) = db.query(
             "SELECT symbol, first_value(price) OVER (PARTITION BY symbol ORDER BY timestamp) AS fv FROM prices"
         );
-        let sol_rows: Vec<_> = rows.iter().filter(|r| r[0] == Value::Str("SOL".to_string())).collect();
+        let sol_rows: Vec<_> = rows
+            .iter()
+            .filter(|r| r[0] == Value::Str("SOL".to_string()))
+            .collect();
         for row in &sol_rows {
             assert_eq!(row[1], Value::F64(10.0)); // first SOL price
         }
@@ -944,9 +963,7 @@ mod window_extra {
             let v = if i < 10 { 1.0 } else { 2.0 };
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {})", ts(i), v));
         }
-        let (_, rows) = db.query(
-            "SELECT v, rank() OVER (ORDER BY v) AS rnk FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, rank() OVER (ORDER BY v) AS rnk FROM t");
         let rank1_count = rows.iter().filter(|r| r[1] == Value::I64(1)).count();
         assert_eq!(rank1_count, 10);
         let rank11_count = rows.iter().filter(|r| r[1] == Value::I64(11)).count();
@@ -961,10 +978,15 @@ mod window_extra {
             let v = if i < 10 { 1.0 } else { 2.0 };
             db.exec_ok(&format!("INSERT INTO t VALUES ({}, {})", ts(i), v));
         }
-        let (_, rows) = db.query(
-            "SELECT v, dense_rank() OVER (ORDER BY v) AS drnk FROM t"
-        );
-        let max_dr = rows.iter().map(|r| match &r[1] { Value::I64(n) => *n, other => panic!("{other:?}") }).max().unwrap();
+        let (_, rows) = db.query("SELECT v, dense_rank() OVER (ORDER BY v) AS drnk FROM t");
+        let max_dr = rows
+            .iter()
+            .map(|r| match &r[1] {
+                Value::I64(n) => *n,
+                other => panic!("{other:?}"),
+            })
+            .max()
+            .unwrap();
         assert_eq!(max_dr, 2); // only 2 distinct values
     }
 
@@ -974,9 +996,7 @@ mod window_extra {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", ts(0)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 2.0)", ts(1)));
-        let (_, rows) = db.query(
-            "SELECT v, lag(v, 5) OVER (ORDER BY timestamp) AS prev5 FROM t"
-        );
+        let (_, rows) = db.query("SELECT v, lag(v, 5) OVER (ORDER BY timestamp) AS prev5 FROM t");
         // Both rows have offset > partition size -> NULL
         assert_eq!(rows[0][1], Value::Null);
         assert_eq!(rows[1][1], Value::Null);
@@ -985,9 +1005,7 @@ mod window_extra {
     #[test]
     fn row_number_with_large_dataset() {
         let db = TestDb::with_trades(50);
-        let (_, rows) = db.query(
-            "SELECT row_number() OVER (ORDER BY timestamp) AS rn FROM trades"
-        );
+        let (_, rows) = db.query("SELECT row_number() OVER (ORDER BY timestamp) AS rn FROM trades");
         assert_eq!(rows.len(), 50);
         assert_eq!(rows[49][0], Value::I64(50));
     }
@@ -999,9 +1017,7 @@ mod window_extra {
         let (_, window_rows) = db.query(
             "SELECT symbol, price, sum(price) OVER (PARTITION BY symbol ORDER BY timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS rs FROM prices"
         );
-        let (_, group_rows) = db.query(
-            "SELECT symbol, sum(price) FROM prices GROUP BY symbol"
-        );
+        let (_, group_rows) = db.query("SELECT symbol, sum(price) FROM prices GROUP BY symbol");
         // For each symbol, the last running sum should match the group sum
         for grow in &group_rows {
             let sym = &grow[0];
@@ -1015,9 +1031,7 @@ mod window_extra {
     #[test]
     fn window_count_over_all_equals_total() {
         let db = setup_window_db();
-        let (_, rows) = db.query(
-            "SELECT count(*) OVER () AS total FROM prices LIMIT 1"
-        );
+        let (_, rows) = db.query("SELECT count(*) OVER () AS total FROM prices LIMIT 1");
         assert_eq!(rows[0][0], Value::I64(15));
     }
 
@@ -1030,7 +1044,7 @@ mod window_extra {
         }
         let (_, rows) = db.query(
             "SELECT v, lag(v, 1) OVER (ORDER BY timestamp) AS prev, \
-                    lead(v, 1) OVER (ORDER BY timestamp) AS nxt FROM t"
+                    lead(v, 1) OVER (ORDER BY timestamp) AS nxt FROM t",
         );
         // row 1: prev=0, nxt=20
         assert_eq!(rows[1][1], Value::F64(0.0));

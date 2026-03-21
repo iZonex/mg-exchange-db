@@ -194,35 +194,15 @@ mod tests {
                     Duration::from_millis(250),
                 )
                 .with_p99(Duration::from_millis(280)),
-                BenchmarkMeasurement::new(
-                    "Multi partition",
-                    1_000_000,
-                    Duration::from_millis(400),
-                ),
-                BenchmarkMeasurement::new(
-                    "WAL enabled",
-                    1_000_000,
-                    Duration::from_millis(600),
-                ),
+                BenchmarkMeasurement::new("Multi partition", 1_000_000, Duration::from_millis(400)),
+                BenchmarkMeasurement::new("WAL enabled", 1_000_000, Duration::from_millis(600)),
             ],
             queries: vec![
                 BenchmarkMeasurement::new("Full scan", 1_000_000, Duration::from_millis(120)),
                 BenchmarkMeasurement::new("Filtered", 1_000_000, Duration::from_millis(45)),
-                BenchmarkMeasurement::new(
-                    "GROUP BY",
-                    1_000_000,
-                    Duration::from_millis(80),
-                ),
-                BenchmarkMeasurement::new(
-                    "SAMPLE BY",
-                    1_000_000,
-                    Duration::from_millis(95),
-                ),
-                BenchmarkMeasurement::new(
-                    "ASOF JOIN",
-                    600_000,
-                    Duration::from_millis(150),
-                ),
+                BenchmarkMeasurement::new("GROUP BY", 1_000_000, Duration::from_millis(80)),
+                BenchmarkMeasurement::new("SAMPLE BY", 1_000_000, Duration::from_millis(95)),
+                BenchmarkMeasurement::new("ASOF JOIN", 600_000, Duration::from_millis(150)),
                 BenchmarkMeasurement::new("Top-10", 1_000_000, Duration::from_millis(55)),
             ],
             storage: vec![

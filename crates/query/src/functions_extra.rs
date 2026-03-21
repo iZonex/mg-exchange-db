@@ -24,7 +24,9 @@ fn val_to_f64(v: &Value) -> Result<f64, String> {
         Value::I64(n) => Ok(*n as f64),
         Value::F64(f) => Ok(*f),
         Value::Timestamp(ns) => Ok(*ns as f64),
-        Value::Str(s) => s.parse::<f64>().map_err(|_| format!("cannot parse '{s}' as f64")),
+        Value::Str(s) => s
+            .parse::<f64>()
+            .map_err(|_| format!("cannot parse '{s}' as f64")),
         Value::Null => Err("expected number, got NULL".into()),
     }
 }
@@ -34,7 +36,9 @@ fn val_to_i64(v: &Value) -> Result<i64, String> {
         Value::I64(n) => Ok(*n),
         Value::F64(f) => Ok(*f as i64),
         Value::Timestamp(ns) => Ok(*ns),
-        Value::Str(s) => s.parse::<i64>().map_err(|_| format!("cannot parse '{s}' as i64")),
+        Value::Str(s) => s
+            .parse::<i64>()
+            .map_err(|_| format!("cannot parse '{s}' as i64")),
         Value::Null => Err("expected integer, got NULL".into()),
     }
 }
@@ -54,7 +58,9 @@ fn val_to_ts(v: &Value) -> Result<i64, String> {
         Value::Timestamp(ns) => Ok(*ns),
         Value::I64(n) => Ok(*n),
         Value::F64(f) => Ok(*f as i64),
-        Value::Str(s) => s.parse::<i64>().map_err(|_| format!("cannot parse '{s}' as timestamp")),
+        Value::Str(s) => s
+            .parse::<i64>()
+            .map_err(|_| format!("cannot parse '{s}' as timestamp")),
         Value::Null => Err("expected timestamp, got NULL".into()),
     }
 }
@@ -135,8 +141,12 @@ macro_rules! scalar_fn {
                 #[allow(clippy::redundant_closure_call)]
                 ($body)(args)
             }
-            fn min_args(&self) -> usize { $min }
-            fn max_args(&self) -> usize { $max }
+            fn min_args(&self) -> usize {
+                $min
+            }
+            fn max_args(&self) -> usize {
+                $max
+            }
         }
     };
 }
@@ -363,14 +373,25 @@ scalar_fn!(GeohashBboxFn, 2, 2, |args: &[Value]| {
         let b = (hash >> i) & 1;
         if is_lon {
             let mid = (lon_range.0 + lon_range.1) / 2.0;
-            if b == 1 { lon_range.0 = mid; } else { lon_range.1 = mid; }
+            if b == 1 {
+                lon_range.0 = mid;
+            } else {
+                lon_range.1 = mid;
+            }
         } else {
             let mid = (lat_range.0 + lat_range.1) / 2.0;
-            if b == 1 { lat_range.0 = mid; } else { lat_range.1 = mid; }
+            if b == 1 {
+                lat_range.0 = mid;
+            } else {
+                lat_range.1 = mid;
+            }
         }
         is_lon = !is_lon;
     }
-    Ok(Value::Str(format!("{},{},{},{}", lat_range.0, lon_range.0, lat_range.1, lon_range.1)))
+    Ok(Value::Str(format!(
+        "{},{},{},{}",
+        lat_range.0, lon_range.0, lat_range.1, lon_range.1
+    )))
 });
 
 scalar_fn!(StDistanceFn, 4, 4, |args: &[Value]| {
@@ -385,7 +406,8 @@ scalar_fn!(StContainsFn, 3, 3, |args: &[Value]| {
     let bbox_str = val_to_str(&args[0]);
     let lat = val_to_f64(&args[1])?;
     let lon = val_to_f64(&args[2])?;
-    let parts: Vec<f64> = bbox_str.split(',')
+    let parts: Vec<f64> = bbox_str
+        .split(',')
         .filter_map(|s| s.trim().parse().ok())
         .collect();
     if parts.len() != 4 {
@@ -397,7 +419,8 @@ scalar_fn!(StContainsFn, 3, 3, |args: &[Value]| {
 
 scalar_fn!(StAreaFn, 1, 1, |args: &[Value]| {
     let bbox_str = val_to_str(&args[0]);
-    let parts: Vec<f64> = bbox_str.split(',')
+    let parts: Vec<f64> = bbox_str
+        .split(',')
         .filter_map(|s| s.trim().parse().ok())
         .collect();
     if parts.len() != 4 {
@@ -503,14 +526,20 @@ scalar_fn!(GeohashDecodeLonFn, 1, 1, |args: &[Value]| {
 
 scalar_fn!(ArrayLengthFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    if s.is_empty() { return Ok(Value::I64(0)); }
+    if s.is_empty() {
+        return Ok(Value::I64(0));
+    }
     Ok(Value::I64(parse_array(&s).len() as i64))
 });
 
 scalar_fn!(ArrayContainsFn, 2, 2, |args: &[Value]| {
     let arr = parse_array(&val_to_str(&args[0]));
     let needle = val_to_str(&args[1]);
-    Ok(Value::I64(if arr.iter().any(|x| x == &needle) { 1 } else { 0 }))
+    Ok(Value::I64(if arr.iter().any(|x| x == &needle) {
+        1
+    } else {
+        0
+    }))
 });
 
 scalar_fn!(ArrayPositionFn, 2, 2, |args: &[Value]| {
@@ -525,7 +554,11 @@ scalar_fn!(ArrayPositionFn, 2, 2, |args: &[Value]| {
 scalar_fn!(ArrayRemoveFn, 2, 2, |args: &[Value]| {
     let arr = parse_array(&val_to_str(&args[0]));
     let needle = val_to_str(&args[1]);
-    let filtered: Vec<&str> = arr.iter().filter(|x| x.as_str() != needle).map(|s| s.as_str()).collect();
+    let filtered: Vec<&str> = arr
+        .iter()
+        .filter(|x| x.as_str() != needle)
+        .map(|s| s.as_str())
+        .collect();
     Ok(Value::Str(filtered.join(",")))
 });
 
@@ -552,8 +585,12 @@ scalar_fn!(ArrayPrependFn, 2, 2, |args: &[Value]| {
 scalar_fn!(ArrayCatFn, 2, 2, |args: &[Value]| {
     let a = val_to_str(&args[0]);
     let b = val_to_str(&args[1]);
-    if a.is_empty() { return Ok(Value::Str(b)); }
-    if b.is_empty() { return Ok(Value::Str(a)); }
+    if a.is_empty() {
+        return Ok(Value::Str(b));
+    }
+    if b.is_empty() {
+        return Ok(Value::Str(a));
+    }
     Ok(Value::Str(format!("{a},{b}")))
 });
 
@@ -561,7 +598,9 @@ scalar_fn!(ArrayUniqueFn, 1, 1, |args: &[Value]| {
     let arr = parse_array(&val_to_str(&args[0]));
     let mut seen = Vec::new();
     for x in &arr {
-        if !seen.contains(x) { seen.push(x.clone()); }
+        if !seen.contains(x) {
+            seen.push(x.clone());
+        }
     }
     Ok(Value::Str(seen.join(",")))
 });
@@ -600,7 +639,9 @@ scalar_fn!(ArraySumFn, 1, 1, |args: &[Value]| {
 
 scalar_fn!(ArrayAvgFn, 1, 1, |args: &[Value]| {
     let arr = parse_array(&val_to_str(&args[0]));
-    if arr.is_empty() { return Ok(Value::Null); }
+    if arr.is_empty() {
+        return Ok(Value::Null);
+    }
     let mut sum = 0.0f64;
     let mut count = 0u64;
     for x in &arr {
@@ -609,7 +650,9 @@ scalar_fn!(ArrayAvgFn, 1, 1, |args: &[Value]| {
             count += 1;
         }
     }
-    if count == 0 { return Ok(Value::Null); }
+    if count == 0 {
+        return Ok(Value::Null);
+    }
     Ok(Value::F64(sum / count as f64))
 });
 
@@ -678,14 +721,18 @@ scalar_fn!(ArrayNdimsFn, 1, 1, |_args: &[Value]| {
 scalar_fn!(ArrayUpperFn, 2, 2, |args: &[Value]| {
     let s = val_to_str(&args[0]);
     let _dim = val_to_i64(&args[1])?;
-    if s.is_empty() { return Ok(Value::I64(0)); }
+    if s.is_empty() {
+        return Ok(Value::I64(0));
+    }
     Ok(Value::I64(parse_array(&s).len() as i64))
 });
 
 scalar_fn!(ArrayLowerFn, 2, 2, |args: &[Value]| {
     let s = val_to_str(&args[0]);
     let _dim = val_to_i64(&args[1])?;
-    if s.is_empty() { return Ok(Value::I64(0)); }
+    if s.is_empty() {
+        return Ok(Value::I64(0));
+    }
     Ok(Value::I64(1))
 });
 
@@ -697,13 +744,16 @@ scalar_fn!(UnnestFn, 1, 1, |args: &[Value]| {
 
 scalar_fn!(ArrayToJsonFn, 1, 1, |args: &[Value]| {
     let arr = parse_array(&val_to_str(&args[0]));
-    let elements: Vec<String> = arr.iter().map(|x| {
-        if x.parse::<f64>().is_ok() {
-            x.clone()
-        } else {
-            format!("\"{}\"", x.replace('"', "\\\""))
-        }
-    }).collect();
+    let elements: Vec<String> = arr
+        .iter()
+        .map(|x| {
+            if x.parse::<f64>().is_ok() {
+                x.clone()
+            } else {
+                format!("\"{}\"", x.replace('"', "\\\""))
+            }
+        })
+        .collect();
     Ok(Value::Str(format!("[{}]", elements.join(","))))
 });
 
@@ -711,7 +761,8 @@ scalar_fn!(JsonToArrayFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
     // Strip [] and quotes
     let trimmed = s.trim().trim_start_matches('[').trim_end_matches(']');
-    let elements: Vec<String> = trimmed.split(',')
+    let elements: Vec<String> = trimmed
+        .split(',')
         .map(|x| x.trim().trim_matches('"').to_string())
         .filter(|x| !x.is_empty())
         .collect();
@@ -722,7 +773,9 @@ scalar_fn!(ArrayDistinctFn, 1, 1, |args: &[Value]| {
     let arr = parse_array(&val_to_str(&args[0]));
     let mut seen = Vec::new();
     for x in &arr {
-        if !seen.contains(x) { seen.push(x.clone()); }
+        if !seen.contains(x) {
+            seen.push(x.clone());
+        }
     }
     Ok(Value::Str(seen.join(",")))
 });
@@ -730,14 +783,22 @@ scalar_fn!(ArrayDistinctFn, 1, 1, |args: &[Value]| {
 scalar_fn!(ArrayIntersectFn, 2, 2, |args: &[Value]| {
     let a = parse_array(&val_to_str(&args[0]));
     let b = parse_array(&val_to_str(&args[1]));
-    let result: Vec<&str> = a.iter().filter(|x| b.contains(x)).map(|s| s.as_str()).collect();
+    let result: Vec<&str> = a
+        .iter()
+        .filter(|x| b.contains(x))
+        .map(|s| s.as_str())
+        .collect();
     Ok(Value::Str(result.join(",")))
 });
 
 scalar_fn!(ArrayExceptFn, 2, 2, |args: &[Value]| {
     let a = parse_array(&val_to_str(&args[0]));
     let b = parse_array(&val_to_str(&args[1]));
-    let result: Vec<&str> = a.iter().filter(|x| !b.contains(x)).map(|s| s.as_str()).collect();
+    let result: Vec<&str> = a
+        .iter()
+        .filter(|x| !b.contains(x))
+        .map(|s| s.as_str())
+        .collect();
     Ok(Value::Str(result.join(",")))
 });
 
@@ -750,7 +811,9 @@ scalar_fn!(ArrayOverlapFn, 2, 2, |args: &[Value]| {
 
 scalar_fn!(CardinalityFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    if s.is_empty() { return Ok(Value::I64(0)); }
+    if s.is_empty() {
+        return Ok(Value::I64(0));
+    }
     Ok(Value::I64(parse_array(&s).len() as i64))
 });
 
@@ -815,8 +878,10 @@ scalar_fn!(MakeIntervalFn, 6, 6, |args: &[Value]| {
     let secs = val_to_i64(&args[5])?;
     // Approximate: 1 year = 365.25 days, 1 month = 30.4375 days
     let total_days = years * 365 + months * 30 + days;
-    let total_ns = total_days * NANOS_PER_DAY + hours * NANOS_PER_HOUR
-        + mins * NANOS_PER_MIN + secs * NANOS_PER_SEC;
+    let total_ns = total_days * NANOS_PER_DAY
+        + hours * NANOS_PER_HOUR
+        + mins * NANOS_PER_MIN
+        + secs * NANOS_PER_SEC;
     Ok(Value::I64(total_ns))
 });
 
@@ -824,7 +889,10 @@ scalar_fn!(JustifyHoursFn, 1, 1, |args: &[Value]| {
     let ns = val_to_i64(&args[0])?;
     let days = ns / NANOS_PER_DAY;
     let remainder = ns % NANOS_PER_DAY;
-    Ok(Value::Str(format!("{days} days {} hours", remainder / NANOS_PER_HOUR)))
+    Ok(Value::Str(format!(
+        "{days} days {} hours",
+        remainder / NANOS_PER_HOUR
+    )))
 });
 
 scalar_fn!(JustifyDaysFn, 1, 1, |args: &[Value]| {
@@ -844,7 +912,9 @@ scalar_fn!(AgeTimestampFn, 2, 2, |args: &[Value]| {
     let rem_days = days % 365;
     let months = rem_days / 30;
     let d = rem_days % 30;
-    Ok(Value::Str(format!("{years} years {months} months {d} days")))
+    Ok(Value::Str(format!(
+        "{years} years {months} months {d} days"
+    )))
 });
 
 scalar_fn!(ExtractEpochFn, 1, 1, |args: &[Value]| {
@@ -881,7 +951,9 @@ scalar_fn!(ToCharTimestampFn, 2, 2, |args: &[Value]| {
     let ts = val_to_ts(&args[0])?;
     let _fmt = val_to_str(&args[1]);
     let (y, mo, d, h, mi, s, _) = decompose_ts(ts);
-    Ok(Value::Str(format!("{y:04}-{mo:02}-{d:02} {h:02}:{mi:02}:{s:02}")))
+    Ok(Value::Str(format!(
+        "{y:04}-{mo:02}-{d:02} {h:02}:{mi:02}:{s:02}"
+    )))
 });
 
 scalar_fn!(ToDateStrFn, 2, 2, |args: &[Value]| {
@@ -946,7 +1018,9 @@ scalar_fn!(GenerateTimestampSeriesFn, 3, 3, |args: &[Value]| {
     let start = val_to_ts(&args[0])?;
     let stop = val_to_ts(&args[1])?;
     let step = val_to_i64(&args[2])?;
-    if step <= 0 { return Err("step must be positive".into()); }
+    if step <= 0 {
+        return Err("step must be positive".into());
+    }
     let mut values = Vec::new();
     let mut t = start;
     let limit = 10_000; // safety limit
@@ -969,7 +1043,9 @@ scalar_fn!(IntervalsOverlapFn, 4, 4, |args: &[Value]| {
 scalar_fn!(TimeBucketFn, 2, 2, |args: &[Value]| {
     let interval_ns = val_to_i64(&args[0])?;
     let ts = val_to_ts(&args[1])?;
-    if interval_ns <= 0 { return Err("time_bucket: interval must be positive".into()); }
+    if interval_ns <= 0 {
+        return Err("time_bucket: interval must be positive".into());
+    }
     let bucket = (ts / interval_ns) * interval_ns;
     Ok(Value::Timestamp(bucket))
 });
@@ -978,7 +1054,9 @@ scalar_fn!(TimeBucketGapfillFn, 2, 2, |args: &[Value]| {
     // Same as time_bucket at scalar level; gapfill logic is in the executor
     let interval_ns = val_to_i64(&args[0])?;
     let ts = val_to_ts(&args[1])?;
-    if interval_ns <= 0 { return Err("time_bucket_gapfill: interval must be positive".into()); }
+    if interval_ns <= 0 {
+        return Err("time_bucket_gapfill: interval must be positive".into());
+    }
     let bucket = (ts / interval_ns) * interval_ns;
     Ok(Value::Timestamp(bucket))
 });
@@ -1065,30 +1143,48 @@ scalar_fn!(ToBinFn, 1, 1, |args: &[Value]| {
 scalar_fn!(PadFn, 2, 2, |args: &[Value]| {
     let s = val_to_str(&args[0]);
     let len = val_to_i64(&args[1])? as usize;
-    if s.len() >= len { return Ok(Value::Str(s)); }
+    if s.len() >= len {
+        return Ok(Value::Str(s));
+    }
     let padding = len - s.len();
     let right = padding / 2;
     let left = padding - right;
-    Ok(Value::Str(format!("{}{}{}", " ".repeat(left), s, " ".repeat(right))))
+    Ok(Value::Str(format!(
+        "{}{}{}",
+        " ".repeat(left),
+        s,
+        " ".repeat(right)
+    )))
 });
 
 scalar_fn!(CenterFn, 2, 2, |args: &[Value]| {
     let s = val_to_str(&args[0]);
     let len = val_to_i64(&args[1])? as usize;
-    if s.len() >= len { return Ok(Value::Str(s)); }
+    if s.len() >= len {
+        return Ok(Value::Str(s));
+    }
     let padding = len - s.len();
     let left = padding / 2;
     let right = padding - left;
-    Ok(Value::Str(format!("{}{}{}", " ".repeat(left), s, " ".repeat(right))))
+    Ok(Value::Str(format!(
+        "{}{}{}",
+        " ".repeat(left),
+        s,
+        " ".repeat(right)
+    )))
 });
 
 scalar_fn!(WrapFn, 2, 2, |args: &[Value]| {
     let s = val_to_str(&args[0]);
     let width = val_to_i64(&args[1])? as usize;
-    if width == 0 { return Ok(Value::Str(s)); }
+    if width == 0 {
+        return Ok(Value::Str(s));
+    }
     let mut result = String::new();
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && i % width == 0 { result.push('\n'); }
+        if i > 0 && i % width == 0 {
+            result.push('\n');
+        }
         result.push(c);
     }
     Ok(Value::Str(result))
@@ -1106,22 +1202,34 @@ scalar_fn!(TruncateStrFn, 2, 2, |args: &[Value]| {
 
 scalar_fn!(EscapeHtmlFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    let escaped = s.replace('&', "&amp;").replace('<', "&lt;")
-        .replace('>', "&gt;").replace('"', "&quot;").replace('\'', "&#39;");
+    let escaped = s
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;");
     Ok(Value::Str(escaped))
 });
 
 scalar_fn!(UnescapeHtmlFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    let unescaped = s.replace("&amp;", "&").replace("&lt;", "<")
-        .replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'");
+    let unescaped = s
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'");
     Ok(Value::Str(unescaped))
 });
 
 scalar_fn!(EscapeJsonFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    let escaped = s.replace('\\', "\\\\").replace('"', "\\\"")
-        .replace('\n', "\\n").replace('\r', "\\r").replace('\t', "\\t");
+    let escaped = s
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t");
     Ok(Value::Str(escaped))
 });
 
@@ -1133,7 +1241,8 @@ scalar_fn!(EscapeSqlFn, 1, 1, |args: &[Value]| {
 
 scalar_fn!(SlugFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]).to_ascii_lowercase();
-    let slug: String = s.chars()
+    let slug: String = s
+        .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
         .collect();
     // Collapse multiple dashes
@@ -1141,7 +1250,9 @@ scalar_fn!(SlugFn, 1, 1, |args: &[Value]| {
     let mut prev_dash = false;
     for c in slug.chars() {
         if c == '-' {
-            if !prev_dash && !result.is_empty() { result.push('-'); }
+            if !prev_dash && !result.is_empty() {
+                result.push('-');
+            }
             prev_dash = true;
         } else {
             result.push(c);
@@ -1172,41 +1283,74 @@ scalar_fn!(TitleCaseExFn, 1, 1, |args: &[Value]| {
 
 scalar_fn!(SwapCaseFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    let swapped: String = s.chars().map(|c| {
-        if c.is_uppercase() {
-            c.to_lowercase().to_string()
-        } else if c.is_lowercase() {
-            c.to_uppercase().to_string()
-        } else {
-            c.to_string()
-        }
-    }).collect();
+    let swapped: String = s
+        .chars()
+        .map(|c| {
+            if c.is_uppercase() {
+                c.to_lowercase().to_string()
+            } else if c.is_lowercase() {
+                c.to_uppercase().to_string()
+            } else {
+                c.to_string()
+            }
+        })
+        .collect();
     Ok(Value::Str(swapped))
 });
 
 scalar_fn!(IsAlphaFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    Ok(Value::I64(if !s.is_empty() && s.chars().all(|c| c.is_alphabetic()) { 1 } else { 0 }))
+    Ok(Value::I64(
+        if !s.is_empty() && s.chars().all(|c| c.is_alphabetic()) {
+            1
+        } else {
+            0
+        },
+    ))
 });
 
 scalar_fn!(IsDigitFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    Ok(Value::I64(if !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()) { 1 } else { 0 }))
+    Ok(Value::I64(
+        if !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()) {
+            1
+        } else {
+            0
+        },
+    ))
 });
 
 scalar_fn!(IsAlnumFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    Ok(Value::I64(if !s.is_empty() && s.chars().all(|c| c.is_alphanumeric()) { 1 } else { 0 }))
+    Ok(Value::I64(
+        if !s.is_empty() && s.chars().all(|c| c.is_alphanumeric()) {
+            1
+        } else {
+            0
+        },
+    ))
 });
 
 scalar_fn!(IsUpperFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    Ok(Value::I64(if !s.is_empty() && s.chars().all(|c| !c.is_alphabetic() || c.is_uppercase()) { 1 } else { 0 }))
+    Ok(Value::I64(
+        if !s.is_empty() && s.chars().all(|c| !c.is_alphabetic() || c.is_uppercase()) {
+            1
+        } else {
+            0
+        },
+    ))
 });
 
 scalar_fn!(IsLowerFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    Ok(Value::I64(if !s.is_empty() && s.chars().all(|c| !c.is_alphabetic() || c.is_lowercase()) { 1 } else { 0 }))
+    Ok(Value::I64(
+        if !s.is_empty() && s.chars().all(|c| !c.is_alphabetic() || c.is_lowercase()) {
+            1
+        } else {
+            0
+        },
+    ))
 });
 
 scalar_fn!(IsBlankFn, 1, 1, |args: &[Value]| {
@@ -1229,20 +1373,21 @@ scalar_fn!(IsUuidFn, 1, 1, |args: &[Value]| {
     // UUID pattern: 8-4-4-4-12 hex chars
     let valid = s.len() == 36
         && s.chars().enumerate().all(|(i, c)| {
-            if i == 8 || i == 13 || i == 18 || i == 23 { c == '-' }
-            else { c.is_ascii_hexdigit() }
+            if i == 8 || i == 13 || i == 18 || i == 23 {
+                c == '-'
+            } else {
+                c.is_ascii_hexdigit()
+            }
         });
     Ok(Value::I64(if valid { 1 } else { 0 }))
 });
 
 scalar_fn!(IsEmailFn, 1, 1, |args: &[Value]| {
     let s = val_to_str(&args[0]);
-    let valid = s.contains('@')
-        && s.split('@').count() == 2
-        && {
-            let parts: Vec<&str> = s.split('@').collect();
-            !parts[0].is_empty() && parts[1].contains('.') && !parts[1].ends_with('.')
-        };
+    let valid = s.contains('@') && s.split('@').count() == 2 && {
+        let parts: Vec<&str> = s.split('@').collect();
+        !parts[0].is_empty() && parts[1].contains('.') && !parts[1].ends_with('.')
+    };
     Ok(Value::I64(if valid { 1 } else { 0 }))
 });
 
@@ -1250,9 +1395,10 @@ scalar_fn!(MaskFn, 2, 2, |args: &[Value]| {
     let s = val_to_str(&args[0]);
     let mask_char = val_to_str(&args[1]);
     let mc = mask_char.chars().next().unwrap_or('*');
-    let masked: String = s.chars().map(|c| {
-        if c.is_alphanumeric() { mc } else { c }
-    }).collect();
+    let masked: String = s
+        .chars()
+        .map(|c| if c.is_alphanumeric() { mc } else { c })
+        .collect();
     Ok(Value::Str(masked))
 });
 
@@ -1262,7 +1408,9 @@ scalar_fn!(MaskFn, 2, 2, |args: &[Value]| {
 
 scalar_fn!(DecodeExFn, 3, usize::MAX, |args: &[Value]| {
     // decode(expr, search1, result1, search2, result2, ..., default)
-    if args.len() < 3 { return Err("decode requires at least 3 arguments".into()); }
+    if args.len() < 3 {
+        return Err("decode requires at least 3 arguments".into());
+    }
     let expr = &args[0];
     let mut i = 1;
     while i + 1 < args.len() {
@@ -1295,11 +1443,19 @@ scalar_fn!(ZeroIfNullExFn, 1, 1, |args: &[Value]| {
 });
 
 scalar_fn!(IfNullExFn, 2, 2, |args: &[Value]| {
-    if matches!(args[0], Value::Null) { Ok(args[1].clone()) } else { Ok(args[0].clone()) }
+    if matches!(args[0], Value::Null) {
+        Ok(args[1].clone())
+    } else {
+        Ok(args[0].clone())
+    }
 });
 
 scalar_fn!(NvlExFn, 2, 2, |args: &[Value]| {
-    if matches!(args[0], Value::Null) { Ok(args[1].clone()) } else { Ok(args[0].clone()) }
+    if matches!(args[0], Value::Null) {
+        Ok(args[1].clone())
+    } else {
+        Ok(args[0].clone())
+    }
 });
 
 scalar_fn!(Nvl2ExFn, 3, 3, |args: &[Value]| {
@@ -1368,7 +1524,10 @@ scalar_fn!(TryCastTimestampExFn, 1, 1, |args: &[Value]| {
         Value::Null => Ok(Value::Null),
         Value::Timestamp(ns) => Ok(Value::Timestamp(*ns)),
         Value::I64(n) => Ok(Value::Timestamp(*n)),
-        Value::Str(s) => Ok(s.parse::<i64>().map(Value::Timestamp).unwrap_or(Value::Null)),
+        Value::Str(s) => Ok(s
+            .parse::<i64>()
+            .map(Value::Timestamp)
+            .unwrap_or(Value::Null)),
         Value::F64(f) => Ok(Value::Timestamp(*f as i64)),
     }
 });
@@ -1398,21 +1557,33 @@ scalar_fn!(TryCastDateExFn, 1, 1, |args: &[Value]| {
 scalar_fn!(SafeDivideFn, 2, 2, |args: &[Value]| {
     let x = val_to_f64(&args[0])?;
     let y = val_to_f64(&args[1])?;
-    if y == 0.0 { Ok(Value::Null) } else { Ok(Value::F64(x / y)) }
+    if y == 0.0 {
+        Ok(Value::Null)
+    } else {
+        Ok(Value::F64(x / y))
+    }
 });
 
 scalar_fn!(SafeSubtractFn, 2, 2, |args: &[Value]| {
     let x = val_to_f64(&args[0])?;
     let y = val_to_f64(&args[1])?;
     let result = x - y;
-    if result.is_finite() { Ok(Value::F64(result)) } else { Ok(Value::Null) }
+    if result.is_finite() {
+        Ok(Value::F64(result))
+    } else {
+        Ok(Value::Null)
+    }
 });
 
 scalar_fn!(SafeMultiplyFn, 2, 2, |args: &[Value]| {
     let x = val_to_f64(&args[0])?;
     let y = val_to_f64(&args[1])?;
     let result = x * y;
-    if result.is_finite() { Ok(Value::F64(result)) } else { Ok(Value::Null) }
+    if result.is_finite() {
+        Ok(Value::F64(result))
+    } else {
+        Ok(Value::Null)
+    }
 });
 
 scalar_fn!(SafeNegateFn, 1, 1, |args: &[Value]| {
@@ -1459,7 +1630,9 @@ scalar_fn!(TablesFn, 0, 0, |_args: &[Value]| {
 
 scalar_fn!(ColumnsFn, 1, 1, |args: &[Value]| {
     let table = val_to_str(&args[0]);
-    Ok(Value::Str(format!("column,type\n(use SHOW COLUMNS FROM {table} for live data)")))
+    Ok(Value::Str(format!(
+        "column,type\n(use SHOW COLUMNS FROM {table} for live data)"
+    )))
 });
 
 scalar_fn!(TablePartitionsFn, 1, 1, |args: &[Value]| {
@@ -1472,20 +1645,22 @@ scalar_fn!(WalTablesFn, 0, 0, |_args: &[Value]| {
 });
 
 scalar_fn!(ServerInfoFn, 0, 0, |_args: &[Value]| {
-    Ok(Value::Str("ExchangeDB 1.0.0\nplatform: rust\nstatus: running".into()))
+    Ok(Value::Str(
+        "ExchangeDB 1.0.0\nplatform: rust\nstatus: running".into(),
+    ))
 });
 
 scalar_fn!(DatabaseSizeFn, 0, 0, |_args: &[Value]| {
     Ok(Value::I64(0))
 });
 
-scalar_fn!(TableSizeFn, 1, 1, |_args: &[Value]| {
-    Ok(Value::I64(0))
-});
+scalar_fn!(TableSizeFn, 1, 1, |_args: &[Value]| { Ok(Value::I64(0)) });
 
 scalar_fn!(IndexInfoFn, 1, 1, |args: &[Value]| {
     let table = val_to_str(&args[0]);
-    Ok(Value::Str(format!("index_name,column\n(indexes for {table})")))
+    Ok(Value::Str(format!(
+        "index_name,column\n(indexes for {table})"
+    )))
 });
 
 scalar_fn!(WalStatusFn, 1, 1, |args: &[Value]| {
@@ -1579,7 +1754,10 @@ pub fn register_extra_functions(registry: &mut ScalarRegistry) {
     registry.register_public("timezone_offset", Box::new(TimezoneOffsetFn));
     registry.register_public("is_dst", Box::new(IsDstFn));
     registry.register_public("overlap", Box::new(OverlapFn));
-    registry.register_public("generate_timestamp_series", Box::new(GenerateTimestampSeriesFn));
+    registry.register_public(
+        "generate_timestamp_series",
+        Box::new(GenerateTimestampSeriesFn),
+    );
     registry.register_public("intervals_overlap", Box::new(IntervalsOverlapFn));
     registry.register_public("time_bucket", Box::new(TimeBucketFn));
     registry.register_public("time_bucket_gapfill", Box::new(TimeBucketGapfillFn));
@@ -1673,9 +1851,11 @@ mod tests {
     #[test]
     fn test_make_geohash_and_lat_lon() {
         // Encode lat=48.8566, lon=2.3522 at 20 bits, then decode
-        let hash = eval("make_geohash", &[
-            Value::F64(48.8566), Value::F64(2.3522), Value::I64(20),
-        ]).unwrap();
+        let hash = eval(
+            "make_geohash",
+            &[Value::F64(48.8566), Value::F64(2.3522), Value::I64(20)],
+        )
+        .unwrap();
         if let Value::I64(h) = hash {
             let lat = eval("geohash_lat", &[Value::I64(h), Value::I64(20)]).unwrap();
             let lon = eval("geohash_lon", &[Value::I64(h), Value::I64(20)]).unwrap();
@@ -1693,10 +1873,16 @@ mod tests {
     #[test]
     fn test_st_distance_haversine() {
         // NYC to London ~ 5570 km
-        let result = eval("st_distance", &[
-            Value::F64(40.7128), Value::F64(-74.0060),
-            Value::F64(51.5074), Value::F64(-0.1278),
-        ]).unwrap();
+        let result = eval(
+            "st_distance",
+            &[
+                Value::F64(40.7128),
+                Value::F64(-74.0060),
+                Value::F64(51.5074),
+                Value::F64(-0.1278),
+            ],
+        )
+        .unwrap();
         if let Value::F64(d) = result {
             assert!(d > 5_000_000.0 && d < 6_000_000.0, "distance {d}m");
         } else {
@@ -1711,11 +1897,19 @@ mod tests {
             Value::I64(3)
         );
         assert_eq!(
-            eval("array_contains", &[Value::Str("a,b,c".into()), Value::Str("b".into())]).unwrap(),
+            eval(
+                "array_contains",
+                &[Value::Str("a,b,c".into()), Value::Str("b".into())]
+            )
+            .unwrap(),
             Value::I64(1)
         );
         assert_eq!(
-            eval("array_position", &[Value::Str("a,b,c".into()), Value::Str("c".into())]).unwrap(),
+            eval(
+                "array_position",
+                &[Value::Str("a,b,c".into()), Value::Str("c".into())]
+            )
+            .unwrap(),
             Value::I64(3)
         );
     }
@@ -1747,20 +1941,30 @@ mod tests {
     #[test]
     fn test_array_intersect_except() {
         assert_eq!(
-            eval("array_intersect", &[Value::Str("1,2,3".into()), Value::Str("2,3,4".into())]).unwrap(),
+            eval(
+                "array_intersect",
+                &[Value::Str("1,2,3".into()), Value::Str("2,3,4".into())]
+            )
+            .unwrap(),
             Value::Str("2,3".into())
         );
         assert_eq!(
-            eval("array_except", &[Value::Str("1,2,3".into()), Value::Str("2,3,4".into())]).unwrap(),
+            eval(
+                "array_except",
+                &[Value::Str("1,2,3".into()), Value::Str("2,3,4".into())]
+            )
+            .unwrap(),
             Value::Str("1".into())
         );
     }
 
     #[test]
     fn test_make_date() {
-        let result = eval("make_date", &[
-            Value::I64(2024), Value::I64(1), Value::I64(15),
-        ]).unwrap();
+        let result = eval(
+            "make_date",
+            &[Value::I64(2024), Value::I64(1), Value::I64(15)],
+        )
+        .unwrap();
         if let Value::Timestamp(ns) = result {
             let days = ns / NANOS_PER_DAY;
             let (y, m, d) = days_to_ymd(days);
@@ -1775,37 +1979,65 @@ mod tests {
         // 1 hour bucket
         let one_hour = NANOS_PER_HOUR;
         let ts = 3 * one_hour + 1234; // 3 hours + a bit
-        let result = eval("time_bucket", &[
-            Value::I64(one_hour), Value::Timestamp(ts),
-        ]).unwrap();
+        let result = eval("time_bucket", &[Value::I64(one_hour), Value::Timestamp(ts)]).unwrap();
         assert_eq!(result, Value::Timestamp(3 * one_hour));
     }
 
     #[test]
     fn test_overlap() {
         // Overlapping intervals
-        let r = eval("overlap", &[
-            Value::Timestamp(100), Value::Timestamp(300),
-            Value::Timestamp(200), Value::Timestamp(400),
-        ]).unwrap();
+        let r = eval(
+            "overlap",
+            &[
+                Value::Timestamp(100),
+                Value::Timestamp(300),
+                Value::Timestamp(200),
+                Value::Timestamp(400),
+            ],
+        )
+        .unwrap();
         assert_eq!(r, Value::I64(1));
 
         // Non-overlapping
-        let r = eval("overlap", &[
-            Value::Timestamp(100), Value::Timestamp(200),
-            Value::Timestamp(300), Value::Timestamp(400),
-        ]).unwrap();
+        let r = eval(
+            "overlap",
+            &[
+                Value::Timestamp(100),
+                Value::Timestamp(200),
+                Value::Timestamp(300),
+                Value::Timestamp(400),
+            ],
+        )
+        .unwrap();
         assert_eq!(r, Value::I64(0));
     }
 
     #[test]
     fn test_is_predicates() {
-        assert_eq!(eval("is_alpha", &[Value::Str("abc".into())]).unwrap(), Value::I64(1));
-        assert_eq!(eval("is_alpha", &[Value::Str("ab3".into())]).unwrap(), Value::I64(0));
-        assert_eq!(eval("is_digit", &[Value::Str("123".into())]).unwrap(), Value::I64(1));
-        assert_eq!(eval("is_numeric", &[Value::Str("3.14".into())]).unwrap(), Value::I64(1));
-        assert_eq!(eval("is_email", &[Value::Str("a@b.com".into())]).unwrap(), Value::I64(1));
-        assert_eq!(eval("is_email", &[Value::Str("notanemail".into())]).unwrap(), Value::I64(0));
+        assert_eq!(
+            eval("is_alpha", &[Value::Str("abc".into())]).unwrap(),
+            Value::I64(1)
+        );
+        assert_eq!(
+            eval("is_alpha", &[Value::Str("ab3".into())]).unwrap(),
+            Value::I64(0)
+        );
+        assert_eq!(
+            eval("is_digit", &[Value::Str("123".into())]).unwrap(),
+            Value::I64(1)
+        );
+        assert_eq!(
+            eval("is_numeric", &[Value::Str("3.14".into())]).unwrap(),
+            Value::I64(1)
+        );
+        assert_eq!(
+            eval("is_email", &[Value::Str("a@b.com".into())]).unwrap(),
+            Value::I64(1)
+        );
+        assert_eq!(
+            eval("is_email", &[Value::Str("notanemail".into())]).unwrap(),
+            Value::I64(0)
+        );
     }
 
     #[test]
@@ -1846,7 +2078,11 @@ mod tests {
 
     #[test]
     fn test_mask() {
-        let r = eval("mask", &[Value::Str("abc-123".into()), Value::Str("*".into())]).unwrap();
+        let r = eval(
+            "mask",
+            &[Value::Str("abc-123".into()), Value::Str("*".into())],
+        )
+        .unwrap();
         assert_eq!(r, Value::Str("***-***".into()));
     }
 }

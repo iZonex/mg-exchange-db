@@ -51,16 +51,17 @@ impl NestedLoopJoinCursor {
     }
 
     fn build(&mut self) -> Result<()> {
-        let mut right = self.right_source.take().expect("right source already consumed");
+        let mut right = self
+            .right_source
+            .take()
+            .expect("right source already consumed");
         loop {
             match right.next_batch(1024)? {
                 None => break,
                 Some(batch) => {
                     let ncols = batch.columns.len();
                     for r in 0..batch.row_count() {
-                        let row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> = (0..ncols).map(|c| batch.get_value(r, c)).collect();
                         self.right_rows.push(row);
                     }
                 }
@@ -104,9 +105,8 @@ impl RecordCursor for NestedLoopJoinCursor {
                 Some(batch) => {
                     let ncols = batch.columns.len();
                     for r in 0..batch.row_count() {
-                        let left_row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(r, c))
-                            .collect();
+                        let left_row: Vec<Value> =
+                            (0..ncols).map(|c| batch.get_value(r, c)).collect();
 
                         for right_row in &self.right_rows {
                             if (self.predicate)(&left_row, right_row) {
@@ -153,26 +153,23 @@ mod tests {
 
         let left = MemoryCursor::from_rows(
             left_schema,
-            &[vec![Value::I64(1)], vec![Value::I64(2)], vec![Value::I64(3)]],
+            &[
+                vec![Value::I64(1)],
+                vec![Value::I64(2)],
+                vec![Value::I64(3)],
+            ],
         );
-        let right = MemoryCursor::from_rows(
-            right_schema,
-            &[vec![Value::I64(2)], vec![Value::I64(3)]],
-        );
+        let right =
+            MemoryCursor::from_rows(right_schema, &[vec![Value::I64(2)], vec![Value::I64(3)]]);
 
         // Join on a < b
-        let predicate: JoinPredicate = Box::new(|left_row, right_row| {
-            match (&left_row[0], &right_row[0]) {
+        let predicate: JoinPredicate =
+            Box::new(|left_row, right_row| match (&left_row[0], &right_row[0]) {
                 (Value::I64(a), Value::I64(b)) => a < b,
                 _ => false,
-            }
-        });
+            });
 
-        let mut cursor = NestedLoopJoinCursor::new(
-            Box::new(left),
-            Box::new(right),
-            predicate,
-        );
+        let mut cursor = NestedLoopJoinCursor::new(Box::new(left), Box::new(right), predicate);
 
         let mut all = Vec::new();
         while let Some(batch) = cursor.next_batch(100).unwrap() {

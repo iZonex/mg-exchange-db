@@ -115,7 +115,10 @@ mod create_table {
     fn create_multiple_tables() {
         let db = TestDb::new();
         for i in 0..10 {
-            db.exec_ok(&format!("CREATE TABLE t{} (timestamp TIMESTAMP, v DOUBLE)", i));
+            db.exec_ok(&format!(
+                "CREATE TABLE t{} (timestamp TIMESTAMP, v DOUBLE)",
+                i
+            ));
         }
         for i in 0..10 {
             db.exec_ok(&format!("INSERT INTO t{} VALUES ({}, {}.0)", i, ts(0), i));
@@ -156,7 +159,10 @@ mod alter_table {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok("ALTER TABLE t ADD COLUMN w DOUBLE");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v, w) VALUES ({}, 1.0, 2.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v, w) VALUES ({}, 1.0, 2.0)",
+            ts(0)
+        ));
         let (cols, _) = db.query("SELECT * FROM t");
         assert_eq!(cols.len(), 3);
     }
@@ -166,7 +172,10 @@ mod alter_table {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok("ALTER TABLE t ADD COLUMN name VARCHAR");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v, name) VALUES ({}, 1.0, 'test')", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v, name) VALUES ({}, 1.0, 'test')",
+            ts(0)
+        ));
         let val = db.query_scalar("SELECT name FROM t");
         assert_eq!(val, Value::Str("test".to_string()));
     }
@@ -264,7 +273,10 @@ mod alter_table {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", ts(0)));
         db.exec_ok("ALTER TABLE t ADD COLUMN s VARCHAR");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v, s) VALUES ({}, 2.0, 'hello')", ts(1)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v, s) VALUES ({}, 2.0, 'hello')",
+            ts(1)
+        ));
         let (_, rows) = db.query("SELECT * FROM t ORDER BY timestamp");
         assert_eq!(rows.len(), 2);
     }
@@ -381,7 +393,10 @@ mod truncate_table {
     fn truncate_basic() {
         let db = TestDb::with_trades(20);
         db.exec_ok("TRUNCATE TABLE trades");
-        assert_eq!(db.query_scalar("SELECT count(*) FROM trades"), Value::I64(0));
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM trades"),
+            Value::I64(0)
+        );
     }
 
     #[test]
@@ -406,9 +421,13 @@ mod truncate_table {
         let db = TestDb::with_trades(10);
         db.exec_ok("TRUNCATE TABLE trades");
         db.exec_ok(&format!(
-            "INSERT INTO trades VALUES ({}, 'NEW/USD', 999.0, 1.0, 'buy')", ts(0)
+            "INSERT INTO trades VALUES ({}, 'NEW/USD', 999.0, 1.0, 'buy')",
+            ts(0)
         ));
-        assert_eq!(db.query_scalar("SELECT count(*) FROM trades"), Value::I64(1));
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM trades"),
+            Value::I64(1)
+        );
     }
 
     #[test]
@@ -423,16 +442,17 @@ mod truncate_table {
         let db = TestDb::with_trades(10);
         db.exec_ok("TRUNCATE TABLE trades");
         db.exec_ok("TRUNCATE TABLE trades"); // second truncate on empty table
-        assert_eq!(db.query_scalar("SELECT count(*) FROM trades"), Value::I64(0));
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM trades"),
+            Value::I64(0)
+        );
     }
 
     #[test]
     fn truncate_large_table() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let values: Vec<String> = (0..1000)
-            .map(|i| format!("({}, {}.0)", ts(i), i))
-            .collect();
+        let values: Vec<String> = (0..1000).map(|i| format!("({}, {}.0)", ts(i), i)).collect();
         db.exec_ok(&format!("INSERT INTO t VALUES {}", values.join(", ")));
         assert_eq!(db.query_scalar("SELECT count(*) FROM t"), Value::I64(1000));
         db.exec_ok("TRUNCATE TABLE t");
@@ -461,7 +481,9 @@ mod mat_view {
     #[test]
     fn create_materialized_view() {
         let db = TestDb::with_trades(20);
-        db.exec_ok("CREATE MATERIALIZED VIEW btc_trades AS SELECT * FROM trades WHERE symbol = 'BTC/USD'");
+        db.exec_ok(
+            "CREATE MATERIALIZED VIEW btc_trades AS SELECT * FROM trades WHERE symbol = 'BTC/USD'",
+        );
         let (_, rows) = db.query("SELECT * FROM btc_trades");
         assert!(!rows.is_empty());
     }
@@ -473,12 +495,19 @@ mod mat_view {
         let (_, before) = db.query("SELECT count(*) FROM mv");
         // Insert more BTC data
         db.exec_ok(&format!(
-            "INSERT INTO trades VALUES ({}, 'BTC/USD', 70000.0, 1.0, 'buy')", ts(9999)
+            "INSERT INTO trades VALUES ({}, 'BTC/USD', 70000.0, 1.0, 'buy')",
+            ts(9999)
         ));
         db.exec_ok("REFRESH MATERIALIZED VIEW mv");
         let (_, after) = db.query("SELECT count(*) FROM mv");
-        let b = match &before[0][0] { Value::I64(n) => *n, other => panic!("{other:?}") };
-        let a = match &after[0][0] { Value::I64(n) => *n, other => panic!("{other:?}") };
+        let b = match &before[0][0] {
+            Value::I64(n) => *n,
+            other => panic!("{other:?}"),
+        };
+        let a = match &after[0][0] {
+            Value::I64(n) => *n,
+            other => panic!("{other:?}"),
+        };
         assert!(a >= b);
     }
 
@@ -632,7 +661,10 @@ mod ddl_lifecycle {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", ts(0)));
         db.exec_ok("ALTER TABLE t ADD COLUMN s VARCHAR");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v, s) VALUES ({}, 2.0, 'x')", ts(1)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v, s) VALUES ({}, 2.0, 'x')",
+            ts(1)
+        ));
         let (_, rows) = db.query("SELECT * FROM t ORDER BY timestamp");
         assert_eq!(rows.len(), 2);
     }
@@ -681,10 +713,14 @@ mod ddl_lifecycle {
         }
         db.exec_ok("ALTER TABLE t ADD COLUMN label VARCHAR");
         db.exec_ok("UPDATE t SET label = 'old'");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v, label) VALUES ({}, 99.0, 'new')", ts(99)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v, label) VALUES ({}, 99.0, 'new')",
+            ts(99)
+        ));
         db.exec_ok("DELETE FROM t WHERE v < 3");
         let count = match db.query_scalar("SELECT count(*) FROM t") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert!(count >= 3); // v=3,4,99
     }
@@ -719,7 +755,10 @@ mod ddl_lifecycle {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, a DOUBLE, b DOUBLE)");
         db.exec_ok("ALTER TABLE t DROP COLUMN b");
-        db.exec_ok(&format!("INSERT INTO t (timestamp, a) VALUES ({}, 1.0)", ts(0)));
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, a) VALUES ({}, 1.0)",
+            ts(0)
+        ));
         assert_eq!(db.query_scalar("SELECT a FROM t"), Value::F64(1.0));
     }
 
@@ -747,8 +786,16 @@ mod ddl_lifecycle {
         let db = TestDb::new();
         for cycle in 0..5 {
             let name = format!("cycle_{}", cycle);
-            db.exec_ok(&format!("CREATE TABLE {} (timestamp TIMESTAMP, v DOUBLE)", name));
-            db.exec_ok(&format!("INSERT INTO {} VALUES ({}, {}.0)", name, ts(0), cycle));
+            db.exec_ok(&format!(
+                "CREATE TABLE {} (timestamp TIMESTAMP, v DOUBLE)",
+                name
+            ));
+            db.exec_ok(&format!(
+                "INSERT INTO {} VALUES ({}, {}.0)",
+                name,
+                ts(0),
+                cycle
+            ));
             db.exec_ok(&format!("DROP TABLE {}", name));
         }
         let (_, rows) = db.query("SHOW TABLES");

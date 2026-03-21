@@ -1,8 +1,8 @@
 use std::sync::RwLock;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
@@ -64,7 +64,11 @@ impl Default for OAuthConfig {
             client_id: String::new(),
             client_secret: None,
             redirect_uri: String::new(),
-            scopes: vec!["openid".to_string(), "profile".to_string(), "email".to_string()],
+            scopes: vec![
+                "openid".to_string(),
+                "profile".to_string(),
+                "email".to_string(),
+            ],
             jwks_url: None,
             allowed_domains: Vec::new(),
             hmac_secret: None,
@@ -280,25 +284,28 @@ impl OAuthProvider {
         // Validate audience if configured.
         if !self.config.client_id.is_empty()
             && let Some(ref aud) = claims.aud
-                && aud != &self.config.client_id {
-                    return Err(OAuthError::InvalidAudience {
-                        expected: self.config.client_id.clone(),
-                        actual: aud.clone(),
-                    });
-                }
+            && aud != &self.config.client_id
+        {
+            return Err(OAuthError::InvalidAudience {
+                expected: self.config.client_id.clone(),
+                actual: aud.clone(),
+            });
+        }
 
         // Validate email domain restriction.
         if !self.config.allowed_domains.is_empty()
-            && let Some(ref email) = claims.email {
-                let domain = email
-                    .rsplit('@')
-                    .next()
-                    .unwrap_or("")
-                    .to_lowercase();
-                if !self.config.allowed_domains.iter().any(|d| d.to_lowercase() == domain) {
-                    return Err(OAuthError::DomainNotAllowed { domain });
-                }
+            && let Some(ref email) = claims.email
+        {
+            let domain = email.rsplit('@').next().unwrap_or("").to_lowercase();
+            if !self
+                .config
+                .allowed_domains
+                .iter()
+                .any(|d| d.to_lowercase() == domain)
+            {
+                return Err(OAuthError::DomainNotAllowed { domain });
             }
+        }
 
         Ok(claims)
     }
@@ -395,7 +402,9 @@ fn decode_jwt_segment(segment: &str) -> Result<String, OAuthError> {
                 3 => format!("{}=", segment),
                 _ => segment.to_string(),
             };
-            URL_SAFE_NO_PAD.decode(&padded).or_else(|_| STANDARD.decode(&padded))
+            URL_SAFE_NO_PAD
+                .decode(&padded)
+                .or_else(|_| STANDARD.decode(&padded))
         })
         .map_err(|e| OAuthError::Base64Error(e.to_string()))?;
 
@@ -443,7 +452,11 @@ mod tests {
             client_id: "test-client-id".to_string(),
             client_secret: Some("test-client-secret".to_string()),
             redirect_uri: "http://localhost:9000/auth/callback".to_string(),
-            scopes: vec!["openid".to_string(), "profile".to_string(), "email".to_string()],
+            scopes: vec![
+                "openid".to_string(),
+                "profile".to_string(),
+                "email".to_string(),
+            ],
             jwks_url: None,
             allowed_domains: vec!["example.com".to_string()],
             hmac_secret: Some("super-secret-key-for-testing".to_string()),

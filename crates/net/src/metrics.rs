@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Instant;
 
 use axum::extract::State;
@@ -186,7 +186,8 @@ impl Metrics {
 
         // Add to sum (store as nanoseconds for precision).
         let nanos = (duration_secs * 1_000_000_000.0) as u64;
-        self.query_duration_sum_ns.fetch_add(nanos, Ordering::Relaxed);
+        self.query_duration_sum_ns
+            .fetch_add(nanos, Ordering::Relaxed);
         self.query_duration_count.fetch_add(1, Ordering::Relaxed);
     }
 
@@ -336,12 +337,14 @@ impl Metrics {
 
     /// Add WAL segments shipped.
     pub fn add_wal_segments_shipped(&self, count: u64) {
-        self.wal_segments_shipped.fetch_add(count, Ordering::Relaxed);
+        self.wal_segments_shipped
+            .fetch_add(count, Ordering::Relaxed);
     }
 
     /// Add WAL segments applied.
     pub fn add_wal_segments_applied(&self, count: u64) {
-        self.wal_segments_applied.fetch_add(count, Ordering::Relaxed);
+        self.wal_segments_applied
+            .fetch_add(count, Ordering::Relaxed);
     }
 
     /// Render all metrics in Prometheus text exposition format.
@@ -356,43 +359,67 @@ impl Metrics {
 
         out.push_str("# HELP exchangedb_rows_written_total Total rows written.\n");
         out.push_str("# TYPE exchangedb_rows_written_total counter\n");
-        push_metric(&mut out, "exchangedb_rows_written_total",
-            self.rows_written_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_rows_written_total",
+            self.rows_written_total.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_rows_read_total Total rows read during queries.\n");
         out.push_str("# TYPE exchangedb_rows_read_total counter\n");
-        push_metric(&mut out, "exchangedb_rows_read_total",
-            self.rows_read_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_rows_read_total",
+            self.rows_read_total.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_bytes_written_total Total bytes written to storage.\n");
         out.push_str("# TYPE exchangedb_bytes_written_total counter\n");
-        push_metric(&mut out, "exchangedb_bytes_written_total",
-            self.bytes_written_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_bytes_written_total",
+            self.bytes_written_total.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_bytes_read_total Total bytes read from storage.\n");
         out.push_str("# TYPE exchangedb_bytes_read_total counter\n");
-        push_metric(&mut out, "exchangedb_bytes_read_total",
-            self.bytes_read_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_bytes_read_total",
+            self.bytes_read_total.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_wal_segments_total Total WAL segments created.\n");
         out.push_str("# TYPE exchangedb_wal_segments_total counter\n");
-        push_metric(&mut out, "exchangedb_wal_segments_total",
-            self.wal_segments_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_wal_segments_total",
+            self.wal_segments_total.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_wal_bytes_total Total bytes written to WAL.\n");
         out.push_str("# TYPE exchangedb_wal_bytes_total counter\n");
-        push_metric(&mut out, "exchangedb_wal_bytes_total",
-            self.wal_bytes_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_wal_bytes_total",
+            self.wal_bytes_total.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_partitions_total Total number of partitions.\n");
         out.push_str("# TYPE exchangedb_partitions_total gauge\n");
-        push_metric(&mut out, "exchangedb_partitions_total",
-            self.partitions_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_partitions_total",
+            self.partitions_total.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_disk_used_bytes Disk space used in bytes.\n");
         out.push_str("# TYPE exchangedb_disk_used_bytes gauge\n");
-        push_metric(&mut out, "exchangedb_disk_used_bytes",
-            self.disk_used_bytes.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_disk_used_bytes",
+            self.disk_used_bytes.load(Ordering::Relaxed) as f64,
+        );
 
         // =====================================================================
         // Query metrics
@@ -400,18 +427,22 @@ impl Metrics {
 
         out.push_str("# HELP exchangedb_queries_total Total number of queries executed.\n");
         out.push_str("# TYPE exchangedb_queries_total counter\n");
-        push_metric(&mut out, "exchangedb_queries_total",
-            self.queries_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_queries_total",
+            self.queries_total.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_queries_failed_total Total number of failed queries.\n");
         out.push_str("# TYPE exchangedb_queries_failed_total counter\n");
-        push_metric(&mut out, "exchangedb_queries_failed_total",
-            self.queries_failed_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_queries_failed_total",
+            self.queries_failed_total.load(Ordering::Relaxed) as f64,
+        );
 
         // --- Histogram: query_duration_seconds ---
-        out.push_str(
-            "# HELP exchangedb_query_duration_seconds Query execution time in seconds.\n",
-        );
+        out.push_str("# HELP exchangedb_query_duration_seconds Query execution time in seconds.\n");
         out.push_str("# TYPE exchangedb_query_duration_seconds histogram\n");
 
         let mut cumulative: u64 = 0;
@@ -437,23 +468,35 @@ impl Metrics {
 
         out.push_str("# HELP exchangedb_slow_queries_total Total slow queries logged.\n");
         out.push_str("# TYPE exchangedb_slow_queries_total counter\n");
-        push_metric(&mut out, "exchangedb_slow_queries_total",
-            self.slow_queries_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_slow_queries_total",
+            self.slow_queries_total.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_plan_cache_hits_total Plan cache hit count.\n");
         out.push_str("# TYPE exchangedb_plan_cache_hits_total counter\n");
-        push_metric(&mut out, "exchangedb_plan_cache_hits_total",
-            self.plan_cache_hits.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_plan_cache_hits_total",
+            self.plan_cache_hits.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_plan_cache_misses_total Plan cache miss count.\n");
         out.push_str("# TYPE exchangedb_plan_cache_misses_total counter\n");
-        push_metric(&mut out, "exchangedb_plan_cache_misses_total",
-            self.plan_cache_misses.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_plan_cache_misses_total",
+            self.plan_cache_misses.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_active_queries Number of currently active queries.\n");
         out.push_str("# TYPE exchangedb_active_queries gauge\n");
-        push_metric(&mut out, "exchangedb_active_queries",
-            self.active_queries.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_active_queries",
+            self.active_queries.load(Ordering::Relaxed) as f64,
+        );
 
         // =====================================================================
         // Connection metrics
@@ -461,28 +504,43 @@ impl Metrics {
 
         out.push_str("# HELP exchangedb_connections_total Total connections accepted.\n");
         out.push_str("# TYPE exchangedb_connections_total counter\n");
-        push_metric(&mut out, "exchangedb_connections_total",
-            self.connections_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_connections_total",
+            self.connections_total.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_connections_active Currently active connections.\n");
         out.push_str("# TYPE exchangedb_connections_active gauge\n");
-        push_metric(&mut out, "exchangedb_connections_active",
-            self.connections_active.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_connections_active",
+            self.connections_active.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_connections_pg Active PostgreSQL wire connections.\n");
         out.push_str("# TYPE exchangedb_connections_pg gauge\n");
-        push_metric(&mut out, "exchangedb_connections_pg",
-            self.connections_pg.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_connections_pg",
+            self.connections_pg.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_connections_http Active HTTP connections.\n");
         out.push_str("# TYPE exchangedb_connections_http gauge\n");
-        push_metric(&mut out, "exchangedb_connections_http",
-            self.connections_http.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_connections_http",
+            self.connections_http.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_connections_ilp Active ILP connections.\n");
         out.push_str("# TYPE exchangedb_connections_ilp gauge\n");
-        push_metric(&mut out, "exchangedb_connections_ilp",
-            self.connections_ilp.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_connections_ilp",
+            self.connections_ilp.load(Ordering::Relaxed) as f64,
+        );
 
         // =====================================================================
         // Replication metrics
@@ -490,23 +548,39 @@ impl Metrics {
 
         out.push_str("# HELP exchangedb_replication_lag_bytes Replication lag in bytes.\n");
         out.push_str("# TYPE exchangedb_replication_lag_bytes gauge\n");
-        push_metric(&mut out, "exchangedb_replication_lag_bytes",
-            self.replication_lag_bytes.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_replication_lag_bytes",
+            self.replication_lag_bytes.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_replication_lag_seconds Replication lag in seconds.\n");
         out.push_str("# TYPE exchangedb_replication_lag_seconds gauge\n");
-        push_metric(&mut out, "exchangedb_replication_lag_seconds",
-            self.replication_lag_seconds.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_replication_lag_seconds",
+            self.replication_lag_seconds.load(Ordering::Relaxed) as f64,
+        );
 
-        out.push_str("# HELP exchangedb_wal_segments_shipped_total WAL segments shipped to replicas.\n");
+        out.push_str(
+            "# HELP exchangedb_wal_segments_shipped_total WAL segments shipped to replicas.\n",
+        );
         out.push_str("# TYPE exchangedb_wal_segments_shipped_total counter\n");
-        push_metric(&mut out, "exchangedb_wal_segments_shipped_total",
-            self.wal_segments_shipped.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_wal_segments_shipped_total",
+            self.wal_segments_shipped.load(Ordering::Relaxed) as f64,
+        );
 
-        out.push_str("# HELP exchangedb_wal_segments_applied_total WAL segments applied from primary.\n");
+        out.push_str(
+            "# HELP exchangedb_wal_segments_applied_total WAL segments applied from primary.\n",
+        );
         out.push_str("# TYPE exchangedb_wal_segments_applied_total counter\n");
-        push_metric(&mut out, "exchangedb_wal_segments_applied_total",
-            self.wal_segments_applied.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_wal_segments_applied_total",
+            self.wal_segments_applied.load(Ordering::Relaxed) as f64,
+        );
 
         // =====================================================================
         // Resource metrics
@@ -514,18 +588,27 @@ impl Metrics {
 
         out.push_str("# HELP exchangedb_memory_used_bytes Current memory usage in bytes.\n");
         out.push_str("# TYPE exchangedb_memory_used_bytes gauge\n");
-        push_metric(&mut out, "exchangedb_memory_used_bytes",
-            self.memory_used_bytes.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_memory_used_bytes",
+            self.memory_used_bytes.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_memory_limit_bytes Configured memory limit in bytes.\n");
         out.push_str("# TYPE exchangedb_memory_limit_bytes gauge\n");
-        push_metric(&mut out, "exchangedb_memory_limit_bytes",
-            self.memory_limit_bytes.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_memory_limit_bytes",
+            self.memory_limit_bytes.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_open_files Number of open file descriptors.\n");
         out.push_str("# TYPE exchangedb_open_files gauge\n");
-        push_metric(&mut out, "exchangedb_open_files",
-            self.open_files.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_open_files",
+            self.open_files.load(Ordering::Relaxed) as f64,
+        );
 
         // =====================================================================
         // System info gauges
@@ -538,7 +621,11 @@ impl Metrics {
         out.push_str("# HELP exchangedb_cpu_usage_percent CPU usage percentage (0-100).\n");
         out.push_str("# TYPE exchangedb_cpu_usage_percent gauge\n");
         let cpu_hundredths = self.cpu_usage_percent.load(Ordering::Relaxed);
-        push_metric(&mut out, "exchangedb_cpu_usage_percent", cpu_hundredths as f64 / 100.0);
+        push_metric(
+            &mut out,
+            "exchangedb_cpu_usage_percent",
+            cpu_hundredths as f64 / 100.0,
+        );
 
         // =====================================================================
         // Legacy metrics (kept for backward compatibility)
@@ -546,18 +633,27 @@ impl Metrics {
 
         out.push_str("# HELP exchangedb_tables_count Number of tables.\n");
         out.push_str("# TYPE exchangedb_tables_count gauge\n");
-        push_metric(&mut out, "exchangedb_tables_count",
-            self.tables_count.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_tables_count",
+            self.tables_count.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_active_connections Active HTTP connections (legacy).\n");
         out.push_str("# TYPE exchangedb_active_connections gauge\n");
-        push_metric(&mut out, "exchangedb_active_connections",
-            self.active_connections.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_active_connections",
+            self.active_connections.load(Ordering::Relaxed) as f64,
+        );
 
         out.push_str("# HELP exchangedb_ilp_lines_received_total Total ILP lines ingested.\n");
         out.push_str("# TYPE exchangedb_ilp_lines_received_total counter\n");
-        push_metric(&mut out, "exchangedb_ilp_lines_received_total",
-            self.ilp_lines_received_total.load(Ordering::Relaxed) as f64);
+        push_metric(
+            &mut out,
+            "exchangedb_ilp_lines_received_total",
+            self.ilp_lines_received_total.load(Ordering::Relaxed) as f64,
+        );
 
         out
     }
@@ -729,17 +825,11 @@ mod tests {
         assert!(output.contains("exchangedb_query_duration_seconds_count 2\n"));
         assert!(output.contains("exchangedb_query_duration_seconds_sum"));
         // The +Inf bucket must equal count.
-        assert!(output.contains(
-            "exchangedb_query_duration_seconds_bucket{le=\"+Inf\"} 2\n"
-        ));
+        assert!(output.contains("exchangedb_query_duration_seconds_bucket{le=\"+Inf\"} 2\n"));
         // The 0.0005 bucket should have 0 (0.003 > 0.0005).
-        assert!(output.contains(
-            "exchangedb_query_duration_seconds_bucket{le=\"0.0005\"} 0\n"
-        ));
+        assert!(output.contains("exchangedb_query_duration_seconds_bucket{le=\"0.0005\"} 0\n"));
         // The 0.005 bucket should have 1 (0.003 <= 0.005).
-        assert!(output.contains(
-            "exchangedb_query_duration_seconds_bucket{le=\"0.005\"} 1\n"
-        ));
+        assert!(output.contains("exchangedb_query_duration_seconds_bucket{le=\"0.005\"} 1\n"));
     }
 
     #[test]

@@ -43,10 +43,23 @@ pub fn asof_join(
     right_output_cols: &[usize],
 ) -> Vec<Vec<Value>> {
     if on_cols.is_empty() {
-        return merge_asof_no_key(left_rows, right_rows, left_ts_col, right_ts_col, right_output_cols);
+        return merge_asof_no_key(
+            left_rows,
+            right_rows,
+            left_ts_col,
+            right_ts_col,
+            right_output_cols,
+        );
     }
 
-    merge_asof_partitioned(left_rows, right_rows, left_ts_col, right_ts_col, on_cols, right_output_cols)
+    merge_asof_partitioned(
+        left_rows,
+        right_rows,
+        left_ts_col,
+        right_ts_col,
+        on_cols,
+        right_output_cols,
+    )
 }
 
 /// Simple two-pointer merge when there are no ON columns.
@@ -112,7 +125,10 @@ fn merge_asof_partitioned(
     let left_col_indices: Vec<usize> = on_cols.iter().map(|(li, _)| *li).collect();
 
     // Pre-extract right timestamps for binary search.
-    let right_ts: Vec<i64> = right_rows.iter().map(|r| ts_value(&r[right_ts_col])).collect();
+    let right_ts: Vec<i64> = right_rows
+        .iter()
+        .map(|r| ts_value(&r[right_ts_col]))
+        .collect();
 
     // Group right row indices by their key columns.
     let mut right_partitions: HashMap<Vec<ValueKey>, Vec<usize>> = HashMap::new();
@@ -282,10 +298,7 @@ mod tests {
     /// ASOF JOIN without on_cols (pure temporal join).
     #[test]
     fn asof_join_no_on_cols() {
-        let left = vec![
-            vec![ts(100), f(1.0)],
-            vec![ts(200), f(2.0)],
-        ];
+        let left = vec![vec![ts(100), f(1.0)], vec![ts(200), f(2.0)]];
         let right = vec![
             vec![ts(50), f(10.0)],
             vec![ts(150), f(20.0)],
@@ -343,7 +356,12 @@ mod tests {
         let mut right = Vec::new();
         for i in 0..5000 {
             let sym = format!("SYM{}", i % 10);
-            right.push(vec![ts(i * 20), s(&sym), f(i as f64 * 0.1), f(i as f64 * 0.2)]);
+            right.push(vec![
+                ts(i * 20),
+                s(&sym),
+                f(i as f64 * 0.1),
+                f(i as f64 * 0.2),
+            ]);
         }
 
         let result = asof_join(&left, &right, 0, 0, &[(1, 1)], &[2, 3]);

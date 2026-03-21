@@ -39,7 +39,11 @@ impl HeapRow {
             let va = &self.values[col_idx];
             let vb = &other.values[col_idx];
             let cmp = va.cmp_coerce(vb).unwrap_or(Ordering::Equal);
-            let cmp = if self.spec.descending[i] { cmp.reverse() } else { cmp };
+            let cmp = if self.spec.descending[i] {
+                cmp.reverse()
+            } else {
+                cmp
+            };
             if cmp != Ordering::Equal {
                 return cmp;
             }
@@ -227,7 +231,10 @@ mod tests {
 
         assert_eq!(all_values.len(), 10);
         // Top 10 descending: 9999, 9998, ..., 9990
-        assert_eq!(all_values, vec![9999, 9998, 9997, 9996, 9995, 9994, 9993, 9992, 9991, 9990]);
+        assert_eq!(
+            all_values,
+            vec![9999, 9998, 9997, 9996, 9995, 9994, 9993, 9992, 9991, 9990]
+        );
     }
 
     #[test]
@@ -258,7 +265,11 @@ mod tests {
     #[test]
     fn top_k_larger_than_input() {
         let schema = vec![("val".to_string(), ColumnType::I64)];
-        let rows = vec![vec![Value::I64(3)], vec![Value::I64(1)], vec![Value::I64(2)]];
+        let rows = vec![
+            vec![Value::I64(3)],
+            vec![Value::I64(1)],
+            vec![Value::I64(2)],
+        ];
         let source = MemoryCursor::from_rows(schema, &rows);
 
         let order_by = vec![OrderBy {

@@ -4,8 +4,8 @@
 //! WAL, recovery, and column store remain consistent and resilient.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -17,7 +17,7 @@ use exchange_core::txn::TxnFile;
 use exchange_core::wal::event::WalEvent;
 use exchange_core::wal::reader::WalReader;
 use exchange_core::wal::row_codec::OwnedColumnValue;
-use exchange_core::wal::segment::{segment_path, WalSegment};
+use exchange_core::wal::segment::{WalSegment, segment_path};
 use exchange_core::wal::writer::{CommitMode, WalWriter, WalWriterConfig};
 use exchange_core::wal_writer::{WalTableWriter, WalTableWriterConfig};
 use tempfile::tempdir;
@@ -174,8 +174,7 @@ fn crash_mid_partition_write() {
 
     // Verify all columns are consistent.
     let part_dir = db_root.join("test").join("2024-03-15");
-    let price_reader =
-        FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
+    let price_reader = FixedColumnReader::open(&part_dir.join("price.d"), ColumnType::F64).unwrap();
     let volume_reader =
         FixedColumnReader::open(&part_dir.join("volume.d"), ColumnType::I64).unwrap();
     assert_eq!(price_reader.row_count(), volume_reader.row_count());
@@ -225,7 +224,10 @@ fn corrupt_wal_segment_detected() {
         }
     }
     // At least some events should be recovered, and corruption detected.
-    assert!(valid_count >= 1, "should recover some events before corruption");
+    assert!(
+        valid_count >= 1,
+        "should recover some events before corruption"
+    );
     assert!(error_count >= 1, "should detect corruption");
 }
 
@@ -877,8 +879,7 @@ fn concurrent_writers_different_tables() {
             let table_name = table_name.to_string();
             thread::spawn(move || {
                 let config = WalTableWriterConfig::default();
-                let mut writer =
-                    WalTableWriter::open(&db_root, &table_name, config).unwrap();
+                let mut writer = WalTableWriter::open(&db_root, &table_name, config).unwrap();
                 let mut count = 0u64;
                 while !stop.load(Ordering::Relaxed) && count < 200 {
                     let ts = Timestamp(TS_BASE + count as i64 * 1_000_000_000);

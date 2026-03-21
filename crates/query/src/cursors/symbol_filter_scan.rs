@@ -40,19 +40,24 @@ impl RecordCursor for SymbolFilterScanCursor {
                 Some(b) => {
                     for r in 0..b.row_count() {
                         if let Value::I64(id) = b.get_value(r, self.symbol_col)
-                            && self.allowed.contains(&id) {
-                                let row: Vec<Value> =
-                                    (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
-                                result.append_row(&row);
-                                if result.row_count() >= max_rows {
-                                    break;
-                                }
+                            && self.allowed.contains(&id)
+                        {
+                            let row: Vec<Value> =
+                                (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
+                            result.append_row(&row);
+                            if result.row_count() >= max_rows {
+                                break;
                             }
+                        }
                     }
                 }
             }
         }
-        if result.row_count() == 0 { Ok(None) } else { Ok(Some(result)) }
+        if result.row_count() == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(result))
+        }
     }
 }
 

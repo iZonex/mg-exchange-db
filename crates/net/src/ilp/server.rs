@@ -21,7 +21,7 @@ use exchange_core::wal::row_codec::OwnedColumnValue;
 use exchange_core::wal_writer::{WalTableWriter, WalTableWriterConfig};
 
 use super::auth::{IlpAuthConfig, IlpAuthenticator};
-use super::parser::{parse_ilp_line, IlpLine, IlpValue};
+use super::parser::{IlpLine, IlpValue, parse_ilp_line};
 
 use std::collections::HashMap;
 
@@ -146,10 +146,8 @@ async fn handle_connection(
             Ok(parsed) => {
                 batch.push(parsed);
                 if batch.len() >= config.batch_size {
-                    let to_flush = std::mem::replace(
-                        &mut batch,
-                        Vec::with_capacity(config.batch_size),
-                    );
+                    let to_flush =
+                        std::mem::replace(&mut batch, Vec::with_capacity(config.batch_size));
                     let db_root = config.db_root.clone();
                     let wm = config.write_mode;
                     tokio::task::spawn_blocking(move || flush_batch(&db_root, to_flush, wm))
@@ -176,7 +174,11 @@ async fn handle_connection(
 }
 
 /// Write a batch of parsed ILP lines to disk (public for UDP server).
-pub fn flush_batch_public(db_root: &Path, lines: Vec<IlpLine>, write_mode: WriteMode) -> io::Result<()> {
+pub fn flush_batch_public(
+    db_root: &Path,
+    lines: Vec<IlpLine>,
+    write_mode: WriteMode,
+) -> io::Result<()> {
     flush_batch(db_root, lines, write_mode)
 }
 
@@ -206,9 +208,8 @@ fn flush_batch(db_root: &Path, lines: Vec<IlpLine>, write_mode: WriteMode) -> io
         // Auto-create the table if it does not exist.
         if !meta_path.exists() {
             let first = table_lines[0];
-            auto_create_table(db_root, table_name, first).map_err(|e| {
-                io::Error::other(format!("auto-create table: {e}"))
-            })?;
+            auto_create_table(db_root, table_name, first)
+                .map_err(|e| io::Error::other(format!("auto-create table: {e}")))?;
         }
 
         match write_mode {
@@ -237,9 +238,8 @@ fn flush_table_wal(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]) -
     let table_dir = db_root.join(table_name);
 
     // Load metadata to determine partition scheme.
-    let meta = TableMeta::load(&table_dir.join("_meta")).map_err(|e| {
-        io::Error::other(format!("load meta: {e}"))
-    })?;
+    let meta = TableMeta::load(&table_dir.join("_meta"))
+        .map_err(|e| io::Error::other(format!("load meta: {e}")))?;
     let partition_by: PartitionBy = meta.partition_by.into();
 
     // Group lines by partition.
@@ -261,9 +261,8 @@ fn flush_table_wal(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]) -
             ..WalTableWriterConfig::default()
         };
 
-        let mut writer = WalTableWriter::open(db_root, table_name, config).map_err(|e| {
-            io::Error::other(format!("open WAL writer: {e}"))
-        })?;
+        let mut writer = WalTableWriter::open(db_root, table_name, config)
+            .map_err(|e| io::Error::other(format!("open WAL writer: {e}")))?;
 
         for line in part_lines {
             let ts = line.timestamp.unwrap_or_else(Timestamp::now);
@@ -286,14 +285,14 @@ fn flush_table_wal(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]) -
                 })
                 .collect();
 
-            writer.write_row(ts, owned_values).map_err(|e| {
-                io::Error::other(format!("WAL write row: {e}"))
-            })?;
+            writer
+                .write_row(ts, owned_values)
+                .map_err(|e| io::Error::other(format!("WAL write row: {e}")))?;
         }
 
-        writer.commit().map_err(|e| {
-            io::Error::other(format!("WAL commit: {e}"))
-        })?;
+        writer
+            .commit()
+            .map_err(|e| io::Error::other(format!("WAL commit: {e}")))?;
     }
 
     Ok(())
@@ -304,12 +303,15 @@ fn flush_table_wal(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]) -
 /// Uses per-partition locking so that concurrent ILP writers writing to
 /// DIFFERENT time partitions can proceed in parallel. Writers to the SAME
 /// partition are serialized.
-fn flush_table_direct(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]) -> io::Result<()> {
+fn flush_table_direct(
+    db_root: &Path,
+    table_name: &str,
+    table_lines: &[&IlpLine],
+) -> io::Result<()> {
     let table_dir = db_root.join(table_name);
 
-    let meta = TableMeta::load(&table_dir.join("_meta")).map_err(|e| {
-        io::Error::other(format!("load meta: {e}"))
-    })?;
+    let meta = TableMeta::load(&table_dir.join("_meta"))
+        .map_err(|e| io::Error::other(format!("load meta: {e}")))?;
     let partition_by: PartitionBy = meta.partition_by.into();
 
     // Group lines by partition.
@@ -325,9 +327,8 @@ fn flush_table_direct(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]
     for (part_name, part_lines) in &by_partition {
         let _lock = partition_mgr.lock_partition(part_name);
 
-        let mut writer = TableWriter::open(db_root, table_name).map_err(|e| {
-            io::Error::other(format!("open writer: {e}"))
-        })?;
+        let mut writer = TableWriter::open(db_root, table_name)
+            .map_err(|e| io::Error::other(format!("open writer: {e}")))?;
 
         for line in part_lines {
             let ts = line.timestamp.unwrap_or_else(Timestamp::now);
@@ -348,14 +349,14 @@ fn flush_table_direct(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]
                 })
                 .collect();
 
-            writer.write_row(ts, &col_values).map_err(|e| {
-                io::Error::other(format!("write row: {e}"))
-            })?;
+            writer
+                .write_row(ts, &col_values)
+                .map_err(|e| io::Error::other(format!("write row: {e}")))?;
         }
 
-        writer.flush().map_err(|e| {
-            io::Error::other(format!("flush: {e}"))
-        })?;
+        writer
+            .flush()
+            .map_err(|e| io::Error::other(format!("flush: {e}")))?;
     }
 
     Ok(())

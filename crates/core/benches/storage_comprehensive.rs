@@ -4,9 +4,7 @@
 //! partition pruning, bitmap index lookup vs full scan, LZ4 compression,
 //! symbol map at scale, and concurrent read+write.
 
-use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::column::{FixedColumnReader, FixedColumnWriter};
 use exchange_core::compression;
@@ -17,7 +15,7 @@ use exchange_core::table::{ColumnValue, TableBuilder, TableMeta, TableWriter};
 use exchange_core::wal::row_codec::OwnedColumnValue;
 use exchange_core::wal_writer::{WalTableWriter, WalTableWriterConfig};
 use std::path::Path;
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
 const HUNDRED_K: u64 = 100_000;
 const MILLION: u64 = 1_000_000;
@@ -106,49 +104,39 @@ fn bench_table_writer(c: &mut Criterion) {
 
     for num_rows in [HUNDRED_K, 500_000, MILLION] {
         group.throughput(Throughput::Elements(num_rows));
-        group.bench_with_input(
-            BenchmarkId::new("rows", num_rows),
-            &num_rows,
-            |b, &rows| {
-                b.iter_with_setup(
-                    || {
-                        let dir = TempDir::new().unwrap();
-                        let _meta = create_empty_trades(dir.path());
-                        dir
-                    },
-                    |dir| {
-                        let mut writer =
-                            TableWriter::open(dir.path(), "trades").unwrap();
-                        let base_ts: i64 = 1_704_067_200_000_000_000;
-                        let mut price = 50_000.0_f64;
+        group.bench_with_input(BenchmarkId::new("rows", num_rows), &num_rows, |b, &rows| {
+            b.iter_with_setup(
+                || {
+                    let dir = TempDir::new().unwrap();
+                    let _meta = create_empty_trades(dir.path());
+                    dir
+                },
+                |dir| {
+                    let mut writer = TableWriter::open(dir.path(), "trades").unwrap();
+                    let base_ts: i64 = 1_704_067_200_000_000_000;
+                    let mut price = 50_000.0_f64;
 
-                        for i in 0..rows {
-                            let ts = Timestamp(base_ts + i as i64 * 1_000_000);
-                            let delta = ((i.wrapping_mul(7).wrapping_add(3)) % 11)
-                                as f64
-                                * 0.5
-                                - 2.5;
-                            price += delta;
+                    for i in 0..rows {
+                        let ts = Timestamp(base_ts + i as i64 * 1_000_000);
+                        let delta = ((i.wrapping_mul(7).wrapping_add(3)) % 11) as f64 * 0.5 - 2.5;
+                        price += delta;
 
-                            writer
-                                .write_row(
-                                    ts,
-                                    &[
-                                        ColumnValue::I32((i % 1000) as i32),
-                                        ColumnValue::F64(black_box(price)),
-                                        ColumnValue::F64(black_box(
-                                            0.01 + (i % 10_000) as f64 * 0.01,
-                                        )),
-                                        ColumnValue::I32((i % 2) as i32),
-                                    ],
-                                )
-                                .unwrap();
-                        }
-                        writer.flush().unwrap();
-                    },
-                );
-            },
-        );
+                        writer
+                            .write_row(
+                                ts,
+                                &[
+                                    ColumnValue::I32((i % 1000) as i32),
+                                    ColumnValue::F64(black_box(price)),
+                                    ColumnValue::F64(black_box(0.01 + (i % 10_000) as f64 * 0.01)),
+                                    ColumnValue::I32((i % 2) as i32),
+                                ],
+                            )
+                            .unwrap();
+                    }
+                    writer.flush().unwrap();
+                },
+            );
+        });
     }
 
     group.finish();
@@ -214,8 +202,7 @@ fn bench_wal_write(c: &mut Criterion) {
 
                 // Initialize _txn file.
                 let table_dir = dir.path().join("wal_bench");
-                let _txn =
-                    exchange_core::txn::TxnFile::open(&table_dir).unwrap();
+                let _txn = exchange_core::txn::TxnFile::open(&table_dir).unwrap();
 
                 dir
             },
@@ -224,8 +211,7 @@ fn bench_wal_write(c: &mut Criterion) {
                     buffer_capacity: 10_000,
                     ..Default::default()
                 };
-                let mut writer =
-                    WalTableWriter::open(dir.path(), "wal_bench", config).unwrap();
+                let mut writer = WalTableWriter::open(dir.path(), "wal_bench", config).unwrap();
 
                 let base_ts: i64 = 1_704_067_200_000_000_000;
                 for i in 0..HUNDRED_K as i64 {
@@ -280,8 +266,7 @@ fn bench_partition_pruning(c: &mut Criterion) {
         b.iter(|| {
             let mut total = 0.0_f64;
             for part in &partitions {
-                if let Ok(reader) =
-                    FixedColumnReader::open(&part.join("price.d"), ColumnType::F64)
+                if let Ok(reader) = FixedColumnReader::open(&part.join("price.d"), ColumnType::F64)
                 {
                     for i in 0..reader.row_count() {
                         total += reader.read_f64(black_box(i));
@@ -294,9 +279,7 @@ fn bench_partition_pruning(c: &mut Criterion) {
 
     // Pruned: only first partition.
     if let Some(first_part) = partitions.first() {
-        let reader =
-            FixedColumnReader::open(&first_part.join("price.d"), ColumnType::F64)
-                .unwrap();
+        let reader = FixedColumnReader::open(&first_part.join("price.d"), ColumnType::F64).unwrap();
         let part_rows = reader.row_count();
         group.throughput(Throughput::Elements(part_rows));
 
@@ -325,8 +308,7 @@ fn bench_index_lookup(c: &mut Criterion) {
 
     // Build bitmap index.
     {
-        let mut idx =
-            BitmapIndexWriter::open_default(dir.path(), "symbol_idx").unwrap();
+        let mut idx = BitmapIndexWriter::open_default(dir.path(), "symbol_idx").unwrap();
         for row_id in 0..num_rows {
             let key = (row_id % num_keys as u64) as i32;
             idx.add(key, row_id).unwrap();
@@ -345,11 +327,8 @@ fn bench_index_lookup(c: &mut Criterion) {
     }
 
     let reader = BitmapIndexReader::open(dir.path(), "symbol_idx").unwrap();
-    let col_reader = FixedColumnReader::open(
-        &dir.path().join("symbol.d"),
-        ColumnType::I32,
-    )
-    .unwrap();
+    let col_reader =
+        FixedColumnReader::open(&dir.path().join("symbol.d"), ColumnType::I32).unwrap();
 
     let mut group = c.benchmark_group("index_vs_full_scan");
     group.sample_size(20);
@@ -395,9 +374,7 @@ fn bench_compression(c: &mut Criterion) {
             let mut price = 50_000.0_f64;
             (0..MILLION)
                 .flat_map(|i| {
-                    let delta = ((i.wrapping_mul(7).wrapping_add(3)) % 11) as f64
-                        * 0.5
-                        - 2.5;
+                    let delta = ((i.wrapping_mul(7).wrapping_add(3)) % 11) as f64 * 0.5 - 2.5;
                     price += delta;
                     price.to_le_bytes()
                 })
@@ -421,17 +398,14 @@ fn bench_compression(c: &mut Criterion) {
         group.bench_function("decompress_1M_f64", |b| {
             b.iter(|| {
                 let decompressed =
-                    lz4_flex::decompress_size_prepended(black_box(&compressed))
-                        .unwrap();
+                    lz4_flex::decompress_size_prepended(black_box(&compressed)).unwrap();
                 black_box(decompressed.len());
             });
         });
 
         // Report ratio via a trivial benchmark that just computes it.
         let ratio = compressed_len as f64 / data_len as f64;
-        eprintln!(
-            "[lz4] f64 price data: {data_len} -> {compressed_len} bytes, ratio = {ratio:.3}"
-        );
+        eprintln!("[lz4] f64 price data: {data_len} -> {compressed_len} bytes, ratio = {ratio:.3}");
     }
 
     // -- i64 timestamp data (very compressible due to constant stride) ------
@@ -456,9 +430,7 @@ fn bench_compression(c: &mut Criterion) {
         let compressed = lz4_flex::compress_prepend_size(&ts_data);
         let compressed_len = compressed.len();
         let ratio = compressed_len as f64 / data_len as f64;
-        eprintln!(
-            "[lz4] timestamp data: {data_len} -> {compressed_len} bytes, ratio = {ratio:.3}"
-        );
+        eprintln!("[lz4] timestamp data: {data_len} -> {compressed_len} bytes, ratio = {ratio:.3}");
     }
 
     group.finish();
@@ -475,8 +447,7 @@ fn bench_symbol_map_scale(c: &mut Criterion) {
     for num_symbols in [10_000u64, 100_000] {
         let dir = tempdir().unwrap();
         let mut sm = SymbolMap::open(dir.path(), "scale_sym").unwrap();
-        let symbols: Vec<String> =
-            (0..num_symbols).map(|i| format!("SYM_{:06}", i)).collect();
+        let symbols: Vec<String> = (0..num_symbols).map(|i| format!("SYM_{:06}", i)).collect();
         for s in &symbols {
             sm.add(s).unwrap();
         }
@@ -525,10 +496,9 @@ fn bench_concurrent_rw(c: &mut Criterion) {
                 let reader_handle = std::thread::spawn(move || {
                     let mut read_sum = 0.0_f64;
                     for _ in 0..10 {
-                        if let Ok(reader) = FixedColumnReader::open(
-                            &reader_dir.join("price.d"),
-                            ColumnType::F64,
-                        ) {
+                        if let Ok(reader) =
+                            FixedColumnReader::open(&reader_dir.join("price.d"), ColumnType::F64)
+                        {
                             for i in 0..reader.row_count() {
                                 read_sum += reader.read_f64(i);
                             }
@@ -538,10 +508,8 @@ fn bench_concurrent_rw(c: &mut Criterion) {
                 });
 
                 // Writer: insert more rows into the table.
-                let mut writer =
-                    TableWriter::open(dir.path(), "trades").unwrap();
-                let base_ts: i64 =
-                    1_704_067_200_000_000_000 + HUNDRED_K as i64 * 1_000_000;
+                let mut writer = TableWriter::open(dir.path(), "trades").unwrap();
+                let base_ts: i64 = 1_704_067_200_000_000_000 + HUNDRED_K as i64 * 1_000_000;
                 let mut price = 50_000.0_f64;
 
                 for i in 0..HUNDRED_K {
@@ -580,7 +548,9 @@ fn bench_delta_encoding(c: &mut Criterion) {
 
     let timestamps: Vec<i64> = {
         let base: i64 = 1_704_067_200_000_000_000;
-        (0..MILLION as i64).map(|i| base + i * 1_000_000_000).collect()
+        (0..MILLION as i64)
+            .map(|i| base + i * 1_000_000_000)
+            .collect()
     };
 
     group.bench_function("encode_1M_timestamps", |b| {
@@ -594,8 +564,7 @@ fn bench_delta_encoding(c: &mut Criterion) {
 
     group.bench_function("decode_1M_timestamps", |b| {
         b.iter(|| {
-            let decoded =
-                compression::delta_decode_i64_nonempty(black_box(&encoded));
+            let decoded = compression::delta_decode_i64_nonempty(black_box(&encoded));
             black_box(decoded);
         });
     });
@@ -634,10 +603,7 @@ fn bench_simd_vs_scalar(c: &mut Criterion) {
 
     group.bench_function("scalar_min_f64", |b| {
         b.iter(|| {
-            let min = data
-                .iter()
-                .copied()
-                .fold(f64::INFINITY, f64::min);
+            let min = data.iter().copied().fold(f64::INFINITY, f64::min);
             black_box(min);
         });
     });
@@ -650,10 +616,7 @@ fn bench_simd_vs_scalar(c: &mut Criterion) {
 
     group.bench_function("scalar_max_f64", |b| {
         b.iter(|| {
-            let max = data
-                .iter()
-                .copied()
-                .fold(f64::NEG_INFINITY, f64::max);
+            let max = data.iter().copied().fold(f64::NEG_INFINITY, f64::max);
             black_box(max);
         });
     });
@@ -671,89 +634,70 @@ fn bench_batch_write(c: &mut Criterion) {
 
     for num_rows in [HUNDRED_K, 500_000, MILLION] {
         group.throughput(Throughput::Elements(num_rows));
-        group.bench_with_input(
-            BenchmarkId::new("rows", num_rows),
-            &num_rows,
-            |b, &rows| {
-                b.iter_with_setup(
-                    || {
-                        let dir = TempDir::new().unwrap();
-                        let _meta = create_empty_trades(dir.path());
+        group.bench_with_input(BenchmarkId::new("rows", num_rows), &num_rows, |b, &rows| {
+            b.iter_with_setup(
+                || {
+                    let dir = TempDir::new().unwrap();
+                    let _meta = create_empty_trades(dir.path());
 
-                        // Pre-build columnar data
-                        let n = rows as usize;
-                        let base_ts: i64 = 1_704_067_200_000_000_000;
+                    // Pre-build columnar data
+                    let n = rows as usize;
+                    let base_ts: i64 = 1_704_067_200_000_000_000;
 
-                        let timestamps: Vec<i64> =
-                            (0..n).map(|i| base_ts + i as i64 * 1_000_000).collect();
+                    let timestamps: Vec<i64> =
+                        (0..n).map(|i| base_ts + i as i64 * 1_000_000).collect();
 
-                        let symbols: Vec<i32> =
-                            (0..n).map(|i| (i % 1000) as i32).collect();
+                    let symbols: Vec<i32> = (0..n).map(|i| (i % 1000) as i32).collect();
 
-                        let mut price = 50_000.0_f64;
-                        let prices: Vec<f64> = (0..n)
-                            .map(|i| {
-                                let delta =
-                                    ((i.wrapping_mul(7).wrapping_add(3)) % 11) as f64 * 0.5 - 2.5;
-                                price += delta;
-                                price
-                            })
-                            .collect();
+                    let mut price = 50_000.0_f64;
+                    let prices: Vec<f64> = (0..n)
+                        .map(|i| {
+                            let delta =
+                                ((i.wrapping_mul(7).wrapping_add(3)) % 11) as f64 * 0.5 - 2.5;
+                            price += delta;
+                            price
+                        })
+                        .collect();
 
-                        let volumes: Vec<f64> =
-                            (0..n).map(|i| 0.01 + (i % 10_000) as f64 * 0.01).collect();
+                    let volumes: Vec<f64> =
+                        (0..n).map(|i| 0.01 + (i % 10_000) as f64 * 0.01).collect();
 
-                        let sides: Vec<i32> =
-                            (0..n).map(|i| (i % 2) as i32).collect();
+                    let sides: Vec<i32> = (0..n).map(|i| (i % 2) as i32).collect();
 
-                        (dir, timestamps, symbols, prices, volumes, sides)
-                    },
-                    |(dir, timestamps, symbols, prices, volumes, sides)| {
-                        let mut writer =
-                            TableWriter::open(dir.path(), "trades").unwrap();
+                    (dir, timestamps, symbols, prices, volumes, sides)
+                },
+                |(dir, timestamps, symbols, prices, volumes, sides)| {
+                    let mut writer = TableWriter::open(dir.path(), "trades").unwrap();
 
-                        let sym_bytes = unsafe {
-                            std::slice::from_raw_parts(
-                                symbols.as_ptr() as *const u8,
-                                symbols.len() * 4,
-                            )
-                        };
-                        let price_bytes = unsafe {
-                            std::slice::from_raw_parts(
-                                prices.as_ptr() as *const u8,
-                                prices.len() * 8,
-                            )
-                        };
-                        let vol_bytes = unsafe {
-                            std::slice::from_raw_parts(
-                                volumes.as_ptr() as *const u8,
-                                volumes.len() * 8,
-                            )
-                        };
-                        let side_bytes = unsafe {
-                            std::slice::from_raw_parts(
-                                sides.as_ptr() as *const u8,
-                                sides.len() * 4,
-                            )
-                        };
+                    let sym_bytes = unsafe {
+                        std::slice::from_raw_parts(symbols.as_ptr() as *const u8, symbols.len() * 4)
+                    };
+                    let price_bytes = unsafe {
+                        std::slice::from_raw_parts(prices.as_ptr() as *const u8, prices.len() * 8)
+                    };
+                    let vol_bytes = unsafe {
+                        std::slice::from_raw_parts(volumes.as_ptr() as *const u8, volumes.len() * 8)
+                    };
+                    let side_bytes = unsafe {
+                        std::slice::from_raw_parts(sides.as_ptr() as *const u8, sides.len() * 4)
+                    };
 
-                        let written = writer
-                            .write_batch(
-                                black_box(&timestamps),
-                                &[
-                                    ("symbol", sym_bytes),
-                                    ("price", price_bytes),
-                                    ("volume", vol_bytes),
-                                    ("side", side_bytes),
-                                ],
-                            )
-                            .unwrap();
-                        writer.flush().unwrap();
-                        black_box(written);
-                    },
-                );
-            },
-        );
+                    let written = writer
+                        .write_batch(
+                            black_box(&timestamps),
+                            &[
+                                ("symbol", sym_bytes),
+                                ("price", price_bytes),
+                                ("volume", vol_bytes),
+                                ("side", side_bytes),
+                            ],
+                        )
+                        .unwrap();
+                    writer.flush().unwrap();
+                    black_box(written);
+                },
+            );
+        });
     }
 
     group.finish();
@@ -769,89 +713,70 @@ fn bench_batch_write_raw(c: &mut Criterion) {
 
     for num_rows in [HUNDRED_K, 500_000, MILLION] {
         group.throughput(Throughput::Elements(num_rows));
-        group.bench_with_input(
-            BenchmarkId::new("rows", num_rows),
-            &num_rows,
-            |b, &rows| {
-                b.iter_with_setup(
-                    || {
-                        let dir = TempDir::new().unwrap();
-                        let _meta = create_empty_trades(dir.path());
+        group.bench_with_input(BenchmarkId::new("rows", num_rows), &num_rows, |b, &rows| {
+            b.iter_with_setup(
+                || {
+                    let dir = TempDir::new().unwrap();
+                    let _meta = create_empty_trades(dir.path());
 
-                        let n = rows as usize;
-                        let base_ts: i64 = 1_704_067_200_000_000_000;
+                    let n = rows as usize;
+                    let base_ts: i64 = 1_704_067_200_000_000_000;
 
-                        let timestamps: Vec<i64> =
-                            (0..n).map(|i| base_ts + i as i64 * 1_000_000).collect();
+                    let timestamps: Vec<i64> =
+                        (0..n).map(|i| base_ts + i as i64 * 1_000_000).collect();
 
-                        let symbols: Vec<i32> =
-                            (0..n).map(|i| (i % 1000) as i32).collect();
+                    let symbols: Vec<i32> = (0..n).map(|i| (i % 1000) as i32).collect();
 
-                        let mut price = 50_000.0_f64;
-                        let prices: Vec<f64> = (0..n)
-                            .map(|i| {
-                                let delta =
-                                    ((i.wrapping_mul(7).wrapping_add(3)) % 11) as f64 * 0.5 - 2.5;
-                                price += delta;
-                                price
-                            })
-                            .collect();
+                    let mut price = 50_000.0_f64;
+                    let prices: Vec<f64> = (0..n)
+                        .map(|i| {
+                            let delta =
+                                ((i.wrapping_mul(7).wrapping_add(3)) % 11) as f64 * 0.5 - 2.5;
+                            price += delta;
+                            price
+                        })
+                        .collect();
 
-                        let volumes: Vec<f64> =
-                            (0..n).map(|i| 0.01 + (i % 10_000) as f64 * 0.01).collect();
+                    let volumes: Vec<f64> =
+                        (0..n).map(|i| 0.01 + (i % 10_000) as f64 * 0.01).collect();
 
-                        let sides: Vec<i32> =
-                            (0..n).map(|i| (i % 2) as i32).collect();
+                    let sides: Vec<i32> = (0..n).map(|i| (i % 2) as i32).collect();
 
-                        (dir, timestamps, symbols, prices, volumes, sides)
-                    },
-                    |(dir, timestamps, symbols, prices, volumes, sides)| {
-                        let mut writer =
-                            TableWriter::open(dir.path(), "trades").unwrap();
+                    (dir, timestamps, symbols, prices, volumes, sides)
+                },
+                |(dir, timestamps, symbols, prices, volumes, sides)| {
+                    let mut writer = TableWriter::open(dir.path(), "trades").unwrap();
 
-                        let sym_bytes = unsafe {
-                            std::slice::from_raw_parts(
-                                symbols.as_ptr() as *const u8,
-                                symbols.len() * 4,
-                            )
-                        };
-                        let price_bytes = unsafe {
-                            std::slice::from_raw_parts(
-                                prices.as_ptr() as *const u8,
-                                prices.len() * 8,
-                            )
-                        };
-                        let vol_bytes = unsafe {
-                            std::slice::from_raw_parts(
-                                volumes.as_ptr() as *const u8,
-                                volumes.len() * 8,
-                            )
-                        };
-                        let side_bytes = unsafe {
-                            std::slice::from_raw_parts(
-                                sides.as_ptr() as *const u8,
-                                sides.len() * 4,
-                            )
-                        };
+                    let sym_bytes = unsafe {
+                        std::slice::from_raw_parts(symbols.as_ptr() as *const u8, symbols.len() * 4)
+                    };
+                    let price_bytes = unsafe {
+                        std::slice::from_raw_parts(prices.as_ptr() as *const u8, prices.len() * 8)
+                    };
+                    let vol_bytes = unsafe {
+                        std::slice::from_raw_parts(volumes.as_ptr() as *const u8, volumes.len() * 8)
+                    };
+                    let side_bytes = unsafe {
+                        std::slice::from_raw_parts(sides.as_ptr() as *const u8, sides.len() * 4)
+                    };
 
-                        // Use column indices: symbol=1, price=2, volume=3, side=4
-                        let written = writer
-                            .write_batch_raw(
-                                black_box(&timestamps),
-                                &[
-                                    (1, sym_bytes),
-                                    (2, price_bytes),
-                                    (3, vol_bytes),
-                                    (4, side_bytes),
-                                ],
-                            )
-                            .unwrap();
-                        writer.flush().unwrap();
-                        black_box(written);
-                    },
-                );
-            },
-        );
+                    // Use column indices: symbol=1, price=2, volume=3, side=4
+                    let written = writer
+                        .write_batch_raw(
+                            black_box(&timestamps),
+                            &[
+                                (1, sym_bytes),
+                                (2, price_bytes),
+                                (3, vol_bytes),
+                                (4, side_bytes),
+                            ],
+                        )
+                        .unwrap();
+                    writer.flush().unwrap();
+                    black_box(written);
+                },
+            );
+        });
     }
 
     group.finish();
@@ -904,8 +829,7 @@ fn bench_write_preallocated(c: &mut Criterion) {
 
                 for i in 0..MILLION {
                     let ts = Timestamp(base_ts + i as i64 * 1_000_000);
-                    let delta =
-                        ((i.wrapping_mul(7).wrapping_add(3)) % 11) as f64 * 0.5 - 2.5;
+                    let delta = ((i.wrapping_mul(7).wrapping_add(3)) % 11) as f64 * 0.5 - 2.5;
                     price += delta;
 
                     writer
@@ -914,9 +838,7 @@ fn bench_write_preallocated(c: &mut Criterion) {
                             &[
                                 ColumnValue::I32((i % 1000) as i32),
                                 ColumnValue::F64(black_box(price)),
-                                ColumnValue::F64(black_box(
-                                    0.01 + (i % 10_000) as f64 * 0.01,
-                                )),
+                                ColumnValue::F64(black_box(0.01 + (i % 10_000) as f64 * 0.01)),
                                 ColumnValue::I32((i % 2) as i32),
                             ],
                         )
@@ -954,8 +876,7 @@ fn bench_wal_write_deferred(c: &mut Criterion) {
                     .unwrap();
 
                 let table_dir = dir.path().join("wal_bench");
-                let _txn =
-                    exchange_core::txn::TxnFile::open(&table_dir).unwrap();
+                let _txn = exchange_core::txn::TxnFile::open(&table_dir).unwrap();
 
                 dir
             },
@@ -965,8 +886,7 @@ fn bench_wal_write_deferred(c: &mut Criterion) {
                     merge_on_commit: false, // <-- deferred merge
                     ..Default::default()
                 };
-                let mut writer =
-                    WalTableWriter::open(dir.path(), "wal_bench", config).unwrap();
+                let mut writer = WalTableWriter::open(dir.path(), "wal_bench", config).unwrap();
 
                 let base_ts: i64 = 1_704_067_200_000_000_000;
                 for i in 0..HUNDRED_K as i64 {

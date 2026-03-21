@@ -14,10 +14,10 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use exchange_query::plan::{QueryResult, Value};
@@ -143,9 +143,7 @@ pub async fn query(
                 if target_type == "table" {
                     results.push(build_table_response(&columns, &rows));
                 } else {
-                    results.extend(build_timeseries_response(
-                        &target_name, &columns, &rows,
-                    ));
+                    results.extend(build_timeseries_response(&target_name, &columns, &rows));
                 }
             }
             QueryResult::Ok { .. } => {}
@@ -166,7 +164,9 @@ fn build_auto_query(table_name: &str, range: Option<&GrafanaTimeRange>) -> Strin
     if let Some(range) = range {
         let from = range.from.replace('\'', "");
         let to = range.to.replace('\'', "");
-        sql.push_str(&format!(" WHERE timestamp >= '{from}' AND timestamp <= '{to}'"));
+        sql.push_str(&format!(
+            " WHERE timestamp >= '{from}' AND timestamp <= '{to}'"
+        ));
     }
 
     sql.push_str(" ORDER BY timestamp LIMIT 10000");
@@ -222,10 +222,7 @@ fn build_timeseries_response(
     // Find the timestamp column (first Timestamp value, or column named "timestamp")
     let ts_idx = rows
         .first()
-        .and_then(|row| {
-            row.iter()
-                .position(|v| matches!(v, Value::Timestamp(_)))
-        })
+        .and_then(|row| row.iter().position(|v| matches!(v, Value::Timestamp(_))))
         .or_else(|| {
             columns
                 .iter()
@@ -237,12 +234,9 @@ fn build_timeseries_response(
     let numeric_cols: Vec<usize> = (0..columns.len())
         .filter(|&i| {
             i != ts_idx
-                && rows.iter().any(|row| {
-                    matches!(
-                        row.get(i),
-                        Some(Value::I64(_)) | Some(Value::F64(_))
-                    )
-                })
+                && rows
+                    .iter()
+                    .any(|row| matches!(row.get(i), Some(Value::I64(_)) | Some(Value::F64(_))))
         })
         .collect();
 
@@ -325,8 +319,7 @@ pub async fn tag_keys(
         if !meta_path.exists() {
             return Ok(vec![]);
         }
-        let meta =
-            exchange_core::table::TableMeta::load(&meta_path).map_err(|e| e.to_string())?;
+        let meta = exchange_core::table::TableMeta::load(&meta_path).map_err(|e| e.to_string())?;
         Ok(meta
             .columns
             .iter()
@@ -358,9 +351,7 @@ pub async fn tag_values(
 
     let safe_table = table_name.replace('\'', "");
     let safe_key = req.key.replace('\'', "");
-    let sql = format!(
-        "SELECT DISTINCT \"{safe_key}\" FROM \"{safe_table}\" LIMIT 100"
-    );
+    let sql = format!("SELECT DISTINCT \"{safe_key}\" FROM \"{safe_table}\" LIMIT 100");
 
     let db_root = state.db_root.clone();
     let result = tokio::task::spawn_blocking(move || {
@@ -456,8 +447,14 @@ mod tests {
     fn test_build_table_response() {
         let columns = vec!["ts".to_string(), "price".to_string()];
         let rows = vec![
-            vec![Value::Timestamp(1_700_000_000_000_000_000), Value::F64(100.0)],
-            vec![Value::Timestamp(1_700_000_001_000_000_000), Value::F64(101.0)],
+            vec![
+                Value::Timestamp(1_700_000_000_000_000_000),
+                Value::F64(100.0),
+            ],
+            vec![
+                Value::Timestamp(1_700_000_001_000_000_000),
+                Value::F64(101.0),
+            ],
         ];
         let resp = build_table_response(&columns, &rows);
         assert_eq!(resp["type"], "table");
@@ -472,8 +469,16 @@ mod tests {
     fn test_build_timeseries_response() {
         let columns = vec!["ts".to_string(), "price".to_string(), "volume".to_string()];
         let rows = vec![
-            vec![Value::Timestamp(1_700_000_000_000_000_000), Value::F64(100.0), Value::I64(500)],
-            vec![Value::Timestamp(1_700_000_001_000_000_000), Value::F64(101.0), Value::I64(600)],
+            vec![
+                Value::Timestamp(1_700_000_000_000_000_000),
+                Value::F64(100.0),
+                Value::I64(500),
+            ],
+            vec![
+                Value::Timestamp(1_700_000_001_000_000_000),
+                Value::F64(101.0),
+                Value::I64(600),
+            ],
         ];
         let resp = build_timeseries_response("trades", &columns, &rows);
         assert_eq!(resp.len(), 2); // price + volume series
@@ -490,9 +495,10 @@ mod tests {
     #[test]
     fn test_build_timeseries_single_numeric_uses_target_name() {
         let columns = vec!["ts".to_string(), "price".to_string()];
-        let rows = vec![
-            vec![Value::Timestamp(1_700_000_000_000_000_000), Value::F64(100.0)],
-        ];
+        let rows = vec![vec![
+            Value::Timestamp(1_700_000_000_000_000_000),
+            Value::F64(100.0),
+        ]];
         let resp = build_timeseries_response("trades", &columns, &rows);
         assert_eq!(resp.len(), 1);
         assert_eq!(resp[0]["target"], "trades"); // not "trades.price"

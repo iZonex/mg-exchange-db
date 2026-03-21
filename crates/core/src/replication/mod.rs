@@ -28,6 +28,6 @@ pub use failover::FailoverManager;
 pub use health_monitor::PrimaryHealthMonitor;
 pub use manager::{ReplicationManager, ReplicationStatus};
 pub use protocol::ReplicationMessage;
-pub use wal_receiver::{ReplicaPosition, WalReceiver};
 pub use s3_shipper::{S3WalReceiver, S3WalShipper};
+pub use wal_receiver::{ReplicaPosition, WalReceiver};
 pub use wal_shipper::{ReplicationLag, ShipStats, WalShipper};

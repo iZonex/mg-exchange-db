@@ -1,18 +1,18 @@
 //! Enterprise feature stress tests — 500+ tests covering RBAC, replication,
 //! encryption, tiered storage, cluster management, metering, tenants, and Raft consensus.
 
-use exchange_core::rbac::model::{Permission, Role, SecurityContext, User};
-use exchange_core::rbac::store::{hash_password, verify_password, RbacStore};
-use exchange_core::encryption::{
-    decrypt_buffer, encrypt_buffer, encrypt_file, decrypt_file,
-    EncryptionAlgorithm, EncryptionConfig,
-};
-use exchange_core::replication::config::{ReplicationConfig, ReplicationRole, ReplicationSyncMode};
-use exchange_core::replication::wal_shipper::WalShipper;
 use exchange_core::cluster::node::{ClusterNode, NodeRole, NodeStatus};
 use exchange_core::cluster::{ClusterConfig, ClusterManager};
 use exchange_core::consensus::raft::{RaftCommand, RaftMessage, RaftNode, RaftState};
+use exchange_core::encryption::{
+    EncryptionAlgorithm, EncryptionConfig, decrypt_buffer, decrypt_file, encrypt_buffer,
+    encrypt_file,
+};
 use exchange_core::metering::{CounterSnapshot, UsageMeter};
+use exchange_core::rbac::model::{Permission, Role, SecurityContext, User};
+use exchange_core::rbac::store::{RbacStore, hash_password, verify_password};
+use exchange_core::replication::config::{ReplicationConfig, ReplicationRole, ReplicationSyncMode};
+use exchange_core::replication::wal_shipper::WalShipper;
 use exchange_core::tenant::{Tenant, TenantManager};
 
 use std::collections::HashMap;
@@ -196,45 +196,138 @@ macro_rules! perm_test {
     };
 }
 
-perm_test!(perm_admin_read, vec![Permission::Admin], |c: &SecurityContext| c.can_read_table("t"), true);
-perm_test!(perm_admin_write, vec![Permission::Admin], |c: &SecurityContext| c.can_write_table("t"), true);
-perm_test!(perm_admin_ddl, vec![Permission::Admin], |c: &SecurityContext| c.can_ddl(), true);
-perm_test!(perm_admin_is_super, vec![Permission::Admin], |c: &SecurityContext| c.is_superuser(), true);
-perm_test!(perm_read_all_read, vec![Permission::Read { table: None }], |c: &SecurityContext| c.can_read_table("any"), true);
-perm_test!(perm_read_all_no_write, vec![Permission::Read { table: None }], |c: &SecurityContext| c.can_write_table("any"), false);
-perm_test!(perm_read_all_no_ddl, vec![Permission::Read { table: None }], |c: &SecurityContext| c.can_ddl(), false);
-perm_test!(perm_write_all_write, vec![Permission::Write { table: None }], |c: &SecurityContext| c.can_write_table("any"), true);
-perm_test!(perm_write_all_no_read, vec![Permission::Write { table: None }], |c: &SecurityContext| c.can_read_table("any"), false);
-perm_test!(perm_ddl_only, vec![Permission::DDL], |c: &SecurityContext| c.can_ddl(), true);
-perm_test!(perm_ddl_no_read, vec![Permission::DDL], |c: &SecurityContext| c.can_read_table("t"), false);
-perm_test!(perm_ddl_no_write, vec![Permission::DDL], |c: &SecurityContext| c.can_write_table("t"), false);
-perm_test!(perm_none_no_read, vec![], |c: &SecurityContext| c.can_read_table("t"), false);
-perm_test!(perm_none_no_write, vec![], |c: &SecurityContext| c.can_write_table("t"), false);
-perm_test!(perm_none_no_ddl, vec![], |c: &SecurityContext| c.can_ddl(), false);
-perm_test!(perm_none_not_admin, vec![], |c: &SecurityContext| c.can_admin(), false);
-perm_test!(perm_none_not_super, vec![], |c: &SecurityContext| c.is_superuser(), false);
+perm_test!(
+    perm_admin_read,
+    vec![Permission::Admin],
+    |c: &SecurityContext| c.can_read_table("t"),
+    true
+);
+perm_test!(
+    perm_admin_write,
+    vec![Permission::Admin],
+    |c: &SecurityContext| c.can_write_table("t"),
+    true
+);
+perm_test!(
+    perm_admin_ddl,
+    vec![Permission::Admin],
+    |c: &SecurityContext| c.can_ddl(),
+    true
+);
+perm_test!(
+    perm_admin_is_super,
+    vec![Permission::Admin],
+    |c: &SecurityContext| c.is_superuser(),
+    true
+);
+perm_test!(
+    perm_read_all_read,
+    vec![Permission::Read { table: None }],
+    |c: &SecurityContext| c.can_read_table("any"),
+    true
+);
+perm_test!(
+    perm_read_all_no_write,
+    vec![Permission::Read { table: None }],
+    |c: &SecurityContext| c.can_write_table("any"),
+    false
+);
+perm_test!(
+    perm_read_all_no_ddl,
+    vec![Permission::Read { table: None }],
+    |c: &SecurityContext| c.can_ddl(),
+    false
+);
+perm_test!(
+    perm_write_all_write,
+    vec![Permission::Write { table: None }],
+    |c: &SecurityContext| c.can_write_table("any"),
+    true
+);
+perm_test!(
+    perm_write_all_no_read,
+    vec![Permission::Write { table: None }],
+    |c: &SecurityContext| c.can_read_table("any"),
+    false
+);
+perm_test!(
+    perm_ddl_only,
+    vec![Permission::DDL],
+    |c: &SecurityContext| c.can_ddl(),
+    true
+);
+perm_test!(
+    perm_ddl_no_read,
+    vec![Permission::DDL],
+    |c: &SecurityContext| c.can_read_table("t"),
+    false
+);
+perm_test!(
+    perm_ddl_no_write,
+    vec![Permission::DDL],
+    |c: &SecurityContext| c.can_write_table("t"),
+    false
+);
+perm_test!(
+    perm_none_no_read,
+    vec![],
+    |c: &SecurityContext| c.can_read_table("t"),
+    false
+);
+perm_test!(
+    perm_none_no_write,
+    vec![],
+    |c: &SecurityContext| c.can_write_table("t"),
+    false
+);
+perm_test!(
+    perm_none_no_ddl,
+    vec![],
+    |c: &SecurityContext| c.can_ddl(),
+    false
+);
+perm_test!(
+    perm_none_not_admin,
+    vec![],
+    |c: &SecurityContext| c.can_admin(),
+    false
+);
+perm_test!(
+    perm_none_not_super,
+    vec![],
+    |c: &SecurityContext| c.is_superuser(),
+    false
+);
 
 perm_test!(
     perm_read_specific_match,
-    vec![Permission::Read { table: Some("trades".into()) }],
+    vec![Permission::Read {
+        table: Some("trades".into())
+    }],
     |c: &SecurityContext| c.can_read_table("trades"),
     true
 );
 perm_test!(
     perm_read_specific_no_match,
-    vec![Permission::Read { table: Some("trades".into()) }],
+    vec![Permission::Read {
+        table: Some("trades".into())
+    }],
     |c: &SecurityContext| c.can_read_table("orders"),
     false
 );
 perm_test!(
     perm_write_specific_match,
-    vec![Permission::Write { table: Some("trades".into()) }],
+    vec![Permission::Write {
+        table: Some("trades".into())
+    }],
     |c: &SecurityContext| c.can_write_table("trades"),
     true
 );
 perm_test!(
     perm_write_specific_no_match,
-    vec![Permission::Write { table: Some("trades".into()) }],
+    vec![Permission::Write {
+        table: Some("trades".into())
+    }],
     |c: &SecurityContext| c.can_write_table("orders"),
     false
 );
@@ -254,9 +347,9 @@ fn perm_column_read_allowed() {
 
 #[test]
 fn perm_column_read_table_level_overrides() {
-    let ctx = ctx_with(vec![
-        Permission::Read { table: Some("trades".to_string()) },
-    ]);
+    let ctx = ctx_with(vec![Permission::Read {
+        table: Some("trades".to_string()),
+    }]);
     assert!(ctx.can_read_column("trades", "any_column"));
 }
 
@@ -306,9 +399,7 @@ fn rbac_update_user_password_50_times() {
         u.password_hash = hash_password(&format!("pass_{i}"));
         store.update_user(&u).unwrap();
 
-        let ctx = store
-            .authenticate("alice", &format!("pass_{i}"))
-            .unwrap();
+        let ctx = store.authenticate("alice", &format!("pass_{i}")).unwrap();
         assert!(ctx.is_some());
     }
 }
@@ -333,10 +424,12 @@ fn rbac_nonexistent_user() {
     let store = make_store(dir.path());
 
     for i in 0..20 {
-        assert!(store
-            .authenticate(&format!("ghost_{i}"), "pass")
-            .unwrap()
-            .is_none());
+        assert!(
+            store
+                .authenticate(&format!("ghost_{i}"), "pass")
+                .unwrap()
+                .is_none()
+        );
     }
 }
 
@@ -358,7 +451,9 @@ fn encrypt_decrypt_100_buffers() {
 #[test]
 fn encrypt_decrypt_various_sizes() {
     let config = test_encryption_config();
-    let sizes = [0, 1, 2, 7, 8, 15, 16, 31, 32, 63, 64, 127, 128, 255, 256, 512, 1024, 4096, 8192, 65536];
+    let sizes = [
+        0, 1, 2, 7, 8, 15, 16, 31, 32, 63, 64, 127, 128, 255, 256, 512, 1024, 4096, 8192, 65536,
+    ];
     for &size in &sizes {
         let data: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
         let encrypted = encrypt_buffer(&data, &config).unwrap();
@@ -413,7 +508,10 @@ fn encrypt_disabled_passthrough() {
 
 #[test]
 fn encrypt_both_algorithms() {
-    for algo in [EncryptionAlgorithm::Aes256Cbc, EncryptionAlgorithm::Aes256Gcm] {
+    for algo in [
+        EncryptionAlgorithm::Aes256Cbc,
+        EncryptionAlgorithm::Aes256Gcm,
+    ] {
         let config = EncryptionConfig::new(algo, vec![0x42; 32]).unwrap();
         for i in 0..25 {
             let data: Vec<u8> = vec![i as u8; 200];
@@ -724,8 +822,12 @@ fn raft_three_node_election() {
     let resp2 = node2.handle_message(vote_req.clone());
     let resp3 = node3.handle_message(vote_req);
 
-    for r in resp2 { node1.handle_message(r); }
-    for r in resp3 { node1.handle_message(r); }
+    for r in resp2 {
+        node1.handle_message(r);
+    }
+    for r in resp3 {
+        node1.handle_message(r);
+    }
 
     assert!(node1.is_leader());
 }
@@ -1109,12 +1211,56 @@ macro_rules! role_perm_test {
 }
 
 role_perm_test!(rp_admin, Permission::Admin, "any", true, true);
-role_perm_test!(rp_read_all, Permission::Read { table: None }, "any", true, false);
-role_perm_test!(rp_write_all, Permission::Write { table: None }, "any", false, true);
-role_perm_test!(rp_read_trades, Permission::Read { table: Some("trades".into()) }, "trades", true, false);
-role_perm_test!(rp_read_trades_not_orders, Permission::Read { table: Some("trades".into()) }, "orders", false, false);
-role_perm_test!(rp_write_trades, Permission::Write { table: Some("trades".into()) }, "trades", false, true);
-role_perm_test!(rp_write_trades_not_orders, Permission::Write { table: Some("trades".into()) }, "orders", false, false);
+role_perm_test!(
+    rp_read_all,
+    Permission::Read { table: None },
+    "any",
+    true,
+    false
+);
+role_perm_test!(
+    rp_write_all,
+    Permission::Write { table: None },
+    "any",
+    false,
+    true
+);
+role_perm_test!(
+    rp_read_trades,
+    Permission::Read {
+        table: Some("trades".into())
+    },
+    "trades",
+    true,
+    false
+);
+role_perm_test!(
+    rp_read_trades_not_orders,
+    Permission::Read {
+        table: Some("trades".into())
+    },
+    "orders",
+    false,
+    false
+);
+role_perm_test!(
+    rp_write_trades,
+    Permission::Write {
+        table: Some("trades".into())
+    },
+    "trades",
+    false,
+    true
+);
+role_perm_test!(
+    rp_write_trades_not_orders,
+    Permission::Write {
+        table: Some("trades".into())
+    },
+    "orders",
+    false,
+    false
+);
 
 // =============================================================================
 // 15. Hash password consistency
@@ -1133,14 +1279,18 @@ fn hash_password_different_inputs() {
 }
 
 #[test]
-#[ignore] #[ignore] fn hash_password_hex_format() {
+#[ignore]
+#[ignore]
+fn hash_password_hex_format() {
     let h = hash_password("test");
     assert_eq!(h.len(), 64); // 64-bit hash as hex = 16 chars
     assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
 }
 
 #[test]
-#[ignore] #[ignore] fn hash_password_empty_string() {
+#[ignore]
+#[ignore]
+fn hash_password_empty_string() {
     let h = hash_password("");
     assert_eq!(h.len(), 64);
 }
@@ -1243,7 +1393,8 @@ macro_rules! raft_propose_test {
             assert!(node.is_leader());
 
             for i in 0..$n {
-                node.propose(RaftCommand::CreateTable(format!("t{i}"))).unwrap();
+                node.propose(RaftCommand::CreateTable(format!("t{i}")))
+                    .unwrap();
             }
 
             let entries = node.take_committed();
@@ -1270,7 +1421,9 @@ macro_rules! rbac_user_count_test {
             let dir = tempdir().unwrap();
             let store = make_store(dir.path());
             for i in 0..$n {
-                store.create_user(&make_user(&format!("u{i}"), &format!("p{i}"))).unwrap();
+                store
+                    .create_user(&make_user(&format!("u{i}"), &format!("p{i}")))
+                    .unwrap();
             }
             assert_eq!(store.list_users().unwrap().len(), $n);
         }
@@ -1318,7 +1471,8 @@ macro_rules! encrypt_key_pattern_test {
     ($name:ident, $byte:expr) => {
         #[test]
         fn $name() {
-            let config = EncryptionConfig::new(EncryptionAlgorithm::Aes256Gcm, vec![$byte; 32]).unwrap();
+            let config =
+                EncryptionConfig::new(EncryptionAlgorithm::Aes256Gcm, vec![$byte; 32]).unwrap();
             let data = b"test data for encryption";
             let enc = encrypt_buffer(data, &config).unwrap();
             let dec = decrypt_buffer(&enc, &config).unwrap();
@@ -1344,13 +1498,15 @@ macro_rules! shipper_ack_test {
     ($name:ident, $n_replicas:expr, $n_acks:expr) => {
         #[test]
         fn $name() {
-            let addrs: Vec<&str> = (0..$n_replicas).map(|i| match i {
-                0 => "r0:9100",
-                1 => "r1:9100",
-                2 => "r2:9100",
-                3 => "r3:9100",
-                _ => "r4:9100",
-            }).collect();
+            let addrs: Vec<&str> = (0..$n_replicas)
+                .map(|i| match i {
+                    0 => "r0:9100",
+                    1 => "r1:9100",
+                    2 => "r2:9100",
+                    3 => "r3:9100",
+                    _ => "r4:9100",
+                })
+                .collect();
             let mut shipper = make_shipper(addrs.clone(), ReplicationSyncMode::Async);
             for ack in 1..=$n_acks {
                 for addr in &addrs {
@@ -1413,7 +1569,10 @@ hash_test!(hash_empty, "");
 hash_test!(hash_a, "a");
 hash_test!(hash_abc, "abc");
 hash_test!(hash_password1, "password");
-hash_test!(hash_long, "this-is-a-very-long-password-for-testing-purposes");
+hash_test!(
+    hash_long,
+    "this-is-a-very-long-password-for-testing-purposes"
+);
 hash_test!(hash_special, "p@$$w0rd!#%");
 hash_test!(hash_unicode_pw, "密码");
 hash_test!(hash_numbers, "1234567890");
@@ -1436,9 +1595,15 @@ fn perm_system_only() {
 #[test]
 fn perm_multiple_read_tables() {
     let ctx = ctx_with(vec![
-        Permission::Read { table: Some("t1".into()) },
-        Permission::Read { table: Some("t2".into()) },
-        Permission::Read { table: Some("t3".into()) },
+        Permission::Read {
+            table: Some("t1".into()),
+        },
+        Permission::Read {
+            table: Some("t2".into()),
+        },
+        Permission::Read {
+            table: Some("t3".into()),
+        },
     ]);
     assert!(ctx.can_read_table("t1"));
     assert!(ctx.can_read_table("t2"));
@@ -1449,8 +1614,12 @@ fn perm_multiple_read_tables() {
 #[test]
 fn perm_read_and_write_same_table() {
     let ctx = ctx_with(vec![
-        Permission::Read { table: Some("t1".into()) },
-        Permission::Write { table: Some("t1".into()) },
+        Permission::Read {
+            table: Some("t1".into()),
+        },
+        Permission::Write {
+            table: Some("t1".into()),
+        },
     ]);
     assert!(ctx.can_read_table("t1"));
     assert!(ctx.can_write_table("t1"));
@@ -1460,10 +1629,7 @@ fn perm_read_and_write_same_table() {
 
 #[test]
 fn perm_ddl_and_read() {
-    let ctx = ctx_with(vec![
-        Permission::DDL,
-        Permission::Read { table: None },
-    ]);
+    let ctx = ctx_with(vec![Permission::DDL, Permission::Read { table: None }]);
     assert!(ctx.can_ddl());
     assert!(ctx.can_read_table("any"));
     assert!(!ctx.can_write_table("any"));
@@ -1526,7 +1692,9 @@ fn raft_propose_alter_table() {
     node.election_timeout = Duration::from_millis(1);
     std::thread::sleep(Duration::from_millis(5));
     node.tick();
-    let idx = node.propose(RaftCommand::AlterTable("t1".into(), "add col".into())).unwrap();
+    let idx = node
+        .propose(RaftCommand::AlterTable("t1".into(), "add col".into()))
+        .unwrap();
     assert_eq!(idx, 1);
 }
 
@@ -1536,7 +1704,12 @@ fn raft_propose_wal_commit() {
     node.election_timeout = Duration::from_millis(1);
     std::thread::sleep(Duration::from_millis(5));
     node.tick();
-    let idx = node.propose(RaftCommand::WalCommit { table: "t1".into(), segment_id: 42 }).unwrap();
+    let idx = node
+        .propose(RaftCommand::WalCommit {
+            table: "t1".into(),
+            segment_id: 42,
+        })
+        .unwrap();
     assert_eq!(idx, 1);
 }
 
@@ -1616,8 +1789,16 @@ enc_data_test!(ed_zeros_10k, 10000usize, |_i| 0u8);
 enc_data_test!(ed_seq_100, 100usize, |i: usize| (i % 256) as u8);
 enc_data_test!(ed_seq_1k, 1000usize, |i: usize| (i % 256) as u8);
 enc_data_test!(ed_seq_10k, 10000usize, |i: usize| (i % 256) as u8);
-enc_data_test!(ed_alt_100, 100usize, |i: usize| if i % 2 == 0 { 0xAA } else { 0x55 });
-enc_data_test!(ed_alt_1k, 1000usize, |i: usize| if i % 2 == 0 { 0xAA } else { 0x55 });
+enc_data_test!(ed_alt_100, 100usize, |i: usize| if i % 2 == 0 {
+    0xAA
+} else {
+    0x55
+});
+enc_data_test!(ed_alt_1k, 1000usize, |i: usize| if i % 2 == 0 {
+    0xAA
+} else {
+    0x55
+});
 enc_data_test!(ed_mod4_1k, 1000usize, |i: usize| (i % 4) as u8);
 enc_data_test!(ed_mod16_1k, 1000usize, |i: usize| (i % 16) as u8);
 enc_data_test!(ed_ff_100, 100usize, |_i| 0xFFu8);
@@ -1640,11 +1821,40 @@ macro_rules! sc_read_test {
 sc_read_test!(scr_admin_t1, Permission::Admin, "t1", true);
 sc_read_test!(scr_admin_t2, Permission::Admin, "t2", true);
 sc_read_test!(scr_admin_any, Permission::Admin, "any_table", true);
-sc_read_test!(scr_read_all_t1, Permission::Read { table: None }, "t1", true);
-sc_read_test!(scr_read_all_t2, Permission::Read { table: None }, "t2", true);
-sc_read_test!(scr_read_t1_t1, Permission::Read { table: Some("t1".into()) }, "t1", true);
-sc_read_test!(scr_read_t1_t2, Permission::Read { table: Some("t1".into()) }, "t2", false);
-sc_read_test!(scr_write_all_t1, Permission::Write { table: None }, "t1", false);
+sc_read_test!(
+    scr_read_all_t1,
+    Permission::Read { table: None },
+    "t1",
+    true
+);
+sc_read_test!(
+    scr_read_all_t2,
+    Permission::Read { table: None },
+    "t2",
+    true
+);
+sc_read_test!(
+    scr_read_t1_t1,
+    Permission::Read {
+        table: Some("t1".into())
+    },
+    "t1",
+    true
+);
+sc_read_test!(
+    scr_read_t1_t2,
+    Permission::Read {
+        table: Some("t1".into())
+    },
+    "t2",
+    false
+);
+sc_read_test!(
+    scr_write_all_t1,
+    Permission::Write { table: None },
+    "t1",
+    false
+);
 sc_read_test!(scr_ddl_t1, Permission::DDL, "t1", false);
 sc_read_test!(scr_system_t1, Permission::System, "t1", false);
 
@@ -1660,11 +1870,40 @@ macro_rules! sc_write_test {
 
 sc_write_test!(scw_admin_t1, Permission::Admin, "t1", true);
 sc_write_test!(scw_admin_t2, Permission::Admin, "t2", true);
-sc_write_test!(scw_write_all_t1, Permission::Write { table: None }, "t1", true);
-sc_write_test!(scw_write_all_t2, Permission::Write { table: None }, "t2", true);
-sc_write_test!(scw_write_t1_t1, Permission::Write { table: Some("t1".into()) }, "t1", true);
-sc_write_test!(scw_write_t1_t2, Permission::Write { table: Some("t1".into()) }, "t2", false);
-sc_write_test!(scw_read_all_t1, Permission::Read { table: None }, "t1", false);
+sc_write_test!(
+    scw_write_all_t1,
+    Permission::Write { table: None },
+    "t1",
+    true
+);
+sc_write_test!(
+    scw_write_all_t2,
+    Permission::Write { table: None },
+    "t2",
+    true
+);
+sc_write_test!(
+    scw_write_t1_t1,
+    Permission::Write {
+        table: Some("t1".into())
+    },
+    "t1",
+    true
+);
+sc_write_test!(
+    scw_write_t1_t2,
+    Permission::Write {
+        table: Some("t1".into())
+    },
+    "t2",
+    false
+);
+sc_write_test!(
+    scw_read_all_t1,
+    Permission::Read { table: None },
+    "t1",
+    false
+);
 sc_write_test!(scw_ddl_t1, Permission::DDL, "t1", false);
 sc_write_test!(scw_system_t1, Permission::System, "t1", false);
 
@@ -1681,7 +1920,11 @@ macro_rules! cluster_node_test {
                 let node = ClusterNode::new(
                     format!("node-{i}"),
                     format!("10.0.0.{i}:9000"),
-                    if i % 3 == 0 { NodeRole::Primary } else { NodeRole::ReadReplica },
+                    if i % 3 == 0 {
+                        NodeRole::Primary
+                    } else {
+                        NodeRole::ReadReplica
+                    },
                 );
                 mgr.add_node(node);
             }
@@ -1799,7 +2042,10 @@ macro_rules! rbac_auth_test {
         fn $name() {
             let dir = tempdir().unwrap();
             let store = make_store(dir.path());
-            let role = Role { name: "r".into(), permissions: vec![Permission::Read { table: None }] };
+            let role = Role {
+                name: "r".into(),
+                permissions: vec![Permission::Read { table: None }],
+            };
             store.create_role(&role).unwrap();
             for i in 0..$n {
                 let mut u = make_user(&format!("u{i}"), &format!("p{i}"));
@@ -1807,7 +2053,10 @@ macro_rules! rbac_auth_test {
                 store.create_user(&u).unwrap();
             }
             for i in 0..$n {
-                let ctx = store.authenticate(&format!("u{i}"), &format!("p{i}")).unwrap().unwrap();
+                let ctx = store
+                    .authenticate(&format!("u{i}"), &format!("p{i}"))
+                    .unwrap()
+                    .unwrap();
                 assert!(ctx.can_read_table("any"));
             }
         }
@@ -1964,10 +2213,15 @@ macro_rules! shipper_lag_test {
     ($name:ident, $n_replicas:expr) => {
         #[test]
         fn $name() {
-            let addrs: Vec<&str> = (0..$n_replicas).map(|i| match i {
-                0 => "r0:9100", 1 => "r1:9100", 2 => "r2:9100",
-                3 => "r3:9100", _ => "r4:9100",
-            }).collect();
+            let addrs: Vec<&str> = (0..$n_replicas)
+                .map(|i| match i {
+                    0 => "r0:9100",
+                    1 => "r1:9100",
+                    2 => "r2:9100",
+                    3 => "r3:9100",
+                    _ => "r4:9100",
+                })
+                .collect();
             let shipper = make_shipper(addrs.clone(), ReplicationSyncMode::Async);
             let lags = shipper.replication_lag();
             assert_eq!(lags.len(), $n_replicas);
@@ -2003,12 +2257,55 @@ macro_rules! multi_perm_test {
 
 multi_perm_test!(mp_empty, vec![], false, false, false);
 multi_perm_test!(mp_admin_only, vec![Permission::Admin], true, true, true);
-multi_perm_test!(mp_read_write, vec![Permission::Read { table: None }, Permission::Write { table: None }], true, true, false);
-multi_perm_test!(mp_read_ddl, vec![Permission::Read { table: None }, Permission::DDL], true, false, true);
-multi_perm_test!(mp_write_ddl, vec![Permission::Write { table: None }, Permission::DDL], false, true, true);
-multi_perm_test!(mp_all_three, vec![Permission::Read { table: None }, Permission::Write { table: None }, Permission::DDL], true, true, true);
-multi_perm_test!(mp_system_only, vec![Permission::System], false, false, false);
-multi_perm_test!(mp_read_system, vec![Permission::Read { table: None }, Permission::System], true, false, false);
+multi_perm_test!(
+    mp_read_write,
+    vec![
+        Permission::Read { table: None },
+        Permission::Write { table: None }
+    ],
+    true,
+    true,
+    false
+);
+multi_perm_test!(
+    mp_read_ddl,
+    vec![Permission::Read { table: None }, Permission::DDL],
+    true,
+    false,
+    true
+);
+multi_perm_test!(
+    mp_write_ddl,
+    vec![Permission::Write { table: None }, Permission::DDL],
+    false,
+    true,
+    true
+);
+multi_perm_test!(
+    mp_all_three,
+    vec![
+        Permission::Read { table: None },
+        Permission::Write { table: None },
+        Permission::DDL
+    ],
+    true,
+    true,
+    true
+);
+multi_perm_test!(
+    mp_system_only,
+    vec![Permission::System],
+    false,
+    false,
+    false
+);
+multi_perm_test!(
+    mp_read_system,
+    vec![Permission::Read { table: None }, Permission::System],
+    true,
+    false,
+    false
+);
 
 // =============================================================================
 // 44. Replication config serialize/deserialize parametric
@@ -2035,15 +2332,60 @@ macro_rules! repl_config_test {
     };
 }
 
-repl_config_test!(rc_p_async_0, ReplicationRole::Primary, ReplicationSyncMode::Async, 0);
-repl_config_test!(rc_p_async_1, ReplicationRole::Primary, ReplicationSyncMode::Async, 1);
-repl_config_test!(rc_p_async_3, ReplicationRole::Primary, ReplicationSyncMode::Async, 3);
-repl_config_test!(rc_p_semi_1, ReplicationRole::Primary, ReplicationSyncMode::SemiSync, 1);
-repl_config_test!(rc_p_semi_3, ReplicationRole::Primary, ReplicationSyncMode::SemiSync, 3);
-repl_config_test!(rc_p_sync_1, ReplicationRole::Primary, ReplicationSyncMode::Sync, 1);
-repl_config_test!(rc_p_sync_3, ReplicationRole::Primary, ReplicationSyncMode::Sync, 3);
-repl_config_test!(rc_r_async, ReplicationRole::Replica, ReplicationSyncMode::Async, 0);
-repl_config_test!(rc_s_async, ReplicationRole::Standalone, ReplicationSyncMode::Async, 0);
+repl_config_test!(
+    rc_p_async_0,
+    ReplicationRole::Primary,
+    ReplicationSyncMode::Async,
+    0
+);
+repl_config_test!(
+    rc_p_async_1,
+    ReplicationRole::Primary,
+    ReplicationSyncMode::Async,
+    1
+);
+repl_config_test!(
+    rc_p_async_3,
+    ReplicationRole::Primary,
+    ReplicationSyncMode::Async,
+    3
+);
+repl_config_test!(
+    rc_p_semi_1,
+    ReplicationRole::Primary,
+    ReplicationSyncMode::SemiSync,
+    1
+);
+repl_config_test!(
+    rc_p_semi_3,
+    ReplicationRole::Primary,
+    ReplicationSyncMode::SemiSync,
+    3
+);
+repl_config_test!(
+    rc_p_sync_1,
+    ReplicationRole::Primary,
+    ReplicationSyncMode::Sync,
+    1
+);
+repl_config_test!(
+    rc_p_sync_3,
+    ReplicationRole::Primary,
+    ReplicationSyncMode::Sync,
+    3
+);
+repl_config_test!(
+    rc_r_async,
+    ReplicationRole::Replica,
+    ReplicationSyncMode::Async,
+    0
+);
+repl_config_test!(
+    rc_s_async,
+    ReplicationRole::Standalone,
+    ReplicationSyncMode::Async,
+    0
+);
 
 // =============================================================================
 // 45. Parametric RBAC user+role+auth integration
@@ -2058,7 +2400,9 @@ macro_rules! rbac_full_test {
             for i in 0..$n_roles {
                 let role = Role {
                     name: format!("role{i}"),
-                    permissions: vec![Permission::Read { table: Some(format!("t{i}")) }],
+                    permissions: vec![Permission::Read {
+                        table: Some(format!("t{i}")),
+                    }],
                 };
                 store.create_role(&role).unwrap();
             }
@@ -2068,7 +2412,10 @@ macro_rules! rbac_full_test {
                 store.create_user(&user).unwrap();
             }
             for i in 0..$n_users {
-                let ctx = store.authenticate(&format!("user{i}"), &format!("pw{i}")).unwrap().unwrap();
+                let ctx = store
+                    .authenticate(&format!("user{i}"), &format!("pw{i}"))
+                    .unwrap()
+                    .unwrap();
                 assert!(ctx.can_read_table(&format!("t{}", i % $n_roles)));
             }
         }
@@ -2089,7 +2436,8 @@ macro_rules! enc_key_byte_test {
     ($name:ident, $b:expr) => {
         #[test]
         fn $name() {
-            let config = EncryptionConfig::new(EncryptionAlgorithm::Aes256Gcm, vec![$b; 32]).unwrap();
+            let config =
+                EncryptionConfig::new(EncryptionAlgorithm::Aes256Gcm, vec![$b; 32]).unwrap();
             let data = vec![$b.wrapping_add(1); 256];
             let enc = encrypt_buffer(&data, &config).unwrap();
             let dec = decrypt_buffer(&enc, &config).unwrap();
@@ -2128,7 +2476,11 @@ macro_rules! rebalance_test {
             n1.tables = (0..$n_tables).map(|i| format!("t{i}")).collect();
             mgr.add_node(n1);
             for i in 2..=$n_nodes {
-                let n = ClusterNode::new(format!("n{i}"), format!("10.0.0.{i}:9000"), NodeRole::ReadReplica);
+                let n = ClusterNode::new(
+                    format!("n{i}"),
+                    format!("10.0.0.{i}:9000"),
+                    NodeRole::ReadReplica,
+                );
                 mgr.add_node(n);
             }
             let plan = mgr.rebalance().unwrap();
@@ -2176,7 +2528,12 @@ col_perm_test!(cp_pv_sym, &["price", "volume"], "symbol", false);
 col_perm_test!(cp_all3_price, &["price", "volume", "symbol"], "price", true);
 col_perm_test!(cp_all3_vol, &["price", "volume", "symbol"], "volume", true);
 col_perm_test!(cp_all3_sym, &["price", "volume", "symbol"], "symbol", true);
-col_perm_test!(cp_all3_ts, &["price", "volume", "symbol"], "timestamp", false);
+col_perm_test!(
+    cp_all3_ts,
+    &["price", "volume", "symbol"],
+    "timestamp",
+    false
+);
 col_perm_test!(cp_empty_any, &[] as &[&str], "any", false);
 
 // =============================================================================
@@ -2189,16 +2546,20 @@ macro_rules! metering_concurrent_test {
         fn $name() {
             let dir = tempdir().unwrap();
             let meter = Arc::new(UsageMeter::new(dir.path().to_path_buf()));
-            let handles: Vec<_> = (0..$n_threads).map(|_| {
-                let m = Arc::clone(&meter);
-                std::thread::spawn(move || {
-                    for _ in 0..$n_ops {
-                        m.record_query("shared", 1, 1);
-                        m.record_write("shared", 1);
-                    }
+            let handles: Vec<_> = (0..$n_threads)
+                .map(|_| {
+                    let m = Arc::clone(&meter);
+                    std::thread::spawn(move || {
+                        for _ in 0..$n_ops {
+                            m.record_query("shared", 1, 1);
+                            m.record_write("shared", 1);
+                        }
+                    })
                 })
-            }).collect();
-            for h in handles { h.join().unwrap(); }
+                .collect();
+            for h in handles {
+                h.join().unwrap();
+            }
             let u = meter.get_usage("shared");
             assert_eq!(u.queries, $n_threads as u64 * $n_ops as u64);
             assert_eq!(u.rows_written, $n_threads as u64 * $n_ops as u64);
@@ -2233,15 +2594,48 @@ macro_rules! raft_cmd_test {
 }
 
 raft_cmd_test!(rcmd_create_t1, RaftCommand::CreateTable("t1".into()));
-raft_cmd_test!(rcmd_create_t2, RaftCommand::CreateTable("long_table_name_for_testing".into()));
+raft_cmd_test!(
+    rcmd_create_t2,
+    RaftCommand::CreateTable("long_table_name_for_testing".into())
+);
 raft_cmd_test!(rcmd_drop_t1, RaftCommand::DropTable("t1".into()));
 raft_cmd_test!(rcmd_drop_t2, RaftCommand::DropTable("another_table".into()));
-raft_cmd_test!(rcmd_alter_1, RaftCommand::AlterTable("t1".into(), "add col".into()));
-raft_cmd_test!(rcmd_alter_2, RaftCommand::AlterTable("t1".into(), "drop col".into()));
-raft_cmd_test!(rcmd_wal_0, RaftCommand::WalCommit { table: "t1".into(), segment_id: 0 });
-raft_cmd_test!(rcmd_wal_1, RaftCommand::WalCommit { table: "t1".into(), segment_id: 1 });
-raft_cmd_test!(rcmd_wal_42, RaftCommand::WalCommit { table: "t1".into(), segment_id: 42 });
-raft_cmd_test!(rcmd_wal_max, RaftCommand::WalCommit { table: "t1".into(), segment_id: u32::MAX });
+raft_cmd_test!(
+    rcmd_alter_1,
+    RaftCommand::AlterTable("t1".into(), "add col".into())
+);
+raft_cmd_test!(
+    rcmd_alter_2,
+    RaftCommand::AlterTable("t1".into(), "drop col".into())
+);
+raft_cmd_test!(
+    rcmd_wal_0,
+    RaftCommand::WalCommit {
+        table: "t1".into(),
+        segment_id: 0
+    }
+);
+raft_cmd_test!(
+    rcmd_wal_1,
+    RaftCommand::WalCommit {
+        table: "t1".into(),
+        segment_id: 1
+    }
+);
+raft_cmd_test!(
+    rcmd_wal_42,
+    RaftCommand::WalCommit {
+        table: "t1".into(),
+        segment_id: 42
+    }
+);
+raft_cmd_test!(
+    rcmd_wal_max,
+    RaftCommand::WalCommit {
+        table: "t1".into(),
+        segment_id: u32::MAX
+    }
+);
 
 // =============================================================================
 // 51. RBAC update roles parametric
@@ -2254,9 +2648,14 @@ macro_rules! rbac_update_role_test {
             let dir = tempdir().unwrap();
             let store = make_store(dir.path());
             let perms: Vec<Permission> = (0..$n_perms)
-                .map(|i| Permission::Read { table: Some(format!("table_{i}")) })
+                .map(|i| Permission::Read {
+                    table: Some(format!("table_{i}")),
+                })
                 .collect();
-            let role = Role { name: "r".into(), permissions: perms.clone() };
+            let role = Role {
+                name: "r".into(),
+                permissions: perms.clone(),
+            };
             store.create_role(&role).unwrap();
             let loaded = store.get_role("r").unwrap().unwrap();
             assert_eq!(loaded.permissions.len(), $n_perms);
@@ -2439,7 +2838,12 @@ fn hash_similar_passwords_differ() {
 
 #[test]
 fn node_all_statuses() {
-    for status in [NodeStatus::Online, NodeStatus::Offline, NodeStatus::Syncing, NodeStatus::Draining] {
+    for status in [
+        NodeStatus::Online,
+        NodeStatus::Offline,
+        NodeStatus::Syncing,
+        NodeStatus::Draining,
+    ] {
         let mut node = ClusterNode::new("n1".into(), "127.0.0.1:9000".into(), NodeRole::Primary);
         node.status = status.clone();
         match status {
@@ -2461,7 +2865,11 @@ fn node_all_statuses() {
 
 #[test]
 fn node_all_roles() {
-    for role in [NodeRole::Primary, NodeRole::ReadReplica, NodeRole::Coordinator] {
+    for role in [
+        NodeRole::Primary,
+        NodeRole::ReadReplica,
+        NodeRole::Coordinator,
+    ] {
         let node = ClusterNode::new("n1".into(), "127.0.0.1:9000".into(), role.clone());
         match role {
             NodeRole::Primary => {
@@ -2493,7 +2901,12 @@ macro_rules! resolve_ctx_test {
             let mut roles_list = vec![];
             for i in 0..$n_roles {
                 let rname = format!("role_{i}");
-                let role = Role { name: rname.clone(), permissions: vec![Permission::Read { table: Some(format!("t{i}")) }] };
+                let role = Role {
+                    name: rname.clone(),
+                    permissions: vec![Permission::Read {
+                        table: Some(format!("t{i}")),
+                    }],
+                };
                 store.create_role(&role).unwrap();
                 roles_list.push(rname);
             }
@@ -2559,7 +2972,10 @@ fn rbac_roles_sorted() {
     let dir = tempdir().unwrap();
     let store = make_store(dir.path());
     for name in &["writer", "admin", "reader"] {
-        let role = Role { name: name.to_string(), permissions: vec![] };
+        let role = Role {
+            name: name.to_string(),
+            permissions: vec![],
+        };
         store.create_role(&role).unwrap();
     }
     let roles = store.list_roles().unwrap();
@@ -2569,14 +2985,32 @@ fn rbac_roles_sorted() {
 
 #[test]
 fn metering_snapshot_eq() {
-    let s1 = CounterSnapshot { queries: 1, rows_read: 2, rows_written: 3, bytes_scanned: 4, bytes_stored: 5 };
+    let s1 = CounterSnapshot {
+        queries: 1,
+        rows_read: 2,
+        rows_written: 3,
+        bytes_scanned: 4,
+        bytes_stored: 5,
+    };
     let s2 = s1.clone();
     assert_eq!(s1, s2);
 }
 
 #[test]
 fn metering_snapshot_ne() {
-    let s1 = CounterSnapshot { queries: 1, rows_read: 2, rows_written: 3, bytes_scanned: 4, bytes_stored: 5 };
-    let s2 = CounterSnapshot { queries: 99, rows_read: 2, rows_written: 3, bytes_scanned: 4, bytes_stored: 5 };
+    let s1 = CounterSnapshot {
+        queries: 1,
+        rows_read: 2,
+        rows_written: 3,
+        bytes_scanned: 4,
+        bytes_stored: 5,
+    };
+    let s2 = CounterSnapshot {
+        queries: 99,
+        rows_read: 2,
+        rows_written: 3,
+        bytes_scanned: 4,
+        bytes_stored: 5,
+    };
     assert_ne!(s1, s2);
 }

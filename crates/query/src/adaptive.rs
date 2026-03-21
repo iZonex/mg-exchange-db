@@ -28,26 +28,30 @@ const PARALLEL_PARTITION_THRESHOLD: u32 = 2;
 
 /// Decides at runtime which execution strategy to use based on the query
 /// plan and table statistics.
-pub fn choose_execution_strategy(
-    plan: &QueryPlan,
-    stats: &TableStats,
-) -> ExecutionStrategy {
+pub fn choose_execution_strategy(plan: &QueryPlan, stats: &TableStats) -> ExecutionStrategy {
     match plan {
         QueryPlan::Select {
             columns,
             group_by,
             sample_by,
             filter: _,
-         latest_on,
+            latest_on,
             ..
         } => {
-            let has_aggregates = columns.iter().any(|c| matches!(c, SelectColumn::Aggregate { .. }));
-            let has_window_functions = columns.iter().any(|c| matches!(c, SelectColumn::WindowFunction(_)));
+            let has_aggregates = columns
+                .iter()
+                .any(|c| matches!(c, SelectColumn::Aggregate { .. }));
+            let has_window_functions = columns
+                .iter()
+                .any(|c| matches!(c, SelectColumn::WindowFunction(_)));
             let has_group_by = !group_by.is_empty();
             let has_sample_by = sample_by.is_some();
             let has_latest_on = latest_on.is_some();
             let has_complex_exprs = columns.iter().any(|c| {
-                matches!(c, SelectColumn::CaseWhen { .. } | SelectColumn::ScalarSubquery { .. })
+                matches!(
+                    c,
+                    SelectColumn::CaseWhen { .. } | SelectColumn::ScalarSubquery { .. }
+                )
             });
 
             // Small tables: row-at-a-time is fastest (no overhead).

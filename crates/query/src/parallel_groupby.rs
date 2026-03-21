@@ -109,14 +109,22 @@ impl AggregateState {
             }
             AggregateKind::First => {
                 if let Some(v) = self.first {
-                    if self.has_float { Value::F64(v) } else { Value::I64(v as i64) }
+                    if self.has_float {
+                        Value::F64(v)
+                    } else {
+                        Value::I64(v as i64)
+                    }
                 } else {
                     Value::Null
                 }
             }
             AggregateKind::Last => {
                 if let Some(v) = self.last {
-                    if self.has_float { Value::F64(v) } else { Value::I64(v as i64) }
+                    if self.has_float {
+                        Value::F64(v)
+                    } else {
+                        Value::I64(v as i64)
+                    }
                 } else {
                     Value::Null
                 }
@@ -163,7 +171,14 @@ pub fn parallel_group_by(
     let partial_results: Vec<Result<PartialResult>> = partitions
         .par_iter()
         .map(|partition_dir| {
-            aggregate_single_partition(partition_dir, meta, group_columns, aggregates, filter, &table_dir)
+            aggregate_single_partition(
+                partition_dir,
+                meta,
+                group_columns,
+                aggregates,
+                filter,
+                &table_dir,
+            )
         })
         .collect();
 
@@ -237,7 +252,12 @@ fn aggregate_single_partition(
 
     // Apply filter.
     let row_mask: Option<Vec<bool>> = if let Some(f) = filter {
-        Some(crate::vector_groupby::compute_filter_mask_pub(native_path, meta, f, row_count)?)
+        Some(crate::vector_groupby::compute_filter_mask_pub(
+            native_path,
+            meta,
+            f,
+            row_count,
+        )?)
     } else {
         None
     };
@@ -246,9 +266,10 @@ fn aggregate_single_partition(
 
     for row_idx in 0..row_count {
         if let Some(ref mask) = row_mask
-            && !mask[row_idx] {
-                continue;
-            }
+            && !mask[row_idx]
+        {
+            continue;
+        }
 
         let mut key = GroupKey(Vec::new());
         let mut key_values: Vec<Value> = Vec::with_capacity(group_columns.len());
@@ -291,9 +312,15 @@ fn aggregate_single_partition(
                         if !v.is_nan() {
                             entry.1[agg_idx].sum += v;
                             entry.1[agg_idx].count += 1;
-                            if v < entry.1[agg_idx].min { entry.1[agg_idx].min = v; }
-                            if v > entry.1[agg_idx].max { entry.1[agg_idx].max = v; }
-                            if entry.1[agg_idx].first.is_none() { entry.1[agg_idx].first = Some(v); }
+                            if v < entry.1[agg_idx].min {
+                                entry.1[agg_idx].min = v;
+                            }
+                            if v > entry.1[agg_idx].max {
+                                entry.1[agg_idx].max = v;
+                            }
+                            if entry.1[agg_idx].first.is_none() {
+                                entry.1[agg_idx].first = Some(v);
+                            }
                             entry.1[agg_idx].last = Some(v);
                             entry.1[agg_idx].has_value = true;
                             entry.1[agg_idx].has_float = true;
@@ -305,9 +332,15 @@ fn aggregate_single_partition(
                         entry.1[agg_idx].sum += v as f64;
                         entry.1[agg_idx].count += 1;
                         let vf = v as f64;
-                        if vf < entry.1[agg_idx].min { entry.1[agg_idx].min = vf; }
-                        if vf > entry.1[agg_idx].max { entry.1[agg_idx].max = vf; }
-                        if entry.1[agg_idx].first.is_none() { entry.1[agg_idx].first = Some(vf); }
+                        if vf < entry.1[agg_idx].min {
+                            entry.1[agg_idx].min = vf;
+                        }
+                        if vf > entry.1[agg_idx].max {
+                            entry.1[agg_idx].max = vf;
+                        }
+                        if entry.1[agg_idx].first.is_none() {
+                            entry.1[agg_idx].first = Some(vf);
+                        }
                         entry.1[agg_idx].last = Some(vf);
                         entry.1[agg_idx].has_value = true;
                     }
@@ -317,9 +350,15 @@ fn aggregate_single_partition(
                         entry.1[agg_idx].sum += v as f64;
                         entry.1[agg_idx].count += 1;
                         let vf = v as f64;
-                        if vf < entry.1[agg_idx].min { entry.1[agg_idx].min = vf; }
-                        if vf > entry.1[agg_idx].max { entry.1[agg_idx].max = vf; }
-                        if entry.1[agg_idx].first.is_none() { entry.1[agg_idx].first = Some(vf); }
+                        if vf < entry.1[agg_idx].min {
+                            entry.1[agg_idx].min = vf;
+                        }
+                        if vf > entry.1[agg_idx].max {
+                            entry.1[agg_idx].max = vf;
+                        }
+                        if entry.1[agg_idx].first.is_none() {
+                            entry.1[agg_idx].first = Some(vf);
+                        }
                         entry.1[agg_idx].last = Some(vf);
                         entry.1[agg_idx].has_value = true;
                     }
@@ -467,7 +506,12 @@ fn build_empty_result(select_cols: &[SelectColumn]) -> Result<QueryResult> {
         .iter()
         .map(|c| match c {
             SelectColumn::Name(n) => n.clone(),
-            SelectColumn::Aggregate { function, column, alias, .. } => {
+            SelectColumn::Aggregate {
+                function,
+                column,
+                alias,
+                ..
+            } => {
                 if let Some(a) = alias {
                     a.clone()
                 } else {
@@ -495,7 +539,12 @@ fn build_result(
     for col in select_cols {
         match col {
             SelectColumn::Name(n) => col_names.push(n.clone()),
-            SelectColumn::Aggregate { function, column, alias, .. } => {
+            SelectColumn::Aggregate {
+                function,
+                column,
+                alias,
+                ..
+            } => {
                 if let Some(a) = alias {
                     col_names.push(a.clone());
                 } else {
@@ -569,7 +618,13 @@ mod tests {
         mf.flush().unwrap();
     }
 
-    fn setup_partition(dir: &Path, name: &str, symbols: &[i32], prices: &[f64], volumes: &[i64]) -> PathBuf {
+    fn setup_partition(
+        dir: &Path,
+        name: &str,
+        symbols: &[i32],
+        prices: &[f64],
+        volumes: &[i64],
+    ) -> PathBuf {
         let part_dir = dir.join(name);
         std::fs::create_dir_all(&part_dir).unwrap();
         write_i32_column(&part_dir.join("symbol.d"), symbols);
@@ -615,16 +670,57 @@ mod tests {
             let symbols: Vec<i32> = (0..100).map(|j| (j % 5) as i32).collect();
             let prices: Vec<f64> = (0..100).map(|j| (i * 100 + j) as f64 * 0.1).collect();
             let volumes: Vec<i64> = (0..100).map(|j| (i * 100 + j) as i64).collect();
-            partitions.push(setup_partition(dir.path(), &format!("p{i}"), &symbols, &prices, &volumes));
+            partitions.push(setup_partition(
+                dir.path(),
+                &format!("p{i}"),
+                &symbols,
+                &prices,
+                &volumes,
+            ));
         }
 
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Sum, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Count, column: "*".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Min, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Max, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Avg, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Sum,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Count,
+                column: "*".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Min,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Max,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Avg,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
 
         let aggregates = vec![
@@ -639,17 +735,35 @@ mod tests {
 
         // Parallel result.
         let par_result = parallel_group_by(
-            dir.path(), "test", &meta, &partitions,
-            &group_columns, &aggregates, &None, &select_cols,
-        ).unwrap();
+            dir.path(),
+            "test",
+            &meta,
+            &partitions,
+            &group_columns,
+            &aggregates,
+            &None,
+            &select_cols,
+        )
+        .unwrap();
 
         // Sequential result (using vector_group_by which processes sequentially).
         let seq_result = crate::vector_groupby::vector_group_by(
-            dir.path(), "test", &meta, &partitions,
-            &group_columns, &aggregates, &None, &select_cols,
-        ).unwrap();
+            dir.path(),
+            "test",
+            &meta,
+            &partitions,
+            &group_columns,
+            &aggregates,
+            &None,
+            &select_cols,
+        )
+        .unwrap();
 
-        if let (QueryResult::Rows { rows: par_rows, .. }, QueryResult::Rows { rows: seq_rows, .. }) = (&par_result, &seq_result) {
+        if let (
+            QueryResult::Rows { rows: par_rows, .. },
+            QueryResult::Rows { rows: seq_rows, .. },
+        ) = (&par_result, &seq_result)
+        {
             assert_eq!(par_rows.len(), seq_rows.len(), "group count mismatch");
 
             let mut par_sorted = par_rows.clone();
@@ -662,7 +776,9 @@ mod tests {
                 assert_eq!(p[0], s[0], "group key mismatch");
                 // SUM.
                 match (&p[1], &s[1]) {
-                    (Value::F64(a), Value::F64(b)) => assert!((a - b).abs() < 1e-6, "sum mismatch: {a} vs {b}"),
+                    (Value::F64(a), Value::F64(b)) => {
+                        assert!((a - b).abs() < 1e-6, "sum mismatch: {a} vs {b}")
+                    }
                     _ => assert_eq!(p[1], s[1]),
                 }
                 // COUNT.
@@ -673,7 +789,9 @@ mod tests {
                 assert_eq!(p[4], s[4], "max mismatch");
                 // AVG.
                 match (&p[5], &s[5]) {
-                    (Value::F64(a), Value::F64(b)) => assert!((a - b).abs() < 1e-6, "avg mismatch: {a} vs {b}"),
+                    (Value::F64(a), Value::F64(b)) => {
+                        assert!((a - b).abs() < 1e-6, "avg mismatch: {a} vs {b}")
+                    }
                     _ => assert_eq!(p[5], s[5]),
                 }
             }
@@ -687,20 +805,46 @@ mod tests {
         let dir = tempdir().unwrap();
         let meta = make_meta();
 
-        let p1 = setup_partition(dir.path(), "p1", &[1, 2, 1], &[10.0, 20.0, 30.0], &[100, 200, 300]);
-        let p2 = setup_partition(dir.path(), "p2", &[1, 2, 1], &[40.0, 50.0, 60.0], &[400, 500, 600]);
+        let p1 = setup_partition(
+            dir.path(),
+            "p1",
+            &[1, 2, 1],
+            &[10.0, 20.0, 30.0],
+            &[100, 200, 300],
+        );
+        let p2 = setup_partition(
+            dir.path(),
+            "p2",
+            &[1, 2, 1],
+            &[40.0, 50.0, 60.0],
+            &[400, 500, 600],
+        );
 
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Sum, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Sum,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let aggregates = vec![(AggregateKind::Sum, "price".to_string())];
         let filter = Some(Filter::Gt("price".to_string(), Value::F64(25.0)));
 
         let result = parallel_group_by(
-            dir.path(), "test", &meta, &[p1, p2],
-            &["symbol".to_string()], &aggregates, &filter, &select_cols,
-        ).unwrap();
+            dir.path(),
+            "test",
+            &meta,
+            &[p1, p2],
+            &["symbol".to_string()],
+            &aggregates,
+            &filter,
+            &select_cols,
+        )
+        .unwrap();
 
         if let QueryResult::Rows { rows, .. } = &result {
             let mut sorted = rows.clone();
@@ -725,14 +869,28 @@ mod tests {
 
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Count, column: "*".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Count,
+                column: "*".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
         let aggregates = vec![(AggregateKind::Count, "*".to_string())];
 
         let result = parallel_group_by(
-            dir.path(), "test", &meta, &[],
-            &["symbol".to_string()], &aggregates, &None, &select_cols,
-        ).unwrap();
+            dir.path(),
+            "test",
+            &meta,
+            &[],
+            &["symbol".to_string()],
+            &aggregates,
+            &None,
+            &select_cols,
+        )
+        .unwrap();
 
         if let QueryResult::Rows { rows, .. } = &result {
             assert_eq!(rows.len(), 0);
@@ -753,11 +911,46 @@ mod tests {
 
         let select_cols = vec![
             SelectColumn::Name("symbol".into()),
-            SelectColumn::Aggregate { function: AggregateKind::Sum, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Count, column: "*".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Avg, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Min, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
-            SelectColumn::Aggregate { function: AggregateKind::Max, column: "price".into(), alias: None, filter: None, within_group_order: None, arg_expr: None },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Sum,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Count,
+                column: "*".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Avg,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Min,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
+            SelectColumn::Aggregate {
+                function: AggregateKind::Max,
+                column: "price".into(),
+                alias: None,
+                filter: None,
+                within_group_order: None,
+                arg_expr: None,
+            },
         ];
 
         let aggregates = vec![
@@ -769,9 +962,16 @@ mod tests {
         ];
 
         let result = parallel_group_by(
-            dir.path(), "test", &meta, &[p1, p2, p3],
-            &["symbol".to_string()], &aggregates, &None, &select_cols,
-        ).unwrap();
+            dir.path(),
+            "test",
+            &meta,
+            &[p1, p2, p3],
+            &["symbol".to_string()],
+            &aggregates,
+            &None,
+            &select_cols,
+        )
+        .unwrap();
 
         if let QueryResult::Rows { rows, .. } = &result {
             assert_eq!(rows.len(), 1);

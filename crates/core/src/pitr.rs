@@ -316,7 +316,7 @@ mod tests {
     use super::*;
     use crate::table::TableBuilder;
     use crate::txn::TxnFile;
-    use crate::wal::row_codec::{encode_row, OwnedColumnValue};
+    use crate::wal::row_codec::{OwnedColumnValue, encode_row};
     use crate::wal::writer::{CommitMode, WalWriter, WalWriterConfig};
     use exchange_common::types::{ColumnType, PartitionBy};
     use tempfile::tempdir;
@@ -349,11 +349,7 @@ mod tests {
                 .ok()
                 .map(|rd| {
                     rd.filter_map(|e| e.ok())
-                        .any(|e| {
-                            e.file_name()
-                                .to_string_lossy()
-                                .ends_with(".wal")
-                        })
+                        .any(|e| e.file_name().to_string_lossy().ends_with(".wal"))
                 })
                 .unwrap_or(false);
 
@@ -425,10 +421,8 @@ mod tests {
         write_wal_rows(&db_root.join("trades"), &[ts1], &[100.0]);
 
         // Merge initial data so the snapshot captures it.
-        let meta =
-            crate::table::TableMeta::load(&db_root.join("trades").join("_meta")).unwrap();
-        crate::recovery::RecoveryManager::recover_table(&db_root.join("trades"), &meta)
-            .unwrap();
+        let meta = crate::table::TableMeta::load(&db_root.join("trades").join("_meta")).unwrap();
+        crate::recovery::RecoveryManager::recover_table(&db_root.join("trades"), &meta).unwrap();
 
         let config = PitrConfig::default();
         let mgr = PitrManager::new(db_root.clone(), config);
@@ -441,9 +435,7 @@ mod tests {
         write_wal_rows(&db_root.join("trades"), &[ts2], &[200.0]);
 
         // Restore to the checkpoint time (should NOT include the second write).
-        let stats = mgr
-            .restore_to(cp.timestamp, restore_dir.path())
-            .unwrap();
+        let stats = mgr.restore_to(cp.timestamp, restore_dir.path()).unwrap();
 
         assert!(stats.tables_restored >= 1);
         assert_eq!(stats.target_timestamp, cp.timestamp);
@@ -465,10 +457,8 @@ mod tests {
         write_wal_rows(&db_root.join("trades"), &[ts1], &[100.0]);
 
         // Merge so snapshot captures it.
-        let meta =
-            crate::table::TableMeta::load(&db_root.join("trades").join("_meta")).unwrap();
-        crate::recovery::RecoveryManager::recover_table(&db_root.join("trades"), &meta)
-            .unwrap();
+        let meta = crate::table::TableMeta::load(&db_root.join("trades").join("_meta")).unwrap();
+        crate::recovery::RecoveryManager::recover_table(&db_root.join("trades"), &meta).unwrap();
 
         let config = PitrConfig::default();
         let mgr = PitrManager::new(db_root.clone(), config);
@@ -503,10 +493,8 @@ mod tests {
         let ts1 = 1_710_513_000_000_000_000i64;
         write_wal_rows(&db_root.join("trades"), &[ts1], &[100.0]);
 
-        let meta =
-            crate::table::TableMeta::load(&db_root.join("trades").join("_meta")).unwrap();
-        crate::recovery::RecoveryManager::recover_table(&db_root.join("trades"), &meta)
-            .unwrap();
+        let meta = crate::table::TableMeta::load(&db_root.join("trades").join("_meta")).unwrap();
+        crate::recovery::RecoveryManager::recover_table(&db_root.join("trades"), &meta).unwrap();
 
         let config = PitrConfig::default();
         let mgr = PitrManager::new(db_root.clone(), config);
@@ -517,8 +505,7 @@ mod tests {
         // Write more data.
         let ts2 = ts1 + 60_000_000_000;
         write_wal_rows(&db_root.join("trades"), &[ts2], &[200.0]);
-        crate::recovery::RecoveryManager::recover_table(&db_root.join("trades"), &meta)
-            .unwrap();
+        crate::recovery::RecoveryManager::recover_table(&db_root.join("trades"), &meta).unwrap();
 
         // Checkpoint 2.
         let cp2 = mgr.create_checkpoint().unwrap();
@@ -526,8 +513,7 @@ mod tests {
         // Write even more data.
         let ts3 = ts1 + 120_000_000_000;
         write_wal_rows(&db_root.join("trades"), &[ts3], &[300.0]);
-        crate::recovery::RecoveryManager::recover_table(&db_root.join("trades"), &meta)
-            .unwrap();
+        crate::recovery::RecoveryManager::recover_table(&db_root.join("trades"), &meta).unwrap();
 
         // Checkpoint 3.
         let _cp3 = mgr.create_checkpoint().unwrap();
@@ -537,9 +523,7 @@ mod tests {
 
         // Restore to checkpoint 2's timestamp.
         let restore_dir = tempdir().unwrap();
-        let stats = mgr
-            .restore_to(cp2.timestamp, restore_dir.path())
-            .unwrap();
+        let stats = mgr.restore_to(cp2.timestamp, restore_dir.path()).unwrap();
 
         // Should use cp2's snapshot (which has rows at ts1 and ts2).
         assert!(stats.tables_restored >= 1);

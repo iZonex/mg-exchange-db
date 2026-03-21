@@ -3,10 +3,8 @@
 //! Uses a simple PRNG instead of external property testing crates.
 
 use exchange_common::types::ColumnType;
-use exchange_core::compression::{
-    delta_decode_i64, delta_encode_i64, rle_decode, rle_encode,
-};
-use exchange_core::wal::row_codec::{decode_row, encode_row, OwnedColumnValue};
+use exchange_core::compression::{delta_decode_i64, delta_encode_i64, rle_decode, rle_encode};
+use exchange_core::wal::row_codec::{OwnedColumnValue, decode_row, encode_row};
 
 // ---------------------------------------------------------------------------
 // Simple PRNG (xorshift64)
@@ -98,13 +96,31 @@ fn random_column_value(rng: &mut SimpleRng) -> (ColumnType, OwnedColumnValue) {
     // Choose from a subset of types that are straightforward to test.
     let type_idx = rng.next_usize(10);
     match type_idx {
-        0 => (ColumnType::Boolean, OwnedColumnValue::Boolean(rng.next_bool())),
-        1 => (ColumnType::I8, OwnedColumnValue::I8((rng.next_u64() & 0xFF) as i8)),
-        2 => (ColumnType::I16, OwnedColumnValue::I16((rng.next_u64() & 0xFFFF) as i16)),
-        3 => (ColumnType::I32, OwnedColumnValue::I32(rng.next_u64() as i32)),
+        0 => (
+            ColumnType::Boolean,
+            OwnedColumnValue::Boolean(rng.next_bool()),
+        ),
+        1 => (
+            ColumnType::I8,
+            OwnedColumnValue::I8((rng.next_u64() & 0xFF) as i8),
+        ),
+        2 => (
+            ColumnType::I16,
+            OwnedColumnValue::I16((rng.next_u64() & 0xFFFF) as i16),
+        ),
+        3 => (
+            ColumnType::I32,
+            OwnedColumnValue::I32(rng.next_u64() as i32),
+        ),
         4 => (ColumnType::I64, OwnedColumnValue::I64(rng.next_i64())),
-        5 => (ColumnType::F32, OwnedColumnValue::F32(rng.next_f64() as f32 * 1000.0)),
-        6 => (ColumnType::F64, OwnedColumnValue::F64(rng.next_f64() * 100000.0)),
+        5 => (
+            ColumnType::F32,
+            OwnedColumnValue::F32(rng.next_f64() as f32 * 1000.0),
+        ),
+        6 => (
+            ColumnType::F64,
+            OwnedColumnValue::F64(rng.next_f64() * 100000.0),
+        ),
         7 => (
             ColumnType::Timestamp,
             OwnedColumnValue::Timestamp(rng.next_u64() as i64),
@@ -172,8 +188,8 @@ fn property_compression_roundtrip() {
         let compressed = lz4_flex::compress_prepend_size(&data);
 
         // Decompress.
-        let decompressed = lz4_flex::decompress_size_prepended(&compressed)
-            .expect("LZ4 decompression failed");
+        let decompressed =
+            lz4_flex::decompress_size_prepended(&compressed).expect("LZ4 decompression failed");
 
         assert_eq!(
             decompressed, data,
@@ -201,16 +217,13 @@ fn property_rle_encoding_roundtrip() {
 
         let encoded = rle_encode(&values);
         let decoded = rle_decode(&encoded);
-        assert_eq!(
-            decoded, values,
-            "RLE roundtrip failed for {} values",
-            count
-        );
+        assert_eq!(decoded, values, "RLE roundtrip failed for {} values", count);
 
         // Also verify that runs are correct: no two adjacent runs have the same value.
         for i in 1..encoded.len() {
             assert_ne!(
-                encoded[i - 1].0, encoded[i].0,
+                encoded[i - 1].0,
+                encoded[i].0,
                 "RLE should merge adjacent equal values"
             );
         }

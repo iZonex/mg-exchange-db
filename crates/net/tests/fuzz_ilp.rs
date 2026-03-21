@@ -168,5 +168,8 @@ fn fuzz_ilp_parser_no_panic() {
 
     assert!(err_count > 0, "expected some errors from random input");
     assert!(ok_count > 0, "expected some valid parses");
-    eprintln!("ILP fuzz: {ok_count} ok, {err_count} errors out of {} inputs", inputs.len());
+    eprintln!(
+        "ILP fuzz: {ok_count} ok, {err_count} errors out of {} inputs",
+        inputs.len()
+    );
 }

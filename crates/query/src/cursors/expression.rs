@@ -34,15 +34,27 @@ impl ExpressionCursor {
             };
             schema.push((name, ColumnType::F64));
         }
-        Self { source, ops, schema }
+        Self {
+            source,
+            ops,
+            schema,
+        }
     }
 
     fn eval_op(op: &ExprOp, row: &[Value]) -> Value {
         let (a_idx, b_idx) = match op {
             ExprOp::Mul(a, b, _) | ExprOp::Add(a, b, _) | ExprOp::Sub(a, b, _) => (*a, *b),
         };
-        let a = match &row[a_idx] { Value::I64(n) => *n as f64, Value::F64(n) => *n, _ => return Value::Null };
-        let b = match &row[b_idx] { Value::I64(n) => *n as f64, Value::F64(n) => *n, _ => return Value::Null };
+        let a = match &row[a_idx] {
+            Value::I64(n) => *n as f64,
+            Value::F64(n) => *n,
+            _ => return Value::Null,
+        };
+        let b = match &row[b_idx] {
+            Value::I64(n) => *n as f64,
+            Value::F64(n) => *n,
+            _ => return Value::Null,
+        };
         Value::F64(match op {
             ExprOp::Mul(..) => a * b,
             ExprOp::Add(..) => a + b,
@@ -52,7 +64,9 @@ impl ExpressionCursor {
 }
 
 impl RecordCursor for ExpressionCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
         match self.source.next_batch(max_rows)? {
@@ -87,9 +101,8 @@ mod tests {
         ];
         let rows = vec![vec![Value::F64(100.0), Value::I64(5)]];
         let source = MemoryCursor::from_rows(schema, &rows);
-        let mut cursor = ExpressionCursor::new(Box::new(source), vec![
-            ExprOp::Mul(0, 1, "notional".into()),
-        ]);
+        let mut cursor =
+            ExpressionCursor::new(Box::new(source), vec![ExprOp::Mul(0, 1, "notional".into())]);
         let batch = cursor.next_batch(10).unwrap().unwrap();
         assert_eq!(batch.get_value(0, 2), Value::F64(500.0));
     }

@@ -99,13 +99,15 @@ impl ScanCursor {
                 let index_path = path.join(format!("{name}.i"));
                 if data_path.exists() && index_path.exists() {
                     let reader = VarColumnReader::open(&data_path, &index_path)?;
-                    self.readers.push((*col_idx, ColReader::Var(reader, *col_type)));
+                    self.readers
+                        .push((*col_idx, ColReader::Var(reader, *col_type)));
                 }
             } else {
                 let data_path = path.join(format!("{name}.d"));
                 if data_path.exists() {
                     let reader = FixedColumnReader::open(&data_path, *col_type)?;
-                    self.readers.push((*col_idx, ColReader::Fixed(reader, *col_type)));
+                    self.readers
+                        .push((*col_idx, ColReader::Fixed(reader, *col_type)));
                 }
             }
         }
@@ -155,10 +157,9 @@ impl RecordCursor for ScanCursor {
         let mut rows_emitted = 0usize;
 
         while rows_emitted < max_rows {
-            if self.current_row >= self.partition_rows
-                && !self.advance_partition()? {
-                    break;
-                }
+            if self.current_row >= self.partition_rows && !self.advance_partition()? {
+                break;
+            }
 
             // Read rows from current partition.
             let rows_remaining_in_partition = (self.partition_rows - self.current_row) as usize;

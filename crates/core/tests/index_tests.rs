@@ -4,7 +4,7 @@
 
 use exchange_core::index::bitmap::{BitmapIndexReader, BitmapIndexWriter};
 use exchange_core::index::symbol_column::{SymbolColumnReader, SymbolColumnWriter};
-use exchange_core::index::symbol_map::{SymbolMap, SYMBOL_NULL};
+use exchange_core::index::symbol_map::{SYMBOL_NULL, SymbolMap};
 use tempfile::tempdir;
 
 // ============================================================================
@@ -262,10 +262,7 @@ mod bitmap_index {
             w.flush().unwrap();
         }
         let r = BitmapIndexReader::open(dir.path(), "idx").unwrap();
-        assert_eq!(
-            r.get_row_ids(0),
-            (0..=cap as u64).collect::<Vec<_>>()
-        );
+        assert_eq!(r.get_row_ids(0), (0..=cap as u64).collect::<Vec<_>>());
     }
 }
 
@@ -546,10 +543,7 @@ mod symbol_column {
         assert_eq!(r.row_count(), 100);
         assert_eq!(r.symbol_map().len(), 10);
         for i in 0..100u64 {
-            assert_eq!(
-                r.read_symbol(i),
-                Some(format!("SYM_{}", i % 10).as_str())
-            );
+            assert_eq!(r.read_symbol(i), Some(format!("SYM_{}", i % 10).as_str()));
         }
     }
 

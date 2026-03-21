@@ -16,12 +16,17 @@ pub struct TimeoutCursor {
 
 impl TimeoutCursor {
     pub fn new(source: Box<dyn RecordCursor>, timeout: Duration) -> Self {
-        Self { source, deadline: Instant::now() + timeout }
+        Self {
+            source,
+            deadline: Instant::now() + timeout,
+        }
     }
 }
 
 impl RecordCursor for TimeoutCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { self.source.schema() }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        self.source.schema()
+    }
 
     fn next_batch(&mut self, max_rows: usize) -> Result<Option<RecordBatch>> {
         if Instant::now() >= self.deadline {

@@ -228,10 +228,7 @@ mod tests {
         let mut writer = TableWriter::open(db_root, "trades").unwrap();
         for (ts, price) in timestamps_secs.iter().zip(prices.iter()) {
             writer
-                .write_row(
-                    Timestamp::from_secs(*ts),
-                    &[ColumnValue::F64(*price)],
-                )
+                .write_row(Timestamp::from_secs(*ts), &[ColumnValue::F64(*price)])
                 .unwrap();
         }
         writer.flush().unwrap();
@@ -307,8 +304,7 @@ mod tests {
         let table_dir = db_root.join("trades");
         let split_ts = Timestamp::from_secs(base + 2000).as_nanos();
 
-        let (p1, p2) =
-            split_partition(&table_dir, "2024-03-15", &meta, split_ts).unwrap();
+        let (p1, p2) = split_partition(&table_dir, "2024-03-15", &meta, split_ts).unwrap();
 
         // Read both halves and verify.
         let rows1 = crate::table::read_partition_rows(&table_dir.join(&p1), &meta).unwrap();
@@ -357,8 +353,7 @@ mod tests {
         assert_eq!(merged, "2024-03-15");
 
         // The merged partition should contain all 4 rows sorted by timestamp.
-        let rows =
-            crate::table::read_partition_rows(&table_dir.join(&merged), &meta).unwrap();
+        let rows = crate::table::read_partition_rows(&table_dir.join(&merged), &meta).unwrap();
         assert_eq!(rows.len(), 4);
 
         // Verify they are sorted by timestamp.

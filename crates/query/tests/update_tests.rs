@@ -153,7 +153,8 @@ mod update_where {
     fn update_where_and() {
         let db = TestDb::with_trades(20);
         db.exec_ok("UPDATE trades SET price = 0.0 WHERE symbol = 'BTC/USD' AND side = 'buy'");
-        let (_, rows) = db.query("SELECT price FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy'");
+        let (_, rows) =
+            db.query("SELECT price FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy'");
         for row in &rows {
             assert_eq!(row[0], Value::F64(0.0));
         }
@@ -163,7 +164,8 @@ mod update_where {
     fn update_where_or() {
         let db = TestDb::with_trades(20);
         db.exec_ok("UPDATE trades SET price = 0.0 WHERE symbol = 'BTC/USD' OR symbol = 'ETH/USD'");
-        let (_, rows) = db.query("SELECT price FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'ETH/USD'");
+        let (_, rows) =
+            db.query("SELECT price FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'ETH/USD'");
         for row in &rows {
             assert_eq!(row[0], Value::F64(0.0));
         }
@@ -290,7 +292,10 @@ mod update_types {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, s VARCHAR)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'old')", ts(0)));
         db.exec_ok("UPDATE t SET s = 'new'");
-        assert_eq!(db.query_scalar("SELECT s FROM t"), Value::Str("new".to_string()));
+        assert_eq!(
+            db.query_scalar("SELECT s FROM t"),
+            Value::Str("new".to_string())
+        );
     }
 
     #[test]
@@ -299,7 +304,10 @@ mod update_types {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, s VARCHAR)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'hello')", ts(0)));
         db.exec_ok("UPDATE t SET s = ''");
-        assert_eq!(db.query_scalar("SELECT s FROM t"), Value::Str("".to_string()));
+        assert_eq!(
+            db.query_scalar("SELECT s FROM t"),
+            Value::Str("".to_string())
+        );
     }
 
     #[test]
@@ -410,10 +418,16 @@ mod update_edge {
     fn update_only_matching_rows() {
         let db = TestDb::with_trades(20);
         let (_, before_btc) = db.query("SELECT count(*) FROM trades WHERE symbol = 'BTC/USD'");
-        let btc_count = match &before_btc[0][0] { Value::I64(n) => *n, other => panic!("{other:?}") };
+        let btc_count = match &before_btc[0][0] {
+            Value::I64(n) => *n,
+            other => panic!("{other:?}"),
+        };
         db.exec_ok("UPDATE trades SET price = 0.0 WHERE symbol = 'BTC/USD'");
         let (_, after_zero) = db.query("SELECT count(*) FROM trades WHERE price = 0.0");
-        let zero_count = match &after_zero[0][0] { Value::I64(n) => *n, other => panic!("{other:?}") };
+        let zero_count = match &after_zero[0][0] {
+            Value::I64(n) => *n,
+            other => panic!("{other:?}"),
+        };
         assert_eq!(btc_count, zero_count);
     }
 
@@ -445,7 +459,10 @@ mod update_edge {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, s VARCHAR)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'old')", ts(0)));
         db.exec_ok("UPDATE t SET s = 'new value with spaces'");
-        assert_eq!(db.query_scalar("SELECT s FROM t"), Value::Str("new value with spaces".to_string()));
+        assert_eq!(
+            db.query_scalar("SELECT s FROM t"),
+            Value::Str("new value with spaces".to_string())
+        );
     }
 
     #[test]
@@ -470,7 +487,10 @@ mod update_edge {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 100.0)", ts(0)));
         db.exec_ok("UPDATE t SET v = v - 30");
-        assert!(db.query_scalar("SELECT v FROM t").eq_coerce(&Value::F64(70.0)));
+        assert!(
+            db.query_scalar("SELECT v FROM t")
+                .eq_coerce(&Value::F64(70.0))
+        );
     }
 
     #[test]
@@ -480,7 +500,10 @@ mod update_edge {
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1.0)", ts(0)));
         db.exec_ok("ALTER TABLE t ADD COLUMN s VARCHAR");
         db.exec_ok("UPDATE t SET s = 'filled'");
-        assert_eq!(db.query_scalar("SELECT s FROM t"), Value::Str("filled".to_string()));
+        assert_eq!(
+            db.query_scalar("SELECT s FROM t"),
+            Value::Str("filled".to_string())
+        );
     }
 
     #[test]
@@ -509,8 +532,14 @@ mod update_edge {
     fn update_where_timestamp_range() {
         let db = TestDb::with_trades(20);
         let cutoff = BASE_TS + 5 * 600_000_000_000i64;
-        db.exec_ok(&format!("UPDATE trades SET side = 'early' WHERE timestamp < {}", cutoff));
-        let (_, rows) = db.query(&format!("SELECT DISTINCT side FROM trades WHERE timestamp < {}", cutoff));
+        db.exec_ok(&format!(
+            "UPDATE trades SET side = 'early' WHERE timestamp < {}",
+            cutoff
+        ));
+        let (_, rows) = db.query(&format!(
+            "SELECT DISTINCT side FROM trades WHERE timestamp < {}",
+            cutoff
+        ));
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], Value::Str("early".to_string()));
     }
@@ -535,7 +564,8 @@ mod update_edge {
         db.exec_ok(&format!("INSERT INTO t VALUES {}", values.join(", ")));
         db.exec_ok("UPDATE t SET v = -1.0 WHERE v < 250");
         let neg_count = match db.query_scalar("SELECT count(*) FROM t WHERE v = -1.0") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert_eq!(neg_count, 250);
     }
@@ -567,15 +597,22 @@ mod update_edge {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, cat VARCHAR, v DOUBLE)");
         for i in 0..20 {
             let cat = if i % 2 == 0 { "even" } else { "odd" };
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, '{}', {}.0)", ts(i), cat, i));
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, '{}', {}.0)",
+                ts(i),
+                cat,
+                i
+            ));
         }
         db.exec_ok("UPDATE t SET v = 0.0 WHERE cat = 'even'");
         let zero_count = match db.query_scalar("SELECT count(*) FROM t WHERE v = 0.0") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert_eq!(zero_count, 10);
         let nonzero_count = match db.query_scalar("SELECT count(*) FROM t WHERE v != 0.0") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert_eq!(nonzero_count, 10);
     }

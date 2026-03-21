@@ -45,16 +45,17 @@ impl CrossJoinCursor {
     }
 
     fn build(&mut self) -> Result<()> {
-        let mut right = self.right_source.take().expect("right source already consumed");
+        let mut right = self
+            .right_source
+            .take()
+            .expect("right source already consumed");
         loop {
             match right.next_batch(1024)? {
                 None => break,
                 Some(batch) => {
                     let ncols = batch.columns.len();
                     for r in 0..batch.row_count() {
-                        let row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> = (0..ncols).map(|c| batch.get_value(r, c)).collect();
                         self.right_rows.push(row);
                     }
                 }
@@ -107,9 +108,7 @@ impl RecordCursor for CrossJoinCursor {
                 Some(batch) => {
                     if batch.row_count() > 0 {
                         let ncols = batch.columns.len();
-                        let row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(0, c))
-                            .collect();
+                        let row: Vec<Value> = (0..ncols).map(|c| batch.get_value(0, c)).collect();
                         self.current_left_row = Some(row);
                         self.right_idx = 0;
                     }
@@ -135,13 +134,15 @@ mod tests {
         let left_schema = vec![("a".to_string(), ColumnType::I64)];
         let right_schema = vec![("b".to_string(), ColumnType::I64)];
 
-        let left = MemoryCursor::from_rows(
-            left_schema,
-            &[vec![Value::I64(1)], vec![Value::I64(2)]],
-        );
+        let left =
+            MemoryCursor::from_rows(left_schema, &[vec![Value::I64(1)], vec![Value::I64(2)]]);
         let right = MemoryCursor::from_rows(
             right_schema,
-            &[vec![Value::I64(10)], vec![Value::I64(20)], vec![Value::I64(30)]],
+            &[
+                vec![Value::I64(10)],
+                vec![Value::I64(20)],
+                vec![Value::I64(30)],
+            ],
         );
 
         let mut cursor = CrossJoinCursor::new(Box::new(left), Box::new(right));

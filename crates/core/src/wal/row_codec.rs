@@ -30,22 +30,22 @@ pub enum OwnedColumnValue {
     I64(i64),
     F32(f32),
     F64(f64),
-    Timestamp(i64),   // nanos since epoch
-    Symbol(i32),       // symbol table index
+    Timestamp(i64), // nanos since epoch
+    Symbol(i32),    // symbol table index
     Uuid([u8; 16]),
     Varchar(String),
     Binary(Vec<u8>),
-    Date(i32),          // days since epoch
-    Char(u16),          // single UTF-16 character
-    IPv4(u32),          // IPv4 address
-    Long128(i128),      // 128-bit integer
-    Long256([u64; 4]),  // 256-bit integer
-    GeoHash(i64),       // geospatial hash
+    Date(i32),         // days since epoch
+    Char(u16),         // single UTF-16 character
+    IPv4(u32),         // IPv4 address
+    Long128(i128),     // 128-bit integer
+    Long256([u64; 4]), // 256-bit integer
+    GeoHash(i64),      // geospatial hash
     // New types
-    Str(String),            // String (same wire format as Varchar)
-    TimestampMicro(i64),    // Microsecond timestamp
-    TimestampMilli(i64),    // Millisecond timestamp
-    Interval([u8; 16]),     // 16-byte interval
+    Str(String),         // String (same wire format as Varchar)
+    TimestampMicro(i64), // Microsecond timestamp
+    TimestampMilli(i64), // Millisecond timestamp
+    Interval([u8; 16]),  // 16-byte interval
     Decimal8(i8),
     Decimal16(i16),
     Decimal32(i32),
@@ -55,17 +55,17 @@ pub enum OwnedColumnValue {
     GeoByte(u8),
     GeoShort(u16),
     GeoInt(u32),
-    Array(Vec<u8>),         // Variable-length array payload
+    Array(Vec<u8>), // Variable-length array payload
     Cursor(i64),
     Record(i64),
     RegClass(i32),
     RegProcedure(i32),
-    ArrayString(String),    // Variable-length text[]
+    ArrayString(String), // Variable-length text[]
     // Null already exists as a variant
-    VarArg,                 // Zero-size sentinel
-    Parameter,              // Zero-size sentinel
-    VarcharSlice(String),   // Transient in-memory varchar slice (same wire format as Varchar)
-    IPv6([u8; 16]),         // IPv6 address (16 bytes)
+    VarArg,               // Zero-size sentinel
+    Parameter,            // Zero-size sentinel
+    VarcharSlice(String), // Transient in-memory varchar slice (same wire format as Varchar)
+    IPv6([u8; 16]),       // IPv6 address (16 bytes)
 }
 
 /// Encode a single row into a binary payload.
@@ -302,91 +302,129 @@ fn decode_value(ct: ColumnType, data: &[u8]) -> Result<(OwnedColumnValue, usize)
 
     match ct {
         ColumnType::Boolean => {
-            if data.is_empty() { return Err(err()); }
+            if data.is_empty() {
+                return Err(err());
+            }
             Ok((OwnedColumnValue::Boolean(data[0] != 0), 1))
         }
         ColumnType::I8 => {
-            if data.is_empty() { return Err(err()); }
+            if data.is_empty() {
+                return Err(err());
+            }
             Ok((OwnedColumnValue::I8(data[0] as i8), 1))
         }
         ColumnType::I16 => {
-            if data.len() < 2 { return Err(err()); }
+            if data.len() < 2 {
+                return Err(err());
+            }
             let v = i16::from_le_bytes(data[..2].try_into().unwrap());
             Ok((OwnedColumnValue::I16(v), 2))
         }
         ColumnType::I32 => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let v = i32::from_le_bytes(data[..4].try_into().unwrap());
             Ok((OwnedColumnValue::I32(v), 4))
         }
         ColumnType::I64 => {
-            if data.len() < 8 { return Err(err()); }
+            if data.len() < 8 {
+                return Err(err());
+            }
             let v = i64::from_le_bytes(data[..8].try_into().unwrap());
             Ok((OwnedColumnValue::I64(v), 8))
         }
         ColumnType::F32 => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let v = f32::from_le_bytes(data[..4].try_into().unwrap());
             Ok((OwnedColumnValue::F32(v), 4))
         }
         ColumnType::F64 => {
-            if data.len() < 8 { return Err(err()); }
+            if data.len() < 8 {
+                return Err(err());
+            }
             let v = f64::from_le_bytes(data[..8].try_into().unwrap());
             Ok((OwnedColumnValue::F64(v), 8))
         }
         ColumnType::Timestamp => {
-            if data.len() < 8 { return Err(err()); }
+            if data.len() < 8 {
+                return Err(err());
+            }
             let v = i64::from_le_bytes(data[..8].try_into().unwrap());
             Ok((OwnedColumnValue::Timestamp(v), 8))
         }
         ColumnType::Symbol => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let v = i32::from_le_bytes(data[..4].try_into().unwrap());
             Ok((OwnedColumnValue::Symbol(v), 4))
         }
         ColumnType::Uuid => {
-            if data.len() < 16 { return Err(err()); }
+            if data.len() < 16 {
+                return Err(err());
+            }
             let mut arr = [0u8; 16];
             arr.copy_from_slice(&data[..16]);
             Ok((OwnedColumnValue::Uuid(arr), 16))
         }
         ColumnType::Varchar => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let len = u32::from_le_bytes(data[..4].try_into().unwrap()) as usize;
-            if data.len() < 4 + len { return Err(err()); }
+            if data.len() < 4 + len {
+                return Err(err());
+            }
             let s = String::from_utf8(data[4..4 + len].to_vec())
                 .map_err(|e| ExchangeDbError::Corruption(e.to_string()))?;
             Ok((OwnedColumnValue::Varchar(s), 4 + len))
         }
         ColumnType::Binary => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let len = u32::from_le_bytes(data[..4].try_into().unwrap()) as usize;
-            if data.len() < 4 + len { return Err(err()); }
+            if data.len() < 4 + len {
+                return Err(err());
+            }
             let b = data[4..4 + len].to_vec();
             Ok((OwnedColumnValue::Binary(b), 4 + len))
         }
         ColumnType::Date => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let v = i32::from_le_bytes(data[..4].try_into().unwrap());
             Ok((OwnedColumnValue::Date(v), 4))
         }
         ColumnType::Char => {
-            if data.len() < 2 { return Err(err()); }
+            if data.len() < 2 {
+                return Err(err());
+            }
             let v = u16::from_le_bytes(data[..2].try_into().unwrap());
             Ok((OwnedColumnValue::Char(v), 2))
         }
         ColumnType::IPv4 => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let v = u32::from_le_bytes(data[..4].try_into().unwrap());
             Ok((OwnedColumnValue::IPv4(v), 4))
         }
         ColumnType::Long128 => {
-            if data.len() < 16 { return Err(err()); }
+            if data.len() < 16 {
+                return Err(err());
+            }
             let v = i128::from_le_bytes(data[..16].try_into().unwrap());
             Ok((OwnedColumnValue::Long128(v), 16))
         }
         ColumnType::Long256 => {
-            if data.len() < 32 { return Err(err()); }
+            if data.len() < 32 {
+                return Err(err());
+            }
             let a = u64::from_le_bytes(data[..8].try_into().unwrap());
             let b = u64::from_le_bytes(data[8..16].try_into().unwrap());
             let c = u64::from_le_bytes(data[16..24].try_into().unwrap());
@@ -394,61 +432,85 @@ fn decode_value(ct: ColumnType, data: &[u8]) -> Result<(OwnedColumnValue, usize)
             Ok((OwnedColumnValue::Long256([a, b, c, d]), 32))
         }
         ColumnType::GeoHash => {
-            if data.len() < 8 { return Err(err()); }
+            if data.len() < 8 {
+                return Err(err());
+            }
             let v = i64::from_le_bytes(data[..8].try_into().unwrap());
             Ok((OwnedColumnValue::GeoHash(v), 8))
         }
         // --- New types ---
         ColumnType::String => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let len = u32::from_le_bytes(data[..4].try_into().unwrap()) as usize;
-            if data.len() < 4 + len { return Err(err()); }
+            if data.len() < 4 + len {
+                return Err(err());
+            }
             let s = std::string::String::from_utf8(data[4..4 + len].to_vec())
                 .map_err(|e| ExchangeDbError::Corruption(e.to_string()))?;
             Ok((OwnedColumnValue::Str(s), 4 + len))
         }
         ColumnType::TimestampMicro => {
-            if data.len() < 8 { return Err(err()); }
+            if data.len() < 8 {
+                return Err(err());
+            }
             let v = i64::from_le_bytes(data[..8].try_into().unwrap());
             Ok((OwnedColumnValue::TimestampMicro(v), 8))
         }
         ColumnType::TimestampMilli => {
-            if data.len() < 8 { return Err(err()); }
+            if data.len() < 8 {
+                return Err(err());
+            }
             let v = i64::from_le_bytes(data[..8].try_into().unwrap());
             Ok((OwnedColumnValue::TimestampMilli(v), 8))
         }
         ColumnType::Interval => {
-            if data.len() < 16 { return Err(err()); }
+            if data.len() < 16 {
+                return Err(err());
+            }
             let mut arr = [0u8; 16];
             arr.copy_from_slice(&data[..16]);
             Ok((OwnedColumnValue::Interval(arr), 16))
         }
         ColumnType::Decimal8 => {
-            if data.is_empty() { return Err(err()); }
+            if data.is_empty() {
+                return Err(err());
+            }
             Ok((OwnedColumnValue::Decimal8(data[0] as i8), 1))
         }
         ColumnType::Decimal16 => {
-            if data.len() < 2 { return Err(err()); }
+            if data.len() < 2 {
+                return Err(err());
+            }
             let v = i16::from_le_bytes(data[..2].try_into().unwrap());
             Ok((OwnedColumnValue::Decimal16(v), 2))
         }
         ColumnType::Decimal32 => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let v = i32::from_le_bytes(data[..4].try_into().unwrap());
             Ok((OwnedColumnValue::Decimal32(v), 4))
         }
         ColumnType::Decimal64 => {
-            if data.len() < 8 { return Err(err()); }
+            if data.len() < 8 {
+                return Err(err());
+            }
             let v = i64::from_le_bytes(data[..8].try_into().unwrap());
             Ok((OwnedColumnValue::Decimal64(v), 8))
         }
         ColumnType::Decimal128 => {
-            if data.len() < 16 { return Err(err()); }
+            if data.len() < 16 {
+                return Err(err());
+            }
             let v = i128::from_le_bytes(data[..16].try_into().unwrap());
             Ok((OwnedColumnValue::Decimal128(v), 16))
         }
         ColumnType::Decimal256 => {
-            if data.len() < 32 { return Err(err()); }
+            if data.len() < 32 {
+                return Err(err());
+            }
             let a = u64::from_le_bytes(data[..8].try_into().unwrap());
             let b = u64::from_le_bytes(data[8..16].try_into().unwrap());
             let c = u64::from_le_bytes(data[16..24].try_into().unwrap());
@@ -456,74 +518,96 @@ fn decode_value(ct: ColumnType, data: &[u8]) -> Result<(OwnedColumnValue, usize)
             Ok((OwnedColumnValue::Decimal256([a, b, c, d]), 32))
         }
         ColumnType::GeoByte => {
-            if data.is_empty() { return Err(err()); }
+            if data.is_empty() {
+                return Err(err());
+            }
             Ok((OwnedColumnValue::GeoByte(data[0]), 1))
         }
         ColumnType::GeoShort => {
-            if data.len() < 2 { return Err(err()); }
+            if data.len() < 2 {
+                return Err(err());
+            }
             let v = u16::from_le_bytes(data[..2].try_into().unwrap());
             Ok((OwnedColumnValue::GeoShort(v), 2))
         }
         ColumnType::GeoInt => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let v = u32::from_le_bytes(data[..4].try_into().unwrap());
             Ok((OwnedColumnValue::GeoInt(v), 4))
         }
         ColumnType::Array => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let len = u32::from_le_bytes(data[..4].try_into().unwrap()) as usize;
-            if data.len() < 4 + len { return Err(err()); }
+            if data.len() < 4 + len {
+                return Err(err());
+            }
             let b = data[4..4 + len].to_vec();
             Ok((OwnedColumnValue::Array(b), 4 + len))
         }
         ColumnType::Cursor => {
-            if data.len() < 8 { return Err(err()); }
+            if data.len() < 8 {
+                return Err(err());
+            }
             let v = i64::from_le_bytes(data[..8].try_into().unwrap());
             Ok((OwnedColumnValue::Cursor(v), 8))
         }
         ColumnType::Record => {
-            if data.len() < 8 { return Err(err()); }
+            if data.len() < 8 {
+                return Err(err());
+            }
             let v = i64::from_le_bytes(data[..8].try_into().unwrap());
             Ok((OwnedColumnValue::Record(v), 8))
         }
         ColumnType::RegClass => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let v = i32::from_le_bytes(data[..4].try_into().unwrap());
             Ok((OwnedColumnValue::RegClass(v), 4))
         }
         ColumnType::RegProcedure => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let v = i32::from_le_bytes(data[..4].try_into().unwrap());
             Ok((OwnedColumnValue::RegProcedure(v), 4))
         }
         ColumnType::ArrayString => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let len = u32::from_le_bytes(data[..4].try_into().unwrap()) as usize;
-            if data.len() < 4 + len { return Err(err()); }
+            if data.len() < 4 + len {
+                return Err(err());
+            }
             let s = std::string::String::from_utf8(data[4..4 + len].to_vec())
                 .map_err(|e| ExchangeDbError::Corruption(e.to_string()))?;
             Ok((OwnedColumnValue::ArrayString(s), 4 + len))
         }
-        ColumnType::Null => {
-            Ok((OwnedColumnValue::Null, 0))
-        }
-        ColumnType::VarArg => {
-            Ok((OwnedColumnValue::VarArg, 0))
-        }
-        ColumnType::Parameter => {
-            Ok((OwnedColumnValue::Parameter, 0))
-        }
+        ColumnType::Null => Ok((OwnedColumnValue::Null, 0)),
+        ColumnType::VarArg => Ok((OwnedColumnValue::VarArg, 0)),
+        ColumnType::Parameter => Ok((OwnedColumnValue::Parameter, 0)),
         ColumnType::VarcharSlice => {
-            if data.len() < 4 { return Err(err()); }
+            if data.len() < 4 {
+                return Err(err());
+            }
             let len = u32::from_le_bytes(data[..4].try_into().unwrap()) as usize;
-            if data.len() < 4 + len { return Err(err()); }
+            if data.len() < 4 + len {
+                return Err(err());
+            }
             let s = std::str::from_utf8(&data[4..4 + len])
                 .map_err(|e| ExchangeDbError::Corruption(e.to_string()))?
                 .to_string();
             Ok((OwnedColumnValue::VarcharSlice(s), 4 + len))
         }
         ColumnType::IPv6 => {
-            if data.len() < 16 { return Err(err()); }
+            if data.len() < 16 {
+                return Err(err());
+            }
             let mut arr = [0u8; 16];
             arr.copy_from_slice(&data[..16]);
             Ok((OwnedColumnValue::IPv6(arr), 16))
@@ -637,10 +721,7 @@ mod tests {
     #[test]
     fn decode_truncated_data_fails() {
         let types = vec![ColumnType::I64, ColumnType::F64];
-        let values = vec![
-            OwnedColumnValue::I64(123),
-            OwnedColumnValue::F64(4.56),
-        ];
+        let values = vec![OwnedColumnValue::I64(123), OwnedColumnValue::F64(4.56)];
         let encoded = encode_row(&types, &values).unwrap();
 
         // Truncate to half.
@@ -701,7 +782,9 @@ mod tests {
     #[test]
     fn roundtrip_interval() {
         let types = vec![ColumnType::Interval];
-        let values = vec![OwnedColumnValue::Interval([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])];
+        let values = vec![OwnedColumnValue::Interval([
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+        ])];
         let encoded = encode_row(&types, &values).unwrap();
         let decoded = decode_row(&types, &encoded).unwrap();
         assert_eq!(decoded, values);
@@ -791,7 +874,9 @@ mod tests {
     #[test]
     fn roundtrip_array_type() {
         let types = vec![ColumnType::Array];
-        let values = vec![OwnedColumnValue::Array(vec![0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE])];
+        let values = vec![OwnedColumnValue::Array(vec![
+            0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE,
+        ])];
         let encoded = encode_row(&types, &values).unwrap();
         let decoded = decode_row(&types, &encoded).unwrap();
         assert_eq!(decoded, values);
@@ -809,7 +894,10 @@ mod tests {
     #[test]
     fn roundtrip_regclass_and_regprocedure() {
         let types = vec![ColumnType::RegClass, ColumnType::RegProcedure];
-        let values = vec![OwnedColumnValue::RegClass(42), OwnedColumnValue::RegProcedure(99)];
+        let values = vec![
+            OwnedColumnValue::RegClass(42),
+            OwnedColumnValue::RegProcedure(99),
+        ];
         let encoded = encode_row(&types, &values).unwrap();
         let decoded = decode_row(&types, &encoded).unwrap();
         assert_eq!(decoded, values);
@@ -827,7 +915,11 @@ mod tests {
     #[test]
     fn roundtrip_null_vararg_parameter() {
         let types = vec![ColumnType::Null, ColumnType::VarArg, ColumnType::Parameter];
-        let values = vec![OwnedColumnValue::Null, OwnedColumnValue::VarArg, OwnedColumnValue::Parameter];
+        let values = vec![
+            OwnedColumnValue::Null,
+            OwnedColumnValue::VarArg,
+            OwnedColumnValue::Parameter,
+        ];
         let encoded = encode_row(&types, &values).unwrap();
         let decoded = decode_row(&types, &encoded).unwrap();
         assert_eq!(decoded, values);

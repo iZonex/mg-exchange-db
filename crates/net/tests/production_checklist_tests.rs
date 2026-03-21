@@ -4,8 +4,7 @@
 //! 6. Connection drain on shutdown
 
 use exchange_net::{
-    active_connection_count, is_shutting_down, track_connection_close,
-    track_connection_open,
+    active_connection_count, is_shutting_down, track_connection_close, track_connection_open,
 };
 
 // ── Item 6: Connection tracking ────────────────────────────────────────

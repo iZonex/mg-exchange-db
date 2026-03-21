@@ -137,12 +137,7 @@ impl WalWriter {
         self.sequencer.last_txn_id()
     }
 
-    fn append(
-        &mut self,
-        event_type: EventType,
-        timestamp: i64,
-        payload: Vec<u8>,
-    ) -> Result<u64> {
+    fn append(&mut self, event_type: EventType, timestamp: i64, payload: Vec<u8>) -> Result<u64> {
         let txn_id = self.sequencer.next_txn_id();
 
         let event = WalEvent {

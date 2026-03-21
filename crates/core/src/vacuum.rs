@@ -84,12 +84,8 @@ impl VacuumJob {
     /// partition directories.
     fn clean_partitions(&self, stats: &mut VacuumStats) -> Result<()> {
         // Build a set of current column names from the metadata.
-        let current_columns: HashSet<&str> = self
-            .meta
-            .columns
-            .iter()
-            .map(|c| c.name.as_str())
-            .collect();
+        let current_columns: HashSet<&str> =
+            self.meta.columns.iter().map(|c| c.name.as_str()).collect();
 
         // List partition directories.
         let mut partitions = Vec::new();
@@ -127,7 +123,9 @@ impl VacuumJob {
                 // Column files have extensions .d or .i
                 let col_name = if let Some(base) = name_str.strip_suffix(".d") {
                     Some(base)
-                } else { name_str.strip_suffix(".i") };
+                } else {
+                    name_str.strip_suffix(".i")
+                };
 
                 if let Some(col) = col_name {
                     if current_columns.contains(col) {
@@ -172,12 +170,8 @@ impl VacuumJob {
         let cv = ColumnVersionFile::load(&cv_path)?;
 
         // Build a set of current column names.
-        let current_columns: HashSet<&str> = self
-            .meta
-            .columns
-            .iter()
-            .map(|c| c.name.as_str())
-            .collect();
+        let current_columns: HashSet<&str> =
+            self.meta.columns.iter().map(|c| c.name.as_str()).collect();
 
         // Keep only entries that reference columns still in the schema,
         // plus Dropped entries (for audit trail).

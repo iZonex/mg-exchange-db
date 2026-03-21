@@ -5,8 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// Controls how and when data is synced to disk.
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub enum SyncMode {
     /// fsync on every flush — strongest durability guarantee.
     #[default]
@@ -18,7 +17,6 @@ pub enum SyncMode {
     /// OS-managed writeback — no explicit sync.
     None,
 }
-
 
 /// Configuration for opening a memory-mapped file.
 #[derive(Debug, Clone)]
@@ -253,29 +251,33 @@ impl MmapFile {
 
         // Check available disk space before attempting to grow the file.
         if additional > 0
-            && let Some(available) = available_disk_space(&self.path) {
-                // Require at least the growth amount plus a small safety margin
-                // (1 MB) to avoid filling the disk completely.
-                let needed = additional + 1024 * 1024;
-                if available < needed {
-                    eprintln!(
-                        "ERROR: disk full when growing '{}': need {} bytes, {} available",
-                        self.path.display(), needed, available
-                    );
-                    return Err(ExchangeDbError::DiskFull {
-                        path: self.path.display().to_string(),
-                        needed_bytes: needed,
-                        available_bytes: available,
-                    });
-                }
+            && let Some(available) = available_disk_space(&self.path)
+        {
+            // Require at least the growth amount plus a small safety margin
+            // (1 MB) to avoid filling the disk completely.
+            let needed = additional + 1024 * 1024;
+            if available < needed {
+                eprintln!(
+                    "ERROR: disk full when growing '{}': need {} bytes, {} available",
+                    self.path.display(),
+                    needed,
+                    available
+                );
+                return Err(ExchangeDbError::DiskFull {
+                    path: self.path.display().to_string(),
+                    needed_bytes: needed,
+                    available_bytes: available,
+                });
             }
+        }
 
         self.file.set_len(new_capacity).map_err(|e| {
             // Convert ENOSPC to our DiskFull error for better diagnostics.
             if e.raw_os_error() == Some(libc_enospc()) {
                 eprintln!(
                     "ERROR: disk full (ENOSPC) when growing '{}' to {} bytes",
-                    self.path.display(), new_capacity
+                    self.path.display(),
+                    new_capacity
                 );
                 ExchangeDbError::DiskFull {
                     path: self.path.display().to_string(),
@@ -285,7 +287,9 @@ impl MmapFile {
             } else {
                 eprintln!(
                     "ERROR: failed to grow '{}' to {} bytes: {}",
-                    self.path.display(), new_capacity, e
+                    self.path.display(),
+                    new_capacity,
+                    e
                 );
                 ExchangeDbError::Io(e)
             }
@@ -337,9 +341,13 @@ fn available_disk_space(path: &Path) -> Option<u64> {
 /// Return the OS error code for ENOSPC (No space left on device).
 fn libc_enospc() -> i32 {
     #[cfg(unix)]
-    { libc::ENOSPC }
+    {
+        libc::ENOSPC
+    }
     #[cfg(not(unix))]
-    { -1 } // Unreachable on non-Unix, but keeps the code compiling.
+    {
+        -1
+    } // Unreachable on non-Unix, but keeps the code compiling.
 }
 
 impl Drop for MmapFile {
@@ -625,7 +633,10 @@ mod tests {
     fn available_disk_space_returns_some_for_existing_dir() {
         let dir = tempdir().unwrap();
         let space = available_disk_space(dir.path());
-        assert!(space.is_some(), "should return available space for a valid dir");
+        assert!(
+            space.is_some(),
+            "should return available space for a valid dir"
+        );
         assert!(space.unwrap() > 0, "available space should be > 0");
     }
 

@@ -20,13 +20,25 @@ pub struct PivotedAggregateCursor {
 }
 
 impl PivotedAggregateCursor {
-    pub fn new(source: Box<dyn RecordCursor>, group_col: usize, pivot_col: usize, pivot_values: Vec<String>) -> Self {
+    pub fn new(
+        source: Box<dyn RecordCursor>,
+        group_col: usize,
+        pivot_col: usize,
+        pivot_values: Vec<String>,
+    ) -> Self {
         let src = source.schema();
         let mut schema = vec![src[group_col].clone()];
         for pv in &pivot_values {
             schema.push((pv.clone(), ColumnType::I64));
         }
-        Self { source: Some(source), group_col, pivot_col, result: None, schema, emitted: false }
+        Self {
+            source: Some(source),
+            group_col,
+            pivot_col,
+            result: None,
+            schema,
+            emitted: false,
+        }
     }
 
     fn materialize(&mut self) -> Result<()> {
@@ -67,11 +79,17 @@ impl PivotedAggregateCursor {
 }
 
 impl RecordCursor for PivotedAggregateCursor {
-    fn schema(&self) -> &[(String, ColumnType)] { &self.schema }
+    fn schema(&self) -> &[(String, ColumnType)] {
+        &self.schema
+    }
 
     fn next_batch(&mut self, _max_rows: usize) -> Result<Option<RecordBatch>> {
-        if self.emitted { return Ok(None); }
-        if self.result.is_none() { self.materialize()?; }
+        if self.emitted {
+            return Ok(None);
+        }
+        if self.result.is_none() {
+            self.materialize()?;
+        }
         self.emitted = true;
         Ok(self.result.take())
     }
@@ -95,7 +113,8 @@ mod tests {
             vec![Value::Str("EU".into()), Value::Str("A".into())],
         ];
         let source = MemoryCursor::from_rows(schema, &rows);
-        let mut cursor = PivotedAggregateCursor::new(Box::new(source), 0, 1, vec!["A".into(), "B".into()]);
+        let mut cursor =
+            PivotedAggregateCursor::new(Box::new(source), 0, 1, vec!["A".into(), "B".into()]);
         let batch = cursor.next_batch(100).unwrap().unwrap();
         assert_eq!(batch.row_count(), 2); // US, EU
     }

@@ -5,9 +5,9 @@
 use exchange_common::types::{ColumnType, PartitionBy, Timestamp};
 use exchange_core::column::{FixedColumnReader, VarColumnReader};
 use exchange_core::table::{
-    add_column_to_partitions, drop_column_from_partitions, drop_table, list_partitions,
-    read_partition_rows, rename_column_in_partitions, rewrite_partition, ColumnValue, TableBuilder,
-    TableMeta,
+    ColumnValue, TableBuilder, TableMeta, add_column_to_partitions, drop_column_from_partitions,
+    drop_table, list_partitions, read_partition_rows, rename_column_in_partitions,
+    rewrite_partition,
 };
 use tempfile::tempdir;
 
@@ -350,8 +350,7 @@ mod table_write {
             .unwrap();
         let mut w = TableWriter::open(dir.path(), "notes").unwrap();
         let ts = Timestamp::from_secs(1710513000);
-        w.write_row(ts, &[ColumnValue::Str("test note")])
-            .unwrap();
+        w.write_row(ts, &[ColumnValue::Str("test note")]).unwrap();
         w.flush().unwrap();
         let part = dir.path().join("notes/2024-03-15");
         assert!(part.join("note.d").exists());
@@ -372,11 +371,8 @@ mod table_write {
         let ts = Timestamp::from_secs(1710513000);
         w.write_row(ts, &[ColumnValue::I32(42)]).unwrap();
         w.flush().unwrap();
-        let r = FixedColumnReader::open(
-            &dir.path().join("t/2024-03-15/code.d"),
-            ColumnType::I32,
-        )
-        .unwrap();
+        let r = FixedColumnReader::open(&dir.path().join("t/2024-03-15/code.d"), ColumnType::I32)
+            .unwrap();
         assert_eq!(r.read_i32(0), 42);
     }
 
@@ -394,11 +390,8 @@ mod table_write {
         let ts = Timestamp::from_secs(1710513000);
         w.write_row(ts, &[ColumnValue::I32(0)]).unwrap();
         w.flush().unwrap();
-        let r = FixedColumnReader::open(
-            &dir.path().join("t/2024-03-15/sym.d"),
-            ColumnType::Symbol,
-        )
-        .unwrap();
+        let r = FixedColumnReader::open(&dir.path().join("t/2024-03-15/sym.d"), ColumnType::Symbol)
+            .unwrap();
         assert_eq!(r.read_i32(0), 0);
     }
 
@@ -456,11 +449,8 @@ mod table_write {
             .unwrap();
         let mut w = TableWriter::open(dir.path(), "t").unwrap();
         // March
-        w.write_row(
-            Timestamp::from_secs(1710513000),
-            &[ColumnValue::I64(1)],
-        )
-        .unwrap();
+        w.write_row(Timestamp::from_secs(1710513000), &[ColumnValue::I64(1)])
+            .unwrap();
         // April
         w.write_row(
             Timestamp::from_secs(1710513000 + 30 * 86400),
@@ -509,11 +499,8 @@ mod table_write {
             .build(dir.path())
             .unwrap();
         let mut w = TableWriter::open(dir.path(), "t").unwrap();
-        w.write_row(
-            Timestamp::from_secs(1710513000),
-            &[ColumnValue::I64(1)],
-        )
-        .unwrap();
+        w.write_row(Timestamp::from_secs(1710513000), &[ColumnValue::I64(1)])
+            .unwrap();
         w.write_row(
             Timestamp::from_secs(1710513000 + 86400),
             &[ColumnValue::I64(2)],
@@ -932,10 +919,7 @@ mod table_read_and_drop {
         let meta = TableMeta::load(&dir.path().join("t/_meta")).unwrap();
         let part = dir.path().join("t/2024-03-15");
         // Rewrite with single row
-        let new_rows = vec![vec![
-            ColumnValue::Timestamp(ts),
-            ColumnValue::I64(999),
-        ]];
+        let new_rows = vec![vec![ColumnValue::Timestamp(ts), ColumnValue::I64(999)]];
         let written = rewrite_partition(&part, &meta, &new_rows).unwrap();
         assert_eq!(written, 1);
 

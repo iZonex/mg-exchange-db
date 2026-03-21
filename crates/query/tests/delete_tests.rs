@@ -34,7 +34,10 @@ mod delete_basic {
     fn delete_by_string_column() {
         let db = TestDb::with_trades(20);
         let (_, before) = db.query("SELECT count(*) FROM trades WHERE symbol = 'SOL/USD'");
-        let sol_count = match &before[0][0] { Value::I64(n) => *n, other => panic!("{other:?}") };
+        let sol_count = match &before[0][0] {
+            Value::I64(n) => *n,
+            other => panic!("{other:?}"),
+        };
         assert!(sol_count > 0);
         db.exec_ok("DELETE FROM trades WHERE symbol = 'SOL/USD'");
         let (_, after) = db.query("SELECT count(*) FROM trades WHERE symbol = 'SOL/USD'");
@@ -53,11 +56,13 @@ mod delete_basic {
     fn delete_reduces_count() {
         let db = TestDb::with_trades(20);
         let before = match db.query_scalar("SELECT count(*) FROM trades") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         db.exec_ok("DELETE FROM trades WHERE symbol = 'BTC/USD'");
         let after = match db.query_scalar("SELECT count(*) FROM trades") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert!(after < before);
     }
@@ -66,11 +71,13 @@ mod delete_basic {
     fn delete_no_matching_rows() {
         let db = TestDb::with_trades(10);
         let before = match db.query_scalar("SELECT count(*) FROM trades") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         db.exec_ok("DELETE FROM trades WHERE symbol = 'DOGE/USD'");
         let after = match db.query_scalar("SELECT count(*) FROM trades") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert_eq!(before, after);
     }
@@ -93,8 +100,14 @@ mod delete_basic {
         // ETH and SOL should remain
         let (_, eth) = db.query("SELECT count(*) FROM trades WHERE symbol = 'ETH/USD'");
         let (_, sol) = db.query("SELECT count(*) FROM trades WHERE symbol = 'SOL/USD'");
-        assert!(match &eth[0][0] { Value::I64(n) => *n > 0, _ => false });
-        assert!(match &sol[0][0] { Value::I64(n) => *n > 0, _ => false });
+        assert!(match &eth[0][0] {
+            Value::I64(n) => *n > 0,
+            _ => false,
+        });
+        assert!(match &sol[0][0] {
+            Value::I64(n) => *n > 0,
+            _ => false,
+        });
     }
 
     #[test]
@@ -113,7 +126,8 @@ mod delete_basic {
         db.exec_ok("DELETE FROM trades WHERE symbol = 'ETH/USD'");
         db.exec_ok("DELETE FROM trades WHERE symbol = 'SOL/USD'");
         let count = match db.query_scalar("SELECT count(*) FROM trades") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert_eq!(count, 0);
     }
@@ -138,7 +152,8 @@ mod delete_all {
         let db = TestDb::with_trades(20);
         db.exec_ok("DELETE FROM trades");
         let count = match db.query_scalar("SELECT count(*) FROM trades") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert_eq!(count, 0);
     }
@@ -161,7 +176,10 @@ mod delete_all {
         let db = TestDb::with_trades(10);
         db.exec_ok("DELETE FROM trades");
         db.exec_ok("DELETE FROM trades"); // second delete on empty table
-        assert_eq!(db.query_scalar("SELECT count(*) FROM trades"), Value::I64(0));
+        assert_eq!(
+            db.query_scalar("SELECT count(*) FROM trades"),
+            Value::I64(0)
+        );
     }
 
     #[test]
@@ -176,10 +194,11 @@ mod delete_all {
     fn delete_all_large_table() {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
-        let values: Vec<String> = (0..500)
-            .map(|i| format!("({}, {}.0)", ts(i), i))
-            .collect();
-        db.exec_ok(&format!("INSERT INTO t (timestamp, v) VALUES {}", values.join(", ")));
+        let values: Vec<String> = (0..500).map(|i| format!("({}, {}.0)", ts(i), i)).collect();
+        db.exec_ok(&format!(
+            "INSERT INTO t (timestamp, v) VALUES {}",
+            values.join(", ")
+        ));
         db.exec_ok("DELETE FROM t");
         assert_eq!(db.query_scalar("SELECT count(*) FROM t"), Value::I64(0));
     }
@@ -217,7 +236,8 @@ mod delete_conditions {
         assert_eq!(eth[0][0], Value::I64(0));
         // SOL should remain
         let sol = match db.query_scalar("SELECT count(*) FROM trades WHERE symbol = 'SOL/USD'") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert!(sol > 0);
     }
@@ -260,7 +280,8 @@ mod delete_conditions {
         let db = TestDb::with_trades(20);
         db.exec_ok("DELETE FROM trades WHERE symbol IN ('BTC/USD', 'SOL/USD')");
         let remaining = match db.query_scalar("SELECT count(DISTINCT symbol) FROM trades") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         // only ETH/USD should remain
         assert!(remaining <= 1);
@@ -269,13 +290,16 @@ mod delete_conditions {
     #[test]
     fn delete_where_is_null() {
         let db = TestDb::with_trades(20);
-        let null_before = match db.query_scalar("SELECT count(*) FROM trades WHERE volume IS NULL") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+        let null_before = match db.query_scalar("SELECT count(*) FROM trades WHERE volume IS NULL")
+        {
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert!(null_before > 0);
         db.exec_ok("DELETE FROM trades WHERE volume IS NULL");
         let null_after = match db.query_scalar("SELECT count(*) FROM trades WHERE volume IS NULL") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert_eq!(null_after, 0);
     }
@@ -304,7 +328,10 @@ mod delete_conditions {
         let db = TestDb::with_trades(20);
         let cutoff = BASE_TS + 5 * 600_000_000_000i64; // after 5th row
         db.exec_ok(&format!("DELETE FROM trades WHERE timestamp < {}", cutoff));
-        let (_, rows) = db.query(&format!("SELECT count(*) FROM trades WHERE timestamp < {}", cutoff));
+        let (_, rows) = db.query(&format!(
+            "SELECT count(*) FROM trades WHERE timestamp < {}",
+            cutoff
+        ));
         assert_eq!(rows[0][0], Value::I64(0));
     }
 }
@@ -343,7 +370,11 @@ mod delete_edge {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for cycle in 0..5 {
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(cycle), cycle));
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, {}.0)",
+                ts(cycle),
+                cycle
+            ));
             db.exec_ok("DELETE FROM t");
             assert_eq!(db.query_scalar("SELECT count(*) FROM t"), Value::I64(0));
         }
@@ -358,7 +389,8 @@ mod delete_edge {
         }
         db.exec_ok("DELETE FROM t WHERE v < 5");
         let count = match db.query_scalar("SELECT count(*) FROM t") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert_eq!(count, 5);
     }
@@ -373,7 +405,8 @@ mod delete_edge {
         for i in 0..5 {
             db.exec_ok(&format!("DELETE FROM t WHERE v = {}.0", i));
             let remaining = match db.query_scalar("SELECT count(*) FROM t") {
-                Value::I64(n) => n, other => panic!("{other:?}")
+                Value::I64(n) => n,
+                other => panic!("{other:?}"),
             };
             assert_eq!(remaining, 4 - i);
         }
@@ -483,7 +516,8 @@ mod delete_edge {
         let db = TestDb::with_trades(20);
         db.exec_ok("DELETE FROM trades WHERE symbol = 'BTC/USD'");
         let count = match db.query_scalar("SELECT count(*) FROM trades WHERE symbol = 'BTC/USD'") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert_eq!(count, 0);
     }
@@ -531,12 +565,17 @@ mod delete_edge {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         for cycle in 0..3 {
             for i in 0..5 {
-                db.exec_ok(&format!("INSERT INTO t VALUES ({}, {}.0)", ts(cycle * 100 + i), cycle * 5 + i));
+                db.exec_ok(&format!(
+                    "INSERT INTO t VALUES ({}, {}.0)",
+                    ts(cycle * 100 + i),
+                    cycle * 5 + i
+                ));
             }
         }
         db.exec_ok("DELETE FROM t WHERE v < 5");
         let count = match db.query_scalar("SELECT count(*) FROM t") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert_eq!(count, 10);
     }
@@ -553,12 +592,15 @@ mod delete_edge {
     #[test]
     fn delete_then_count_per_symbol() {
         let db = TestDb::with_trades(30);
-        let btc_before = match db.query_scalar("SELECT count(*) FROM trades WHERE symbol = 'BTC/USD'") {
-            Value::I64(n) => n, other => panic!("{other:?}")
-        };
+        let btc_before =
+            match db.query_scalar("SELECT count(*) FROM trades WHERE symbol = 'BTC/USD'") {
+                Value::I64(n) => n,
+                other => panic!("{other:?}"),
+            };
         db.exec_ok("DELETE FROM trades WHERE symbol = 'BTC/USD'");
         let total_after = match db.query_scalar("SELECT count(*) FROM trades") {
-            Value::I64(n) => n, other => panic!("{other:?}")
+            Value::I64(n) => n,
+            other => panic!("{other:?}"),
         };
         assert_eq!(total_after, 30 - btc_before);
     }

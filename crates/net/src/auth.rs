@@ -9,15 +9,13 @@ use crate::oauth::OAuthProvider;
 use crate::service_account::{ServiceAccountStore, extract_credentials};
 
 /// Configuration for token-based authentication.
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct AuthConfig {
     /// Whether authentication is enabled.
     pub enabled: bool,
     /// List of valid API tokens.
     pub tokens: Vec<String>,
 }
-
 
 impl AuthConfig {
     /// Create a new auth config with the given tokens. Enables auth automatically
@@ -36,8 +34,7 @@ impl AuthConfig {
             // but not which token matched or how many bytes matched.
             let t_bytes = t.as_bytes();
             let token_bytes = token.as_bytes();
-            t_bytes.len() == token_bytes.len()
-                && t_bytes.ct_eq(token_bytes).into()
+            t_bytes.len() == token_bytes.len() && t_bytes.ct_eq(token_bytes).into()
         })
     }
 }
@@ -93,10 +90,7 @@ pub enum AuthResult {
 
 /// Paths that are always public (no auth required).
 fn is_public_path(path: &str) -> bool {
-    path == "/"
-        || path == "/api/v1/health"
-        || path == "/metrics"
-        || path.starts_with("/auth/")
+    path == "/" || path == "/api/v1/health" || path == "/metrics" || path.starts_with("/auth/")
 }
 
 /// Try to authenticate a request using the given auth method.
@@ -117,9 +111,7 @@ pub fn try_authenticate(method: &AuthMethod, headers: &axum::http::HeaderMap) ->
                 };
             }
 
-            let auth_header = headers
-                .get("authorization")
-                .and_then(|v| v.to_str().ok());
+            let auth_header = headers.get("authorization").and_then(|v| v.to_str().ok());
 
             match auth_header {
                 Some(header) if header.starts_with("Bearer ") => {
@@ -139,9 +131,7 @@ pub fn try_authenticate(method: &AuthMethod, headers: &axum::http::HeaderMap) ->
         }
 
         AuthMethod::OAuth(provider) => {
-            let auth_header = headers
-                .get("authorization")
-                .and_then(|v| v.to_str().ok());
+            let auth_header = headers.get("authorization").and_then(|v| v.to_str().ok());
 
             match auth_header {
                 Some(header) if header.starts_with("Bearer ") => {
@@ -159,29 +149,33 @@ pub fn try_authenticate(method: &AuthMethod, headers: &axum::http::HeaderMap) ->
             }
         }
 
-        AuthMethod::ServiceAccount(store) => {
-            match extract_credentials(headers) {
-                Some((api_key, secret)) => {
-                    match store.authenticate(&api_key, &secret) {
-                        Ok(Some(account)) => AuthResult::Authenticated {
-                            identity: format!("service:{}", account.name),
-                            method: "service-account".to_string(),
-                            roles: account.roles,
-                        },
-                        Ok(None) => AuthResult::NoCredentials,
-                        Err(e) => AuthResult::InvalidCredentials(format!("Service account: {e}")),
-                    }
-                }
-                None => AuthResult::NoCredentials,
-            }
-        }
+        AuthMethod::ServiceAccount(store) => match extract_credentials(headers) {
+            Some((api_key, secret)) => match store.authenticate(&api_key, &secret) {
+                Ok(Some(account)) => AuthResult::Authenticated {
+                    identity: format!("service:{}", account.name),
+                    method: "service-account".to_string(),
+                    roles: account.roles,
+                },
+                Ok(None) => AuthResult::NoCredentials,
+                Err(e) => AuthResult::InvalidCredentials(format!("Service account: {e}")),
+            },
+            None => AuthResult::NoCredentials,
+        },
 
         AuthMethod::Multi(methods) => {
             let mut last_error = None;
             for m in methods {
                 match try_authenticate(m, headers) {
-                    AuthResult::Authenticated { identity, method, roles } => {
-                        return AuthResult::Authenticated { identity, method, roles };
+                    AuthResult::Authenticated {
+                        identity,
+                        method,
+                        roles,
+                    } => {
+                        return AuthResult::Authenticated {
+                            identity,
+                            method,
+                            roles,
+                        };
                     }
                     AuthResult::InvalidCredentials(msg) => {
                         last_error = Some(msg);
@@ -446,10 +440,7 @@ mod tests {
     #[test]
     fn test_auth_method_multi_first_succeeds() {
         let config = AuthConfig::new(vec!["my-token".to_string()]);
-        let method = AuthMethod::Multi(vec![
-            AuthMethod::Token(config),
-            AuthMethod::None,
-        ]);
+        let method = AuthMethod::Multi(vec![AuthMethod::Token(config), AuthMethod::None]);
 
         let mut headers = axum::http::HeaderMap::new();
         headers.insert("authorization", "Bearer my-token".parse().unwrap());
@@ -482,10 +473,8 @@ mod tests {
     fn test_auth_method_multi_all_fail() {
         let config1 = AuthConfig::new(vec!["token-a".to_string()]);
         let config2 = AuthConfig::new(vec!["token-b".to_string()]);
-        let method = AuthMethod::Multi(vec![
-            AuthMethod::Token(config1),
-            AuthMethod::Token(config2),
-        ]);
+        let method =
+            AuthMethod::Multi(vec![AuthMethod::Token(config1), AuthMethod::Token(config2)]);
 
         let mut headers = axum::http::HeaderMap::new();
         headers.insert("authorization", "Bearer wrong".parse().unwrap());

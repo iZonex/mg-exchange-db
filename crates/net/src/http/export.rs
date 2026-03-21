@@ -59,13 +59,15 @@ pub async fn export_csv(
     if params.format != "csv" {
         return Err(ErrorResponse::new(
             StatusCode::BAD_REQUEST,
-            format!("unsupported export format: '{}'. Only 'csv' is supported.", params.format),
+            format!(
+                "unsupported export format: '{}'. Only 'csv' is supported.",
+                params.format
+            ),
         ));
     }
 
-    let plan = plan_query(&params.query).map_err(|e| {
-        ErrorResponse::new(StatusCode::BAD_REQUEST, e.to_string())
-    })?;
+    let plan = plan_query(&params.query)
+        .map_err(|e| ErrorResponse::new(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     let db_root = state.db_root.clone();
     let result = tokio::task::spawn_blocking(move || execute(&db_root, &plan))
@@ -142,17 +144,16 @@ pub async fn import_csv(
     let table_name = params.table.clone();
     let db_root = state.db_root.clone();
 
-    let rows_imported = tokio::task::spawn_blocking(move || {
-        import_csv_impl(&db_root, &table_name, &body)
-    })
-    .await
-    .map_err(|e| {
-        ErrorResponse::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("task join error: {e}"),
-        )
-    })?
-    .map_err(|e| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let rows_imported =
+        tokio::task::spawn_blocking(move || import_csv_impl(&db_root, &table_name, &body))
+            .await
+            .map_err(|e| {
+                ErrorResponse::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("task join error: {e}"),
+                )
+            })?
+            .map_err(|e| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok((
         StatusCode::OK,
@@ -288,7 +289,9 @@ fn import_csv_impl(
             })
             .collect();
 
-        writer.write_row(ts, &col_values).map_err(|e| e.to_string())?;
+        writer
+            .write_row(ts, &col_values)
+            .map_err(|e| e.to_string())?;
         count += 1;
     }
 
@@ -425,7 +428,10 @@ mod tests {
         assert_eq!(value_to_csv_string(&Value::Null), "");
         assert_eq!(value_to_csv_string(&Value::I64(42)), "42");
         assert_eq!(value_to_csv_string(&Value::F64(3.14)), "3.14");
-        assert_eq!(value_to_csv_string(&Value::Str("hello".to_string())), "hello");
+        assert_eq!(
+            value_to_csv_string(&Value::Str("hello".to_string())),
+            "hello"
+        );
         assert_eq!(
             value_to_csv_string(&Value::Str("a,b".to_string())),
             "\"a,b\""
@@ -487,20 +493,14 @@ mod tests {
 
     #[test]
     fn test_detect_column_type_float() {
-        let rows = vec![
-            vec!["1.5".to_string()],
-            vec!["2.5".to_string()],
-        ];
+        let rows = vec![vec!["1.5".to_string()], vec!["2.5".to_string()]];
         let ct = detect_column_type(&rows, 0);
         assert!(matches!(ct, exchange_common::types::ColumnType::F64));
     }
 
     #[test]
     fn test_detect_column_type_varchar() {
-        let rows = vec![
-            vec!["hello".to_string()],
-            vec!["world".to_string()],
-        ];
+        let rows = vec![vec!["hello".to_string()], vec!["world".to_string()]];
         let ct = detect_column_type(&rows, 0);
         assert!(matches!(ct, exchange_common::types::ColumnType::Varchar));
     }

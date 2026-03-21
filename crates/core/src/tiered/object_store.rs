@@ -50,9 +50,10 @@ impl ObjectStore for LocalObjectStore {
         let path = self.key_path(key);
         // Ensure parent directory exists
         if let Some(parent) = path.parent()
-            && !parent.exists() {
-                std::fs::create_dir_all(parent)?;
-            }
+            && !parent.exists()
+        {
+            std::fs::create_dir_all(parent)?;
+        }
         std::fs::write(&path, data)?;
         Ok(())
     }
@@ -283,9 +284,8 @@ impl ObjectStore for S3ObjectStore {
             req = req.set(k, v);
         }
 
-        req.send_bytes(data).map_err(|e| {
-            ExchangeDbError::Corruption(format!("S3 PUT failed for {key}: {e}"))
-        })?;
+        req.send_bytes(data)
+            .map_err(|e| ExchangeDbError::Corruption(format!("S3 PUT failed for {key}: {e}")))?;
 
         Ok(())
     }
@@ -300,12 +300,15 @@ impl ObjectStore for S3ObjectStore {
             req = req.set(k, v);
         }
 
-        let response = req.call().map_err(|e| {
-            ExchangeDbError::Corruption(format!("S3 GET failed for {key}: {e}"))
-        })?;
+        let response = req
+            .call()
+            .map_err(|e| ExchangeDbError::Corruption(format!("S3 GET failed for {key}: {e}")))?;
 
         let mut body = Vec::new();
-        response.into_reader().read_to_end(&mut body).map_err(ExchangeDbError::Io)?;
+        response
+            .into_reader()
+            .read_to_end(&mut body)
+            .map_err(ExchangeDbError::Io)?;
 
         Ok(body)
     }
@@ -320,9 +323,8 @@ impl ObjectStore for S3ObjectStore {
             req = req.set(k, v);
         }
 
-        req.call().map_err(|e| {
-            ExchangeDbError::Corruption(format!("S3 DELETE failed for {key}: {e}"))
-        })?;
+        req.call()
+            .map_err(|e| ExchangeDbError::Corruption(format!("S3 DELETE failed for {key}: {e}")))?;
 
         Ok(())
     }
@@ -354,13 +356,11 @@ impl ObjectStore for S3ObjectStore {
             .set("x-amz-content-sha256", &empty_hash)
             .set("x-amz-date", &timestamp)
             .call()
-            .map_err(|e| {
-                ExchangeDbError::Corruption(format!("S3 LIST failed: {e}"))
-            })?;
+            .map_err(|e| ExchangeDbError::Corruption(format!("S3 LIST failed: {e}")))?;
 
-        let body = response.into_string().map_err(|e| {
-            ExchangeDbError::Corruption(format!("S3 LIST read body failed: {e}"))
-        })?;
+        let body = response
+            .into_string()
+            .map_err(|e| ExchangeDbError::Corruption(format!("S3 LIST read body failed: {e}")))?;
 
         // Parse XML response to extract <Key> elements.
         let mut keys = Vec::new();
@@ -453,9 +453,7 @@ fn extract_host(url: &str) -> String {
     } else {
         url
     };
-    let end = without_scheme
-        .find('/')
-        .unwrap_or(without_scheme.len());
+    let end = without_scheme.find('/').unwrap_or(without_scheme.len());
     without_scheme[..end].to_string()
 }
 
@@ -511,17 +509,15 @@ pub fn sign_aws_v4(
     let (path, query) = parse_url_path_query(url);
 
     // Build canonical request.
-    let canonical_request = format!(
-        "{method}\n{path}\n{query}\n{canonical_headers}\n{signed_headers}\n{body_hash}"
-    );
+    let canonical_request =
+        format!("{method}\n{path}\n{query}\n{canonical_headers}\n{signed_headers}\n{body_hash}");
 
     // Hash the canonical request.
     let canonical_request_hash = sha256_hex(canonical_request.as_bytes());
 
     // Build string to sign.
-    let string_to_sign = format!(
-        "AWS4-HMAC-SHA256\n{timestamp}\n{credential_scope}\n{canonical_request_hash}"
-    );
+    let string_to_sign =
+        format!("AWS4-HMAC-SHA256\n{timestamp}\n{credential_scope}\n{canonical_request_hash}");
 
     // Derive the signing key.
     let k_date = hmac_sha256(format!("AWS4{secret_key}").as_bytes(), date.as_bytes());
@@ -586,8 +582,8 @@ const SHA256_K: [u32; 64] = [
 
 fn sha256(data: &[u8]) -> [u8; 32] {
     let mut h: [u32; 8] = [
-        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+        0x5be0cd19,
     ];
 
     // Pre-processing: padding.
@@ -779,9 +775,7 @@ mod tests {
         let store = LocalObjectStore::new(dir.path().to_path_buf()).unwrap();
 
         // 1MB object
-        let data: Vec<u8> = (0..1_000_000u32)
-            .flat_map(|i| i.to_le_bytes())
-            .collect();
+        let data: Vec<u8> = (0..1_000_000u32).flat_map(|i| i.to_le_bytes()).collect();
 
         store.put("large_file", &data).unwrap();
         let retrieved = store.get("large_file").unwrap();
@@ -878,7 +872,10 @@ mod tests {
         let auth = sign_aws_v4(
             "GET",
             "https://s3.amazonaws.com/mybucket/mykey",
-            &[("host", "s3.amazonaws.com"), ("x-amz-content-sha256", "UNSIGNED-PAYLOAD")],
+            &[
+                ("host", "s3.amazonaws.com"),
+                ("x-amz-content-sha256", "UNSIGNED-PAYLOAD"),
+            ],
             "UNSIGNED-PAYLOAD",
             "AKIAIOSFODNN7EXAMPLE",
             "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
@@ -906,14 +903,26 @@ mod tests {
     #[test]
     fn sign_aws_v4_deterministic() {
         let auth1 = sign_aws_v4(
-            "PUT", "https://s3.amazonaws.com/bucket/key",
+            "PUT",
+            "https://s3.amazonaws.com/bucket/key",
             &[("host", "s3.amazonaws.com")],
-            "abc123", "KEY", "SECRET", "us-east-1", "s3", "20260101T000000Z",
+            "abc123",
+            "KEY",
+            "SECRET",
+            "us-east-1",
+            "s3",
+            "20260101T000000Z",
         );
         let auth2 = sign_aws_v4(
-            "PUT", "https://s3.amazonaws.com/bucket/key",
+            "PUT",
+            "https://s3.amazonaws.com/bucket/key",
             &[("host", "s3.amazonaws.com")],
-            "abc123", "KEY", "SECRET", "us-east-1", "s3", "20260101T000000Z",
+            "abc123",
+            "KEY",
+            "SECRET",
+            "us-east-1",
+            "s3",
+            "20260101T000000Z",
         );
         assert_eq!(auth1, auth2, "same inputs should produce same signature");
     }

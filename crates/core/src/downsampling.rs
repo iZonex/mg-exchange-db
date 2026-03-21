@@ -262,10 +262,7 @@ impl DownsamplingManager {
     ///
     /// In a real system this would read from the column store; here we accept
     /// pre-loaded rows for testability.
-    pub fn refresh_all_with_data(
-        &mut self,
-        source_rows: &[SourceRow],
-    ) -> Result<DownsampleStats> {
+    pub fn refresh_all_with_data(&mut self, source_rows: &[SourceRow]) -> Result<DownsampleStats> {
         let mut total = DownsampleStats {
             rows_processed: 0,
             rows_written: 0,
@@ -275,8 +272,7 @@ impl DownsamplingManager {
         // Process each config.
         for config in &self.configs {
             for interval in &config.intervals {
-                let stats =
-                    Self::refresh_interval(interval, source_rows, &mut self.states)?;
+                let stats = Self::refresh_interval(interval, source_rows, &mut self.states)?;
                 total.rows_processed += stats.rows_processed;
                 total.rows_written += stats.rows_written;
                 total.intervals_refreshed += stats.intervals_refreshed;
@@ -374,15 +370,16 @@ impl DownsamplingManager {
 
         // Update watermark.
         if let Some(max_ts) = rows_to_process.iter().map(|r| r.timestamp).max()
-            && let Some(state) = states.get_mut(&interval.name) {
-                state.watermark = max_ts;
-                state.last_refresh = Some(
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_nanos() as i64,
-                );
-            }
+            && let Some(state) = states.get_mut(&interval.name)
+        {
+            state.watermark = max_ts;
+            state.last_refresh = Some(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos() as i64,
+            );
+        }
 
         Ok(DownsampleStats {
             rows_processed,
@@ -499,40 +496,25 @@ mod tests {
             // Minute 0: 2 trades
             SourceRow {
                 timestamp: base,
-                columns: HashMap::from([
-                    ("price".into(), 100.0),
-                    ("volume".into(), 10.0),
-                ]),
+                columns: HashMap::from([("price".into(), 100.0), ("volume".into(), 10.0)]),
             },
             SourceRow {
                 timestamp: base + 30_000_000_000, // +30s
-                columns: HashMap::from([
-                    ("price".into(), 105.0),
-                    ("volume".into(), 5.0),
-                ]),
+                columns: HashMap::from([("price".into(), 105.0), ("volume".into(), 5.0)]),
             },
             // Minute 1: 2 trades
             SourceRow {
                 timestamp: base + minute + 10_000_000_000, // +1m10s
-                columns: HashMap::from([
-                    ("price".into(), 102.0),
-                    ("volume".into(), 8.0),
-                ]),
+                columns: HashMap::from([("price".into(), 102.0), ("volume".into(), 8.0)]),
             },
             SourceRow {
                 timestamp: base + minute + 50_000_000_000, // +1m50s
-                columns: HashMap::from([
-                    ("price".into(), 98.0),
-                    ("volume".into(), 12.0),
-                ]),
+                columns: HashMap::from([("price".into(), 98.0), ("volume".into(), 12.0)]),
             },
             // Minute 2: 1 trade
             SourceRow {
                 timestamp: base + 2 * minute,
-                columns: HashMap::from([
-                    ("price".into(), 110.0),
-                    ("volume".into(), 3.0),
-                ]),
+                columns: HashMap::from([("price".into(), 110.0), ("volume".into(), 3.0)]),
             },
         ]
     }
@@ -623,10 +605,10 @@ mod tests {
         let (_, _, vals1) = &results[1];
         assert_eq!(vals1[0], 102.0); // open
         assert_eq!(vals1[1], 102.0); // high
-        assert_eq!(vals1[2], 98.0);  // low
-        assert_eq!(vals1[3], 98.0);  // close
+        assert_eq!(vals1[2], 98.0); // low
+        assert_eq!(vals1[3], 98.0); // close
         assert!((vals1[4] - 20.0).abs() < 1e-9); // volume
-        assert_eq!(vals1[5], 2.0);   // count
+        assert_eq!(vals1[5], 2.0); // count
 
         // Minute 2: open=110, high=110, low=110, close=110, volume=3, count=1
         let (_, _, vals2) = &results[2];
@@ -744,9 +726,7 @@ mod tests {
             },
         ];
 
-        let results = mgr
-            .compute_aggregates("trades_by_sym_1m", &rows)
-            .unwrap();
+        let results = mgr.compute_aggregates("trades_by_sym_1m", &rows).unwrap();
 
         // Same minute, but 2 symbols -> 2 buckets.
         assert_eq!(results.len(), 2);

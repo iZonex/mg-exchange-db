@@ -97,8 +97,8 @@ impl TxnFile {
 
     /// Persist a new header (without partition entries) to disk.
     pub fn write_header(&mut self, hdr: &TxnHeader) -> Result<()> {
-        let needed = TXN_HEADER_SIZE as u64
-            + (hdr.partition_count as u64) * (PARTITION_ENTRY_SIZE as u64);
+        let needed =
+            TXN_HEADER_SIZE as u64 + (hdr.partition_count as u64) * (PARTITION_ENTRY_SIZE as u64);
 
         self.ensure_capacity(needed)?;
 
@@ -445,12 +445,7 @@ impl TxnManager {
     }
 
     /// Convenience: commit without changing partitions (just update counts/timestamps).
-    pub fn commit_write_simple(
-        &self,
-        new_row_count: u64,
-        min_ts: i64,
-        max_ts: i64,
-    ) -> Result<u64> {
+    pub fn commit_write_simple(&self, new_row_count: u64, min_ts: i64, max_ts: i64) -> Result<u64> {
         let mut txn_file = self.txn_file.lock().unwrap();
         let current = txn_file.read_header();
         let new_version = current.version + 1;
@@ -660,22 +655,44 @@ mod tests {
 
         // Write 3 partitions.
         let parts3 = vec![
-            PartitionEntry { timestamp: 1, row_count: 1, name_offset: 0 },
-            PartitionEntry { timestamp: 2, row_count: 2, name_offset: 0 },
-            PartitionEntry { timestamp: 3, row_count: 3, name_offset: 0 },
+            PartitionEntry {
+                timestamp: 1,
+                row_count: 1,
+                name_offset: 0,
+            },
+            PartitionEntry {
+                timestamp: 2,
+                row_count: 2,
+                name_offset: 0,
+            },
+            PartitionEntry {
+                timestamp: 3,
+                row_count: 3,
+                name_offset: 0,
+            },
         ];
         let hdr3 = TxnHeader {
-            version: 1, row_count: 6, min_timestamp: 1, max_timestamp: 3, partition_count: 3,
+            version: 1,
+            row_count: 6,
+            min_timestamp: 1,
+            max_timestamp: 3,
+            partition_count: 3,
         };
         txn.commit(&hdr3, &parts3).unwrap();
         assert_eq!(txn.read_partitions().len(), 3);
 
         // Overwrite with 1 partition.
-        let parts1 = vec![
-            PartitionEntry { timestamp: 10, row_count: 10, name_offset: 0 },
-        ];
+        let parts1 = vec![PartitionEntry {
+            timestamp: 10,
+            row_count: 10,
+            name_offset: 0,
+        }];
         let hdr1 = TxnHeader {
-            version: 2, row_count: 10, min_timestamp: 10, max_timestamp: 10, partition_count: 1,
+            version: 2,
+            row_count: 10,
+            min_timestamp: 10,
+            max_timestamp: 10,
+            partition_count: 1,
         };
         txn.commit(&hdr1, &parts1).unwrap();
         let read = txn.read_partitions();
@@ -942,8 +959,16 @@ mod tests {
         {
             let mgr = TxnManager::open(dir.path()).unwrap();
             let parts = vec![
-                PartitionEntry { timestamp: 10, row_count: 5, name_offset: 0 },
-                PartitionEntry { timestamp: 20, row_count: 7, name_offset: 10 },
+                PartitionEntry {
+                    timestamp: 10,
+                    row_count: 5,
+                    name_offset: 0,
+                },
+                PartitionEntry {
+                    timestamp: 20,
+                    row_count: 7,
+                    name_offset: 10,
+                },
             ];
             mgr.commit_write(12, 10, 20, &parts).unwrap();
         }

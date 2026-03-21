@@ -98,15 +98,24 @@ impl HealthChecker {
                     let gb = free as f64 / (1024.0 * 1024.0 * 1024.0);
                     if free < 1024 * 1024 * 100 {
                         // < 100 MB
-                        (CheckStatus::Fail, format!("critically low disk space: {gb:.2} GB free"))
+                        (
+                            CheckStatus::Fail,
+                            format!("critically low disk space: {gb:.2} GB free"),
+                        )
                     } else if free < 1024 * 1024 * 1024 {
                         // < 1 GB
-                        (CheckStatus::Warn, format!("low disk space: {gb:.2} GB free"))
+                        (
+                            CheckStatus::Warn,
+                            format!("low disk space: {gb:.2} GB free"),
+                        )
                     } else {
                         (CheckStatus::Pass, format!("{gb:.2} GB free"))
                     }
                 }
-                Err(e) => (CheckStatus::Warn, format!("unable to check disk space: {e}")),
+                Err(e) => (
+                    CheckStatus::Warn,
+                    format!("unable to check disk space: {e}"),
+                ),
             }
         } else {
             (CheckStatus::Fail, "data directory does not exist".into())
@@ -140,17 +149,17 @@ impl HealthChecker {
                             format!("elevated WAL lag: {segment_count} segments"),
                         )
                     } else {
-                        (
-                            CheckStatus::Pass,
-                            format!("{segment_count} WAL segments"),
-                        )
+                        (CheckStatus::Pass, format!("{segment_count} WAL segments"))
                     }
                 }
                 Err(e) => (CheckStatus::Warn, format!("unable to read WAL dir: {e}")),
             }
         } else {
             // No WAL directory may be normal if WAL is disabled.
-            (CheckStatus::Pass, "WAL directory not present (WAL may be disabled)".into())
+            (
+                CheckStatus::Pass,
+                "WAL directory not present (WAL may be disabled)".into(),
+            )
         };
 
         HealthCheck {
@@ -175,7 +184,10 @@ impl HealthChecker {
                     (CheckStatus::Pass, format!("{mb:.0} MB used"))
                 }
             }
-            Err(e) => (CheckStatus::Pass, format!("unable to read memory usage: {e}")),
+            Err(e) => (
+                CheckStatus::Pass,
+                format!("unable to read memory usage: {e}"),
+            ),
         };
 
         HealthCheck {
@@ -202,7 +214,10 @@ impl HealthChecker {
                     let _ = std::fs::remove_file(&probe);
                     (CheckStatus::Pass, "data directory is writable".into())
                 }
-                Err(e) => (CheckStatus::Fail, format!("data directory not writable: {e}")),
+                Err(e) => (
+                    CheckStatus::Fail,
+                    format!("data directory not writable: {e}"),
+                ),
             }
         };
 
@@ -373,7 +388,11 @@ mod tests {
         let checker = HealthChecker::new(dir.path().to_path_buf(), "node-1".into());
 
         let status = checker.check();
-        let disk_check = status.checks.iter().find(|c| c.name == "disk_space").unwrap();
+        let disk_check = status
+            .checks
+            .iter()
+            .find(|c| c.name == "disk_space")
+            .unwrap();
         // On a test machine we should have enough disk space
         assert_ne!(disk_check.status, CheckStatus::Fail);
     }
@@ -414,7 +433,11 @@ mod tests {
         for check in &status.checks {
             // Duration should be non-negative (it's u64, always is)
             // Just verify the field is populated
-            assert!(check.duration_ms < 5000, "check '{}' took too long", check.name);
+            assert!(
+                check.duration_ms < 5000,
+                "check '{}' took too long",
+                check.name
+            );
         }
     }
 }

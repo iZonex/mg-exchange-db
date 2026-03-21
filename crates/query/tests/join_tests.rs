@@ -20,12 +20,19 @@ fn setup_join_db() -> TestDb {
     db.exec_ok("CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)");
     db.exec_ok("CREATE TABLE markets (timestamp TIMESTAMP, symbol VARCHAR, name VARCHAR)");
 
-    for (i, (sym, price)) in [("BTC/USD", 60000.0), ("ETH/USD", 3000.0), ("SOL/USD", 100.0)]
-        .iter()
-        .enumerate()
+    for (i, (sym, price)) in [
+        ("BTC/USD", 60000.0),
+        ("ETH/USD", 3000.0),
+        ("SOL/USD", 100.0),
+    ]
+    .iter()
+    .enumerate()
     {
         db.exec_ok(&format!(
-            "INSERT INTO trades VALUES ({}, '{}', {})", ts(i as i64), sym, price
+            "INSERT INTO trades VALUES ({}, '{}', {})",
+            ts(i as i64),
+            sym,
+            price
         ));
     }
 
@@ -34,7 +41,10 @@ fn setup_join_db() -> TestDb {
         .enumerate()
     {
         db.exec_ok(&format!(
-            "INSERT INTO markets VALUES ({}, '{}', '{}')", ts(i as i64), sym, name
+            "INSERT INTO markets VALUES ({}, '{}', '{}')",
+            ts(i as i64),
+            sym,
+            name
         ));
     }
 
@@ -44,14 +54,19 @@ fn setup_join_db() -> TestDb {
 /// Create a database with two tables having overlapping keys for join tests.
 fn setup_orders_db() -> TestDb {
     let db = TestDb::new();
-    db.exec_ok("CREATE TABLE orders (timestamp TIMESTAMP, order_id DOUBLE, symbol VARCHAR, qty DOUBLE)");
+    db.exec_ok(
+        "CREATE TABLE orders (timestamp TIMESTAMP, order_id DOUBLE, symbol VARCHAR, qty DOUBLE)",
+    );
     db.exec_ok("CREATE TABLE fills (timestamp TIMESTAMP, order_id DOUBLE, price DOUBLE, filled_qty DOUBLE)");
 
     // Orders: 5 orders
     for i in 0..5 {
         db.exec_ok(&format!(
             "INSERT INTO orders VALUES ({}, {}, '{}', {})",
-            ts(i), i, if i % 2 == 0 { "BTC" } else { "ETH" }, (i + 1) as f64 * 10.0
+            ts(i),
+            i,
+            if i % 2 == 0 { "BTC" } else { "ETH" },
+            (i + 1) as f64 * 10.0
         ));
     }
 
@@ -59,12 +74,16 @@ fn setup_orders_db() -> TestDb {
     for i in 0..3 {
         db.exec_ok(&format!(
             "INSERT INTO fills VALUES ({}, {}, {}, {})",
-            ts(i), i, 50000.0 + i as f64 * 1000.0, (i + 1) as f64 * 5.0
+            ts(i),
+            i,
+            50000.0 + i as f64 * 1000.0,
+            (i + 1) as f64 * 5.0
         ));
     }
     // Extra fill for order 0
     db.exec_ok(&format!(
-        "INSERT INTO fills VALUES ({}, 0, 50100.0, 3.0)", ts(10)
+        "INSERT INTO fills VALUES ({}, 0, 50100.0, 3.0)",
+        ts(10)
     ));
 
     db
@@ -88,13 +107,15 @@ mod inner_join {
     #[test]
     fn inner_join_no_match_excluded() {
         let db = setup_join_db();
-        let (_, rows) = db.query(
-            "SELECT t.symbol FROM trades t INNER JOIN markets m ON t.symbol = m.symbol"
-        );
-        let symbols: Vec<&str> = rows.iter().map(|r| match &r[0] {
-            Value::Str(s) => s.as_str(),
-            other => panic!("{other:?}"),
-        }).collect();
+        let (_, rows) =
+            db.query("SELECT t.symbol FROM trades t INNER JOIN markets m ON t.symbol = m.symbol");
+        let symbols: Vec<&str> = rows
+            .iter()
+            .map(|r| match &r[0] {
+                Value::Str(s) => s.as_str(),
+                other => panic!("{other:?}"),
+            })
+            .collect();
         assert!(!symbols.contains(&"SOL/USD"));
     }
 
@@ -126,13 +147,14 @@ mod inner_join {
     #[test]
     fn inner_join_self_join() {
         let db = TestDb::new();
-        db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, id DOUBLE, parent_id DOUBLE, name VARCHAR)");
+        db.exec_ok(
+            "CREATE TABLE t (timestamp TIMESTAMP, id DOUBLE, parent_id DOUBLE, name VARCHAR)",
+        );
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 1, 0, 'root')", ts(0)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 2, 1, 'child1')", ts(1)));
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 3, 1, 'child2')", ts(2)));
-        let (_, rows) = db.query(
-            "SELECT c.name, p.name FROM t c INNER JOIN t p ON c.parent_id = p.id"
-        );
+        let (_, rows) =
+            db.query("SELECT c.name, p.name FROM t c INNER JOIN t p ON c.parent_id = p.id");
         assert_eq!(rows.len(), 2); // child1 and child2 match root
     }
 
@@ -150,7 +172,7 @@ mod inner_join {
     fn inner_join_with_count() {
         let db = setup_orders_db();
         let val = db.query_scalar(
-            "SELECT count(*) FROM orders o INNER JOIN fills f ON o.order_id = f.order_id"
+            "SELECT count(*) FROM orders o INNER JOIN fills f ON o.order_id = f.order_id",
         );
         assert_eq!(val, Value::I64(4));
     }
@@ -196,9 +218,8 @@ mod inner_join {
     #[test]
     fn inner_join_with_limit() {
         let db = setup_orders_db();
-        let (_, rows) = db.query(
-            "SELECT * FROM orders o INNER JOIN fills f ON o.order_id = f.order_id LIMIT 2"
-        );
+        let (_, rows) = db
+            .query("SELECT * FROM orders o INNER JOIN fills f ON o.order_id = f.order_id LIMIT 2");
         assert_eq!(rows.len(), 2);
     }
 
@@ -206,7 +227,7 @@ mod inner_join {
     fn inner_join_select_specific_columns() {
         let db = setup_join_db();
         let (cols, rows) = db.query(
-            "SELECT t.price, m.name FROM trades t INNER JOIN markets m ON t.symbol = m.symbol"
+            "SELECT t.price, m.name FROM trades t INNER JOIN markets m ON t.symbol = m.symbol",
         );
         assert_eq!(cols.len(), 2);
         assert_eq!(rows.len(), 2);
@@ -232,7 +253,7 @@ mod left_join {
     fn basic_left_join() {
         let db = setup_join_db();
         let (_, rows) = db.query(
-            "SELECT t.symbol, m.name FROM trades t LEFT JOIN markets m ON t.symbol = m.symbol"
+            "SELECT t.symbol, m.name FROM trades t LEFT JOIN markets m ON t.symbol = m.symbol",
         );
         assert_eq!(rows.len(), 3); // All 3 trades appear
     }
@@ -244,7 +265,9 @@ mod left_join {
             "SELECT t.symbol, m.name FROM trades t LEFT JOIN markets m ON t.symbol = m.symbol ORDER BY t.symbol"
         );
         // SOL/USD should have NULL for m.name
-        let sol_row = rows.iter().find(|r| r[0] == Value::Str("SOL/USD".to_string()));
+        let sol_row = rows
+            .iter()
+            .find(|r| r[0] == Value::Str("SOL/USD".to_string()));
         assert!(sol_row.is_some());
         assert_eq!(sol_row.unwrap()[1], Value::Null);
     }
@@ -289,7 +312,7 @@ mod left_join {
     fn left_join_one_to_many() {
         let db = setup_orders_db();
         let (_, rows) = db.query(
-            "SELECT o.order_id, f.price FROM orders o LEFT JOIN fills f ON o.order_id = f.order_id"
+            "SELECT o.order_id, f.price FROM orders o LEFT JOIN fills f ON o.order_id = f.order_id",
         );
         // 5 orders: order 0 -> 2 fills, orders 1,2 -> 1 fill each, orders 3,4 -> NULL
         assert!(rows.len() >= 5);
@@ -299,7 +322,7 @@ mod left_join {
     fn left_join_preserves_all_left_rows() {
         let db = setup_orders_db();
         let (_, rows) = db.query(
-            "SELECT DISTINCT o.order_id FROM orders o LEFT JOIN fills f ON o.order_id = f.order_id"
+            "SELECT DISTINCT o.order_id FROM orders o LEFT JOIN fills f ON o.order_id = f.order_id",
         );
         assert_eq!(rows.len(), 5);
     }
@@ -308,7 +331,7 @@ mod left_join {
     fn left_join_with_count() {
         let db = setup_join_db();
         let val = db.query_scalar(
-            "SELECT count(*) FROM trades t LEFT JOIN markets m ON t.symbol = m.symbol"
+            "SELECT count(*) FROM trades t LEFT JOIN markets m ON t.symbol = m.symbol",
         );
         assert_eq!(val, Value::I64(3));
     }
@@ -344,7 +367,7 @@ mod right_join {
     fn basic_right_join() {
         let db = setup_join_db();
         let (_, rows) = db.query(
-            "SELECT t.symbol, m.name FROM trades t RIGHT JOIN markets m ON t.symbol = m.symbol"
+            "SELECT t.symbol, m.name FROM trades t RIGHT JOIN markets m ON t.symbol = m.symbol",
         );
         // Both BTC and ETH should appear
         assert!(rows.len() >= 2);
@@ -426,9 +449,7 @@ mod full_outer_join {
         db.exec_ok(&format!("INSERT INTO a VALUES ({}, 2, 20)", ts(1)));
         db.exec_ok(&format!("INSERT INTO b VALUES ({}, 2, 200)", ts(0)));
         db.exec_ok(&format!("INSERT INTO b VALUES ({}, 3, 300)", ts(1)));
-        let (_, rows) = db.query(
-            "SELECT a.k, a.v, b.k, b.w FROM a FULL OUTER JOIN b ON a.k = b.k"
-        );
+        let (_, rows) = db.query("SELECT a.k, a.v, b.k, b.w FROM a FULL OUTER JOIN b ON a.k = b.k");
         // k=1: left only, k=2: both, k=3: right only -> 3 rows
         assert_eq!(rows.len(), 3);
     }
@@ -456,7 +477,7 @@ mod full_outer_join {
     fn full_outer_join_with_count() {
         let db = setup_join_db();
         let val = db.query_scalar(
-            "SELECT count(*) FROM trades t FULL OUTER JOIN markets m ON t.symbol = m.symbol"
+            "SELECT count(*) FROM trades t FULL OUTER JOIN markets m ON t.symbol = m.symbol",
         );
         match val {
             Value::I64(n) => assert!(n >= 3),
@@ -554,7 +575,7 @@ mod asof_join {
     fn asof_join_with_aliases() {
         let db = TestDb::with_trades_and_quotes();
         let (_, rows) = db.query(
-            "SELECT t.price, q.bid, q.ask FROM trades t ASOF JOIN quotes q ON t.symbol = q.symbol"
+            "SELECT t.price, q.bid, q.ask FROM trades t ASOF JOIN quotes q ON t.symbol = q.symbol",
         );
         assert!(!rows.is_empty());
     }
@@ -571,9 +592,7 @@ mod asof_join {
         db.exec_ok(&format!("INSERT INTO q VALUES ({}, 'A', 99.0)", ts(5)));
         db.exec_ok(&format!("INSERT INTO q VALUES ({}, 'A', 101.0)", ts(15)));
 
-        let (_, rows) = db.query(
-            "SELECT t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol"
-        );
+        let (_, rows) = db.query("SELECT t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol");
         assert!(!rows.is_empty());
         // ASOF should match the quote at t=5s (most recent <= trade timestamp)
         assert_eq!(rows[0][1], Value::F64(99.0));
@@ -590,9 +609,7 @@ mod asof_join {
         // Quote at t=10s
         db.exec_ok(&format!("INSERT INTO q VALUES ({}, 'A', 99.0)", ts(10)));
 
-        let (_, rows) = db.query(
-            "SELECT t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol"
-        );
+        let (_, rows) = db.query("SELECT t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol");
         assert_eq!(rows.len(), 1);
         // No prior quote -> bid should be NULL
         assert_eq!(rows[0][1], Value::Null);
@@ -609,9 +626,8 @@ mod asof_join {
         db.exec_ok(&format!("INSERT INTO q VALUES ({}, 'A', 99.0)", ts(5)));
         db.exec_ok(&format!("INSERT INTO q VALUES ({}, 'B', 199.0)", ts(5)));
 
-        let (_, rows) = db.query(
-            "SELECT t.symbol, t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol"
-        );
+        let (_, rows) =
+            db.query("SELECT t.symbol, t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol");
         assert_eq!(rows.len(), 2);
     }
 
@@ -625,12 +641,14 @@ mod asof_join {
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'A', 100.0)", ts(50)));
         // Many quotes before
         for i in 0..10 {
-            db.exec_ok(&format!("INSERT INTO q VALUES ({}, 'A', {})", ts(i * 5), 90.0 + i as f64));
+            db.exec_ok(&format!(
+                "INSERT INTO q VALUES ({}, 'A', {})",
+                ts(i * 5),
+                90.0 + i as f64
+            ));
         }
 
-        let (_, rows) = db.query(
-            "SELECT t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol"
-        );
+        let (_, rows) = db.query("SELECT t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol");
         assert!(!rows.is_empty());
         // Should match quote at t=45s (bid = 99.0)
         assert_eq!(rows[0][1], Value::F64(99.0));
@@ -640,7 +658,7 @@ mod asof_join {
     fn asof_join_with_trades_and_quotes() {
         let db = TestDb::with_trades_and_quotes();
         let val = db.query_scalar(
-            "SELECT count(*) FROM trades ASOF JOIN quotes ON trades.symbol = quotes.symbol"
+            "SELECT count(*) FROM trades ASOF JOIN quotes ON trades.symbol = quotes.symbol",
         );
         match val {
             Value::I64(n) => assert!(n > 0),
@@ -657,9 +675,7 @@ mod asof_join {
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'A', 100.0)", ts(10)));
         db.exec_ok(&format!("INSERT INTO q VALUES ({}, 'A', 99.5)", ts(10)));
 
-        let (_, rows) = db.query(
-            "SELECT t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol"
-        );
+        let (_, rows) = db.query("SELECT t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][1], Value::F64(99.5));
     }
@@ -673,9 +689,7 @@ mod asof_join {
         db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'A', 100.0)", ts(10)));
         db.exec_ok(&format!("INSERT INTO q VALUES ({}, 'B', 99.0)", ts(5)));
 
-        let (_, rows) = db.query(
-            "SELECT t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol"
-        );
+        let (_, rows) = db.query("SELECT t.price, q.bid FROM t ASOF JOIN q ON t.symbol = q.symbol");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][1], Value::Null); // No matching symbol
     }
@@ -704,7 +718,7 @@ mod multi_table_join {
         let (_, rows) = db.query(
             "SELECT a.name, b.value, c.tag FROM a \
              INNER JOIN b ON a.id = b.a_id \
-             INNER JOIN c ON a.id = c.a_id"
+             INNER JOIN c ON a.id = c.a_id",
         );
         assert_eq!(rows.len(), 2);
     }
@@ -726,7 +740,7 @@ mod multi_table_join {
         let (_, rows) = db.query(
             "SELECT a.name, b.value, c.tag FROM a \
              LEFT JOIN b ON a.id = b.a_id \
-             INNER JOIN c ON a.id = c.a_id"
+             INNER JOIN c ON a.id = c.a_id",
         );
         assert_eq!(rows.len(), 2);
     }
@@ -740,17 +754,37 @@ mod multi_table_join {
         db.exec_ok("CREATE TABLE t4 (timestamp TIMESTAMP, k DOUBLE, v4 DOUBLE)");
 
         for i in 0..3 {
-            db.exec_ok(&format!("INSERT INTO t1 VALUES ({}, {}, {})", ts(i), i, i * 10));
-            db.exec_ok(&format!("INSERT INTO t2 VALUES ({}, {}, {})", ts(i), i, i * 20));
-            db.exec_ok(&format!("INSERT INTO t3 VALUES ({}, {}, {})", ts(i), i, i * 30));
-            db.exec_ok(&format!("INSERT INTO t4 VALUES ({}, {}, {})", ts(i), i, i * 40));
+            db.exec_ok(&format!(
+                "INSERT INTO t1 VALUES ({}, {}, {})",
+                ts(i),
+                i,
+                i * 10
+            ));
+            db.exec_ok(&format!(
+                "INSERT INTO t2 VALUES ({}, {}, {})",
+                ts(i),
+                i,
+                i * 20
+            ));
+            db.exec_ok(&format!(
+                "INSERT INTO t3 VALUES ({}, {}, {})",
+                ts(i),
+                i,
+                i * 30
+            ));
+            db.exec_ok(&format!(
+                "INSERT INTO t4 VALUES ({}, {}, {})",
+                ts(i),
+                i,
+                i * 40
+            ));
         }
 
         let (_, rows) = db.query(
             "SELECT t1.v1, t2.v2, t3.v3, t4.v4 FROM t1 \
              INNER JOIN t2 ON t1.k = t2.k \
              INNER JOIN t3 ON t1.k = t3.k \
-             INNER JOIN t4 ON t1.k = t4.k"
+             INNER JOIN t4 ON t1.k = t4.k",
         );
         assert_eq!(rows.len(), 3);
     }
@@ -770,7 +804,7 @@ mod multi_table_join {
         let (_, rows) = db.query(
             "SELECT a.name, b.val, c.tag FROM a \
              LEFT JOIN b ON a.id = b.a_id \
-             LEFT JOIN c ON a.id = c.a_id"
+             LEFT JOIN c ON a.id = c.a_id",
         );
         assert_eq!(rows.len(), 2);
     }
@@ -781,7 +815,7 @@ mod multi_table_join {
         let (_, rows) = db.query(
             "SELECT o.symbol, sum(f.filled_qty) FROM orders o \
              INNER JOIN fills f ON o.order_id = f.order_id \
-             GROUP BY o.symbol"
+             GROUP BY o.symbol",
         );
         assert!(!rows.is_empty());
     }
@@ -789,12 +823,20 @@ mod multi_table_join {
     #[test]
     fn join_with_subquery_as_table() {
         let db = TestDb::with_trades(20);
-        db.exec_ok("CREATE TABLE ref_prices (timestamp TIMESTAMP, symbol VARCHAR, ref_price DOUBLE)");
-        db.exec_ok(&format!("INSERT INTO ref_prices VALUES ({}, 'BTC/USD', 60000.0)", ts(0)));
-        db.exec_ok(&format!("INSERT INTO ref_prices VALUES ({}, 'ETH/USD', 3000.0)", ts(0)));
+        db.exec_ok(
+            "CREATE TABLE ref_prices (timestamp TIMESTAMP, symbol VARCHAR, ref_price DOUBLE)",
+        );
+        db.exec_ok(&format!(
+            "INSERT INTO ref_prices VALUES ({}, 'BTC/USD', 60000.0)",
+            ts(0)
+        ));
+        db.exec_ok(&format!(
+            "INSERT INTO ref_prices VALUES ({}, 'ETH/USD', 3000.0)",
+            ts(0)
+        ));
         let (_, rows) = db.query(
             "SELECT t.symbol, t.price, r.ref_price FROM trades t \
-             INNER JOIN ref_prices r ON t.symbol = r.symbol"
+             INNER JOIN ref_prices r ON t.symbol = r.symbol",
         );
         assert!(!rows.is_empty());
     }
@@ -805,7 +847,7 @@ mod multi_table_join {
         let (_, rows) = db.query(
             "SELECT o.order_id, f.price FROM orders o \
              INNER JOIN fills f ON o.order_id = f.order_id \
-             ORDER BY f.price DESC"
+             ORDER BY f.price DESC",
         );
         for i in 1..rows.len() {
             assert!(rows[i - 1][1].cmp_coerce(&rows[i][1]) != Some(std::cmp::Ordering::Less));
@@ -817,7 +859,7 @@ mod multi_table_join {
         let db = setup_orders_db();
         let (_, rows) = db.query(
             "SELECT DISTINCT o.symbol FROM orders o \
-             INNER JOIN fills f ON o.order_id = f.order_id"
+             INNER JOIN fills f ON o.order_id = f.order_id",
         );
         assert!(!rows.is_empty());
     }
@@ -828,7 +870,7 @@ mod multi_table_join {
         let (_, rows) = db.query(
             "SELECT o.order_id, count(f.price) FROM orders o \
              LEFT JOIN fills f ON o.order_id = f.order_id \
-             GROUP BY o.order_id"
+             GROUP BY o.order_id",
         );
         assert_eq!(rows.len(), 5); // all 5 orders
     }
@@ -865,7 +907,7 @@ mod multi_table_join {
         let (_, rows) = db.query(
             "SELECT o.order_id, f.price FROM orders o \
              INNER JOIN fills f ON o.order_id = f.order_id \
-             WHERE o.symbol = 'BTC' AND f.price > 50000"
+             WHERE o.symbol = 'BTC' AND f.price > 50000",
         );
         for row in &rows {
             match &row[1] {
@@ -894,7 +936,7 @@ mod multi_table_join {
         let (_, rows) = db.query(
             "SELECT o.symbol, sum(f.filled_qty) AS total_filled \
              FROM orders o INNER JOIN fills f ON o.order_id = f.order_id \
-             GROUP BY o.symbol"
+             GROUP BY o.symbol",
         );
         for row in &rows {
             match &row[1] {
@@ -911,7 +953,7 @@ mod multi_table_join {
         let (_, rows) = db.query(
             "SELECT o.order_id, count(f.price) AS fill_count \
              FROM orders o LEFT JOIN fills f ON o.order_id = f.order_id \
-             GROUP BY o.order_id HAVING fill_count > 0"
+             GROUP BY o.order_id HAVING fill_count > 0",
         );
         assert!(rows.len() <= 5);
     }
@@ -922,14 +964,20 @@ mod multi_table_join {
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE)");
         db.exec_ok("CREATE TABLE q (timestamp TIMESTAMP, symbol VARCHAR, bid DOUBLE)");
         for i in 0..20 {
-            db.exec_ok(&format!("INSERT INTO t VALUES ({}, 'A', {})", ts(i * 2), 100.0 + i as f64));
+            db.exec_ok(&format!(
+                "INSERT INTO t VALUES ({}, 'A', {})",
+                ts(i * 2),
+                100.0 + i as f64
+            ));
         }
         for i in 0..10 {
-            db.exec_ok(&format!("INSERT INTO q VALUES ({}, 'A', {})", ts(i * 4 + 1), 99.0 + i as f64));
+            db.exec_ok(&format!(
+                "INSERT INTO q VALUES ({}, 'A', {})",
+                ts(i * 4 + 1),
+                99.0 + i as f64
+            ));
         }
-        let val = db.query_scalar(
-            "SELECT count(*) FROM t ASOF JOIN q ON t.symbol = q.symbol"
-        );
+        let val = db.query_scalar("SELECT count(*) FROM t ASOF JOIN q ON t.symbol = q.symbol");
         assert_eq!(val, Value::I64(20));
     }
 
@@ -949,9 +997,8 @@ mod multi_table_join {
     fn join_after_delete() {
         let db = setup_join_db();
         db.exec_ok("DELETE FROM trades WHERE symbol = 'SOL/USD'");
-        let (_, rows) = db.query(
-            "SELECT t.symbol FROM trades t LEFT JOIN markets m ON t.symbol = m.symbol"
-        );
+        let (_, rows) =
+            db.query("SELECT t.symbol FROM trades t LEFT JOIN markets m ON t.symbol = m.symbol");
         assert_eq!(rows.len(), 2); // only BTC and ETH
     }
 

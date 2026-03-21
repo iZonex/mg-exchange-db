@@ -23,7 +23,13 @@ struct SortedAccumulator {
 
 impl SortedAccumulator {
     fn new(op: HashAggOp) -> Self {
-        Self { op, sum: 0.0, count: 0, min: None, max: None }
+        Self {
+            op,
+            sum: 0.0,
+            count: 0,
+            min: None,
+            max: None,
+        }
     }
 
     fn accumulate(&mut self, val: &Value) {
@@ -88,10 +94,8 @@ impl SortedGroupByCursor {
         agg_specs: Vec<(HashAggOp, usize)>,
     ) -> Self {
         let src_schema = source.schema();
-        let mut schema: Vec<(String, ColumnType)> = group_cols
-            .iter()
-            .map(|&i| src_schema[i].clone())
-            .collect();
+        let mut schema: Vec<(String, ColumnType)> =
+            group_cols.iter().map(|&i| src_schema[i].clone()).collect();
         for (op, col) in &agg_specs {
             let name = format!("{:?}({})", op, src_schema[*col].0).to_lowercase();
             let ct = match op {
@@ -101,7 +105,10 @@ impl SortedGroupByCursor {
             schema.push((name, ct));
         }
 
-        let accumulators = agg_specs.iter().map(|(op, _)| SortedAccumulator::new(*op)).collect();
+        let accumulators = agg_specs
+            .iter()
+            .map(|(op, _)| SortedAccumulator::new(*op))
+            .collect();
 
         Self {
             source,
@@ -173,9 +180,7 @@ impl RecordCursor for SortedGroupByCursor {
                 Some(batch) => {
                     let ncols = batch.columns.len();
                     for r in 0..batch.row_count() {
-                        let row: Vec<Value> = (0..ncols)
-                            .map(|c| batch.get_value(r, c))
-                            .collect();
+                        let row: Vec<Value> = (0..ncols).map(|c| batch.get_value(r, c)).collect();
 
                         let key = self.extract_key(&row);
 
@@ -233,11 +238,8 @@ mod tests {
             vec![Value::Str("B".into()), Value::F64(40.0)],
         ];
         let source = MemoryCursor::from_rows(schema, &rows);
-        let mut cursor = SortedGroupByCursor::new(
-            Box::new(source),
-            vec![0],
-            vec![(HashAggOp::Sum, 1)],
-        );
+        let mut cursor =
+            SortedGroupByCursor::new(Box::new(source), vec![0], vec![(HashAggOp::Sum, 1)]);
 
         let mut all = Vec::new();
         while let Some(batch) = cursor.next_batch(100).unwrap() {

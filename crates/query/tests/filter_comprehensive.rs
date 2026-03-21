@@ -368,9 +368,8 @@ mod in_tests {
     #[test]
     fn in_string_all() {
         let db = db_filter();
-        let (_, rows) = db.query(
-            "SELECT * FROM t WHERE s IN ('alpha', 'beta', 'gamma', 'delta', 'epsilon')",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM t WHERE s IN ('alpha', 'beta', 'gamma', 'delta', 'epsilon')");
         assert_eq!(rows.len(), 10);
     }
 
@@ -419,9 +418,8 @@ mod not_in_tests {
     #[test]
     fn not_in_all_excluded() {
         let db = db_filter();
-        let (_, rows) = db.query(
-            "SELECT * FROM t WHERE s NOT IN ('alpha', 'beta', 'gamma', 'delta', 'epsilon')",
-        );
+        let (_, rows) = db
+            .query("SELECT * FROM t WHERE s NOT IN ('alpha', 'beta', 'gamma', 'delta', 'epsilon')");
         assert_eq!(rows.len(), 0);
     }
 
@@ -651,9 +649,7 @@ mod and_tests {
     #[test]
     fn and_with_in() {
         let db = db_filter();
-        let (_, rows) = db.query(
-            "SELECT * FROM t WHERE s IN ('alpha', 'beta') AND i > 5",
-        );
+        let (_, rows) = db.query("SELECT * FROM t WHERE s IN ('alpha', 'beta') AND i > 5");
         assert_eq!(rows.len(), 2); // alpha i=6, beta i=7
     }
 
@@ -710,9 +706,8 @@ mod or_tests {
     #[test]
     fn or_with_and() {
         let db = db_filter();
-        let (_, rows) = db.query(
-            "SELECT * FROM t WHERE (s = 'alpha' AND i > 3) OR (s = 'beta' AND i > 5)",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM t WHERE (s = 'alpha' AND i > 3) OR (s = 'beta' AND i > 5)");
         assert_eq!(rows.len(), 2); // alpha i=6, beta i=7
     }
 }
@@ -754,27 +749,22 @@ mod nested_filter_tests {
     #[test]
     fn nested_and_or() {
         let db = db_filter();
-        let (_, rows) = db.query(
-            "SELECT * FROM t WHERE s = 'alpha' AND (i = 1 OR i = 6)",
-        );
+        let (_, rows) = db.query("SELECT * FROM t WHERE s = 'alpha' AND (i = 1 OR i = 6)");
         assert_eq!(rows.len(), 2);
     }
 
     #[test]
     fn nested_or_and() {
         let db = db_filter();
-        let (_, rows) = db.query(
-            "SELECT * FROM t WHERE (s = 'alpha' OR s = 'beta') AND i > 5",
-        );
+        let (_, rows) = db.query("SELECT * FROM t WHERE (s = 'alpha' OR s = 'beta') AND i > 5");
         assert_eq!(rows.len(), 2);
     }
 
     #[test]
     fn deeply_nested() {
         let db = db_filter();
-        let (_, rows) = db.query(
-            "SELECT * FROM t WHERE (i > 3 AND i < 8) AND (s = 'delta' OR s = 'epsilon')",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM t WHERE (i > 3 AND i < 8) AND (s = 'delta' OR s = 'epsilon')");
         assert_eq!(rows.len(), 2); // delta i=4, epsilon i=5
     }
 
@@ -900,18 +890,15 @@ mod filter_trades_integration {
     #[test]
     fn trades_where_and() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy'",
-        );
+        let (_, rows) = db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' AND side = 'buy'");
         assert_eq!(rows.len(), 2);
     }
 
     #[test]
     fn trades_where_or() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'SOL/USD'",
-        );
+        let (_, rows) =
+            db.query("SELECT * FROM trades WHERE symbol = 'BTC/USD' OR symbol = 'SOL/USD'");
         assert_eq!(rows.len(), 8);
     }
 
@@ -982,9 +969,8 @@ mod filter_trades_integration {
     #[test]
     fn trades_filtered_order_limit() {
         let db = TestDb::with_trades(20);
-        let (_, rows) = db.query(
-            "SELECT price FROM trades WHERE symbol = 'BTC/USD' ORDER BY price DESC LIMIT 3",
-        );
+        let (_, rows) = db
+            .query("SELECT price FROM trades WHERE symbol = 'BTC/USD' ORDER BY price DESC LIMIT 3");
         assert_eq!(rows.len(), 3);
         // Should be in descending order
         match (&rows[0][0], &rows[1][0]) {
@@ -996,9 +982,8 @@ mod filter_trades_integration {
     #[test]
     fn trades_filter_empty_result_group_by() {
         let db = TestDb::with_trades(12);
-        let (_, rows) = db.query(
-            "SELECT symbol, count(*) FROM trades WHERE symbol = 'XRP/USD' GROUP BY symbol",
-        );
+        let (_, rows) = db
+            .query("SELECT symbol, count(*) FROM trades WHERE symbol = 'XRP/USD' GROUP BY symbol");
         assert_eq!(rows.len(), 0);
     }
 

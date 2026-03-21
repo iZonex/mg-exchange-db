@@ -20,10 +20,7 @@ impl MemoryCursor {
     }
 
     /// Create a cursor from row-major data.
-    pub fn from_rows(
-        schema: Vec<(String, ColumnType)>,
-        rows: &[Vec<Value>],
-    ) -> Self {
+    pub fn from_rows(schema: Vec<(String, ColumnType)>, rows: &[Vec<Value>]) -> Self {
         let mut batch = RecordBatch::new(schema);
         for row in rows {
             batch.append_row(row);

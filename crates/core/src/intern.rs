@@ -38,9 +38,10 @@ impl StringInterner {
 
         // Fast path: check if already interned.
         if let Some(existing) = self.map.get(&hash)
-            && &**existing == s {
-                return Arc::clone(&existing);
-            }
+            && &**existing == s
+        {
+            return Arc::clone(&existing);
+        }
 
         // Slow path: insert.
         // Handle hash collisions by using a secondary hash offset.
