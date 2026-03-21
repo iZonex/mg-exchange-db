@@ -59,12 +59,12 @@ impl HealthChecker {
 
     /// Run all health checks and return aggregate status.
     pub fn check(&self) -> HealthStatus {
-        let mut checks = Vec::new();
-
-        checks.push(self.check_disk_space());
-        checks.push(self.check_wal_lag());
-        checks.push(self.check_memory_usage());
-        checks.push(self.check_data_dir());
+        let checks = vec![
+            self.check_disk_space(),
+            self.check_wal_lag(),
+            self.check_memory_usage(),
+            self.check_data_dir(),
+        ];
 
         // Determine overall status from individual checks.
         let overall = if checks.iter().any(|c| c.status == CheckStatus::Fail) {

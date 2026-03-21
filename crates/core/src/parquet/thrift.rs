@@ -31,6 +31,12 @@ pub struct ThriftEncoder {
     last_field_id: i16,
 }
 
+impl Default for ThriftEncoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ThriftEncoder {
     pub fn new() -> Self {
         Self {

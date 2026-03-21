@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "exchangedb.fullname" . }}-config
+  labels:
+    {{- include "exchangedb.labels" . | nindent 4 }}
+data:
+  exchange-db.toml: |
+    {{- .Values.config | nindent 4 }}

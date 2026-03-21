@@ -61,11 +61,7 @@ impl QueryMemoryTracker {
     /// Remaining budget in bytes.
     pub fn remaining(&self) -> u64 {
         let used = self.used();
-        if used >= self.limit {
-            0
-        } else {
-            self.limit - used
-        }
+        self.limit.saturating_sub(used)
     }
 
     /// The configured limit.

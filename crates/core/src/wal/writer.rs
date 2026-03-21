@@ -65,10 +65,8 @@ impl WalWriter {
 
         // Scan the last segment to find the highest txn_id.
         let mut max_txn_id: u64 = 0;
-        for event_result in segment.iter_events() {
-            if let Ok(event) = event_result {
-                max_txn_id = max_txn_id.max(event.txn_id);
-            }
+        for event in segment.iter_events().flatten() {
+            max_txn_id = max_txn_id.max(event.txn_id);
         }
 
         // Also scan all previous segments in case the last one is empty.
@@ -77,10 +75,8 @@ impl WalWriter {
         if max_txn_id == 0 && last_segment_id > 0 {
             for seg_id in (0..last_segment_id).rev() {
                 let prev_seg = WalSegment::open(wal_dir, seg_id)?;
-                for event_result in prev_seg.iter_events() {
-                    if let Ok(event) = event_result {
-                        max_txn_id = max_txn_id.max(event.txn_id);
-                    }
+                for event in prev_seg.iter_events().flatten() {
+                    max_txn_id = max_txn_id.max(event.txn_id);
                 }
                 if max_txn_id > 0 {
                     break;

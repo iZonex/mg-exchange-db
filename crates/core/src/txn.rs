@@ -10,25 +10,25 @@ use crate::mmap::MmapFile;
 // TxnFile – persistent transaction metadata stored in `_txn`
 // ---------------------------------------------------------------------------
 
-/// On-disk layout (all little-endian):
-///
-/// ```text
-/// offset  size   field
-/// ------  -----  -----
-///  0       8     version          (u64)
-///  8       8     row_count        (u64)
-/// 16       8     min_timestamp    (i64)
-/// 24       8     max_timestamp    (i64)
-/// 32       4     partition_count  (u32)
-/// 36       ..    partition entries (20 bytes each)
-/// ```
-///
-/// Each partition entry:
-/// ```text
-///  0       8     timestamp   (i64)  – partition key timestamp
-///  8       8     row_count   (u64)
-/// 16       4     name_offset (u32)  – byte offset into a name table (future)
-/// ```
+// On-disk layout (all little-endian):
+//
+// ```text
+// offset  size   field
+// ------  -----  -----
+//  0       8     version          (u64)
+//  8       8     row_count        (u64)
+// 16       8     min_timestamp    (i64)
+// 24       8     max_timestamp    (i64)
+// 32       4     partition_count  (u32)
+// 36       ..    partition entries (20 bytes each)
+// ```
+//
+// Each partition entry:
+// ```text
+//  0       8     timestamp   (i64)  – partition key timestamp
+//  8       8     row_count   (u64)
+// 16       4     name_offset (u32)  – byte offset into a name table (future)
+// ```
 
 const TXN_HEADER_SIZE: usize = 36;
 const PARTITION_ENTRY_SIZE: usize = 20;
@@ -69,7 +69,7 @@ impl TxnFile {
         // already zero which is a valid initial state (version 0, no rows, no
         // partitions).  We only need to make sure `min_timestamp` / `max_timestamp`
         // are set to sensible sentinel values when there are no rows.
-        if txn_file.mmap.len() == 0 || txn_file.read_header().version == 0 {
+        if txn_file.mmap.is_empty() || txn_file.read_header().version == 0 {
             // First open – write a clean header.
             txn_file.write_header(&TxnHeader {
                 version: 0,

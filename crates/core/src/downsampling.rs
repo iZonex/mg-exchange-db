@@ -8,6 +8,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use exchange_common::error::{ExchangeDbError, Result};
+
+/// A single aggregate row: (bucket_timestamp, partition_key, finalized_values).
+type AggregateRow = (i64, Vec<String>, Vec<f64>);
 use serde::{Deserialize, Serialize};
 
 /// Configuration for downsampling a single source table.
@@ -370,8 +373,8 @@ impl DownsamplingManager {
         let rows_written = buckets.len() as u64;
 
         // Update watermark.
-        if let Some(max_ts) = rows_to_process.iter().map(|r| r.timestamp).max() {
-            if let Some(state) = states.get_mut(&interval.name) {
+        if let Some(max_ts) = rows_to_process.iter().map(|r| r.timestamp).max()
+            && let Some(state) = states.get_mut(&interval.name) {
                 state.watermark = max_ts;
                 state.last_refresh = Some(
                     std::time::SystemTime::now()
@@ -380,7 +383,6 @@ impl DownsamplingManager {
                         .as_nanos() as i64,
                 );
             }
-        }
 
         Ok(DownsampleStats {
             rows_processed,
@@ -395,7 +397,7 @@ impl DownsamplingManager {
         &self,
         interval_name: &str,
         source_rows: &[SourceRow],
-    ) -> Result<Vec<(i64, Vec<String>, Vec<f64>)>> {
+    ) -> Result<Vec<AggregateRow>> {
         let interval = self
             .configs
             .iter()
@@ -451,7 +453,7 @@ impl DownsamplingManager {
             }
         }
 
-        let mut results: Vec<(i64, Vec<String>, Vec<f64>)> = buckets
+        let mut results: Vec<AggregateRow> = buckets
             .into_iter()
             .map(|((partition_key, bucket_ts), states)| {
                 let values: Vec<f64> = states.iter().map(|s| s.finalize()).collect();

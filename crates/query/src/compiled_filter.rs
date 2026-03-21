@@ -25,6 +25,9 @@ use crate::plan::{Filter, Value};
 /// if the row passes the filter.
 pub type FilterFn = Box<dyn Fn(&[Value]) -> bool + Send + Sync>;
 
+/// A compiled columnar filter closure. Takes column byte slices and a row index.
+pub type ColumnarFilterFn = Box<dyn Fn(&[&[u8]], usize) -> bool + Send + Sync>;
+
 /// Enum-based compiled filter that avoids dynamic dispatch.
 ///
 /// Each variant stores column indices (resolved at compile time from column
@@ -511,7 +514,7 @@ pub fn compile_filter(filter: &Filter, column_indices: &HashMap<String, usize>) 
 pub fn compile_columnar_filter(
     filter: &Filter,
     column_indices: &HashMap<String, usize>,
-) -> Box<dyn Fn(&[&[u8]], usize) -> bool + Send + Sync> {
+) -> ColumnarFilterFn {
     match filter {
         Filter::Eq(col, val) => {
             let idx = column_indices[col];
@@ -598,14 +601,14 @@ pub fn compile_columnar_filter(
             })
         }
         Filter::And(filters) => {
-            let compiled: Vec<Box<dyn Fn(&[&[u8]], usize) -> bool + Send + Sync>> = filters
+            let compiled: Vec<ColumnarFilterFn> = filters
                 .iter()
                 .map(|f| compile_columnar_filter(f, column_indices))
                 .collect();
             Box::new(move |cols: &[&[u8]], row: usize| compiled.iter().all(|f| f(cols, row)))
         }
         Filter::Or(filters) => {
-            let compiled: Vec<Box<dyn Fn(&[&[u8]], usize) -> bool + Send + Sync>> = filters
+            let compiled: Vec<ColumnarFilterFn> = filters
                 .iter()
                 .map(|f| compile_columnar_filter(f, column_indices))
                 .collect();

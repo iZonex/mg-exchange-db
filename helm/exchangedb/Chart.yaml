@@ -1,0 +1,18 @@
+apiVersion: v2
+name: exchangedb
+description: A Helm chart for ExchangeDB - high-performance time-series database for financial exchange data
+type: application
+version: 0.1.1
+appVersion: "0.1.1"
+keywords:
+  - database
+  - timeseries
+  - exchange
+  - financial
+  - market-data
+home: https://github.com/izonex/mg-exchange-db
+sources:
+  - https://github.com/izonex/mg-exchange-db
+maintainers:
+  - name: izonex
+    url: https://github.com/izonex

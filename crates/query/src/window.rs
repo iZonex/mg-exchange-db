@@ -103,7 +103,7 @@ pub fn is_window_function(name: &str) -> bool {
 ///
 /// Returns the names of the appended columns and the modified rows.
 pub fn apply_window_functions(
-    rows: &mut Vec<Vec<Value>>,
+    rows: &mut [Vec<Value>],
     base_columns: &[String],
     window_fns: &[WindowFunction],
 ) -> Vec<String> {
@@ -480,8 +480,7 @@ fn compute_windowed_aggregate(
         let mut has_float = false;
         let mut count: i64 = 0;
 
-        for frame_pos in frame_start..=frame_end {
-            let row_idx = sorted_indices[frame_pos];
+        for &row_idx in &sorted_indices[frame_start..=frame_end] {
             let val = &rows[row_idx][col_idx];
 
             if is_count_star {

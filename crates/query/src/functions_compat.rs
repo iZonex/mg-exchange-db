@@ -492,7 +492,7 @@ impl ScalarFunction for GetBitFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         let v = val_to_i64(&args[0]);
         let n = val_to_i64(&args[1]);
-        if n < 0 || n >= 64 { return Ok(Value::I64(0)); }
+        if !(0..64).contains(&n) { return Ok(Value::I64(0)); }
         Ok(Value::I64((v >> n) & 1))
     }
     fn min_args(&self) -> usize { 2 }
@@ -506,7 +506,7 @@ impl ScalarFunction for SetBitFn {
         let v = val_to_i64(&args[0]);
         let n = val_to_i64(&args[1]);
         let bit = if args.len() > 2 { val_to_i64(&args[2]) } else { 1 };
-        if n < 0 || n >= 64 { return Ok(Value::I64(v)); }
+        if !(0..64).contains(&n) { return Ok(Value::I64(v)); }
         let result = if bit != 0 {
             v | (1 << n)
         } else {
@@ -524,7 +524,7 @@ impl ScalarFunction for GetByteFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         let v = val_to_i64(&args[0]);
         let n = val_to_i64(&args[1]);
-        if n < 0 || n >= 8 { return Ok(Value::I64(0)); }
+        if !(0..8).contains(&n) { return Ok(Value::I64(0)); }
         Ok(Value::I64((v >> (n * 8)) & 0xFF))
     }
     fn min_args(&self) -> usize { 2 }
@@ -538,7 +538,7 @@ impl ScalarFunction for SetByteFn {
         let v = val_to_i64(&args[0]);
         let n = val_to_i64(&args[1]);
         let byte_val = if args.len() > 2 { val_to_i64(&args[2]) & 0xFF } else { 0 };
-        if n < 0 || n >= 8 { return Ok(Value::I64(v)); }
+        if !(0..8).contains(&n) { return Ok(Value::I64(v)); }
         let mask = !(0xFFi64 << (n * 8));
         let result = (v & mask) | (byte_val << (n * 8));
         Ok(Value::I64(result))

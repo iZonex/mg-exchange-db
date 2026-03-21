@@ -89,7 +89,7 @@ pub fn encode_row(column_types: &[ColumnType], values: &[OwnedColumnValue]) -> R
                 buf.push(1); // null flag
                 // Write zero-filled placeholder for fixed types, or 0-length for var.
                 if let Some(size) = ct.fixed_size() {
-                    buf.extend(std::iter::repeat(0u8).take(size));
+                    buf.extend(std::iter::repeat_n(0u8, size));
                 } else {
                     buf.extend_from_slice(&0u32.to_le_bytes());
                 }
@@ -289,7 +289,7 @@ fn encode_value(buf: &mut Vec<u8>, ct: ColumnType, val: &OwnedColumnValue) {
         _ => {
             // Type mismatch: write zeros (defensive).
             if let Some(size) = ct.fixed_size() {
-                buf.extend(std::iter::repeat(0u8).take(size));
+                buf.extend(std::iter::repeat_n(0u8, size));
             } else {
                 buf.extend_from_slice(&0u32.to_le_bytes());
             }

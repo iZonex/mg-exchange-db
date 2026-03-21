@@ -224,11 +224,7 @@ fn substitute_params(sql: &str, params: &[serde_json::Value]) -> String {
 pub async fn health(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let uptime = state.start_time.elapsed().as_secs_f64();
 
-    let replication = if let Some(ref mgr) = state.replication_manager {
-        Some(mgr.status())
-    } else {
-        None
-    };
+    let replication = state.replication_manager.as_ref().map(|mgr| mgr.status());
 
     // Run actual health checks using the HealthChecker.
     let db_root = state.db_root.clone();
@@ -333,13 +329,11 @@ fn resolve_session(
     state: &AppState,
     headers: &axum::http::HeaderMap,
 ) -> (String, Option<crate::session::Session>) {
-    if let Some(hv) = headers.get(SESSION_HEADER) {
-        if let Ok(id) = hv.to_str() {
-            if let Some(session) = state.session_manager.get_session(id) {
+    if let Some(hv) = headers.get(SESSION_HEADER)
+        && let Ok(id) = hv.to_str()
+            && let Some(session) = state.session_manager.get_session(id) {
                 return (id.to_string(), Some(session));
             }
-        }
-    }
     // Create a new session.
     match state.session_manager.create_session() {
         Ok(id) => {
@@ -394,7 +388,7 @@ fn build_execution_context(
     // Determine whether to use cursor engine for this query.
     // Enable for SELECT / Join / SetOperation plans when the server-wide flag is on.
     let use_cursors = state.use_cursor_engine
-        && plan.map_or(false, |p| matches!(
+        && plan.is_some_and(|p| matches!(
             p,
             QueryPlan::Select { .. }
             | QueryPlan::Join { .. }
@@ -485,62 +479,33 @@ pub async fn query(
     let start = Instant::now();
 
     // --- Plan cache: check before planning ---
-    if let Some(ref cache) = state.plan_cache {
+    let (plan, cache_hit) = if let Some(ref cache) = state.plan_cache {
         if let Some(cached_plan) = cache.get(&query_sql) {
             state.metrics.inc_plan_cache_hits();
-
-            let ctx = build_execution_context(&state, &headers, Some(&cached_plan))?;
-            let cached_query_id = ctx.query_id;
-            let sql_for_log = query_sql.clone();
-            let exec_start = Instant::now();
-            let result = execute_with_context(&ctx, &cached_plan).map_err(|e| {
-                    state.query_registry.deregister(cached_query_id);
-                    state.metrics.dec_active_queries();
-                    state.metrics.inc_queries_failed();
-                    db_error_to_response(e)
-                })?;
-            let timing_ms = exec_start.elapsed().as_secs_f64() * 1000.0;
-            state.query_registry.deregister(cached_query_id);
-
-            let duration = start.elapsed();
-            state.metrics.inc_queries();
-            state.metrics.observe_query_duration(duration.as_secs_f64());
-            state.metrics.dec_active_queries();
-
-            // Record metering for the tenant.
-            if let Some(ref meter) = state.usage_meter {
-                let tid = tenant_id.as_deref().unwrap_or("default");
-                let rows = match &result {
-                    QueryResult::Rows { rows, .. } => rows.len() as u64,
-                    QueryResult::Ok { .. } => 0,
-                };
-                meter.record_query(tid, rows, 0);
-            }
-
-            // Log slow queries and increment slow metric.
-            if let Some(ref slow_log) = state.slow_query_log {
-                let row_count = match &result {
-                    QueryResult::Rows { rows, .. } => rows.len() as u64,
-                    QueryResult::Ok { affected_rows } => *affected_rows,
-                };
-                if duration >= slow_log.threshold() {
-                    state.metrics.inc_slow_queries();
-                }
-                slow_log.maybe_log(&sql_for_log, duration, row_count);
-            }
-
-            return format_query_result(result, timing_ms, &state);
+            (cached_plan, true)
         } else {
             state.metrics.inc_plan_cache_misses();
+            let p = plan_query(&query_sql).map_err(|e| {
+                state.metrics.dec_active_queries();
+                state.metrics.inc_queries_failed();
+                db_error_to_response(e)
+            })?;
+            // Store in cache for next time.
+            if matches!(&p, QueryPlan::Select { .. } | QueryPlan::Join { .. }
+                | QueryPlan::MultiJoin { .. } | QueryPlan::AsofJoin { .. }) {
+                cache.put(&query_sql, p.clone());
+            }
+            (p, false)
         }
-    }
-
-    // Parse and plan the SQL query.
-    let plan = plan_query(&query_sql).map_err(|e| {
-        state.metrics.dec_active_queries();
-        state.metrics.inc_queries_failed();
-        db_error_to_response(e)
-    })?;
+    } else {
+        let p = plan_query(&query_sql).map_err(|e| {
+            state.metrics.dec_active_queries();
+            state.metrics.inc_queries_failed();
+            db_error_to_response(e)
+        })?;
+        (p, false)
+    };
+    let t_plan = start.elapsed();
 
     // Handle SET key = value via session manager.
     if let QueryPlan::Set { name, value } = &plan {
@@ -560,30 +525,34 @@ pub async fn query(
         return Ok(Json(response));
     }
 
-    // --- Plan cache: store after planning (only idempotent SELECT plans) ---
-    if let Some(ref cache) = state.plan_cache {
-        if matches!(&plan, QueryPlan::Select { .. } | QueryPlan::Join { .. }
-            | QueryPlan::MultiJoin { .. } | QueryPlan::AsofJoin { .. }) {
-            cache.put(&query_sql, plan.clone());
-        }
-    }
-
     // Build execution context with RBAC, resource limits, and cursor routing.
     let ctx = build_execution_context(&state, &headers, Some(&plan))?;
     let main_query_id = ctx.query_id;
+    let t_ctx = start.elapsed();
 
     // Execute the plan directly on the current thread to avoid spawn_blocking
     // scheduling overhead (~1-2ms). Query execution is CPU-bound and fast enough
     // that the async runtime is not meaningfully blocked.
+    let exec_start = Instant::now();
     let result = execute_with_context(&ctx, &plan).map_err(|e| {
             state.query_registry.deregister(main_query_id);
             state.metrics.dec_active_queries();
             state.metrics.inc_queries_failed();
             db_error_to_response(e)
         })?;
-    // timing_ms covers planning + execution (start is set before plan cache check).
+    let t_exec = exec_start.elapsed();
     let timing_ms = start.elapsed().as_secs_f64() * 1000.0;
     state.query_registry.deregister(main_query_id);
+
+    // Log per-phase timing for profiling.
+    tracing::info!(
+        plan_us = t_plan.as_micros(),
+        ctx_us = (t_ctx - t_plan).as_micros(),
+        exec_us = t_exec.as_micros(),
+        total_us = start.elapsed().as_micros(),
+        cache_hit = cache_hit,
+        "query phases"
+    );
 
     let duration = start.elapsed();
     let duration_secs = duration.as_secs_f64();
@@ -606,8 +575,8 @@ pub async fn query(
     // Invalidate plan cache after DDL operations.
     if let Some(ref cache) = state.plan_cache {
         let upper = query_sql.trim().to_ascii_uppercase();
-        if upper.starts_with("CREATE") || upper.starts_with("DROP") || upper.starts_with("ALTER") || upper.starts_with("TRUNCATE") {
-            if let Ok(ref p) = plan_query(&query_sql) {
+        if (upper.starts_with("CREATE") || upper.starts_with("DROP") || upper.starts_with("ALTER") || upper.starts_with("TRUNCATE"))
+            && let Ok(ref p) = plan_query(&query_sql) {
                 match p {
                     exchange_query::QueryPlan::CreateTable { name, .. }
                     | exchange_query::QueryPlan::DropTable { table: name, .. }
@@ -621,7 +590,6 @@ pub async fn query(
                     _ => {}
                 }
             }
-        }
     }
 
     // Log slow queries and increment slow metric.

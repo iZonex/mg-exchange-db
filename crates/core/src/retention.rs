@@ -90,23 +90,21 @@ impl RetentionManager {
 
             for p in &partitions {
                 let name = p.file_name().unwrap().to_string_lossy();
-                if let Some(partition_secs) = parse_partition_timestamp(&name, self.partition_by) {
-                    if partition_secs < cutoff_secs {
+                if let Some(partition_secs) = parse_partition_timestamp(&name, self.partition_by)
+                    && partition_secs < cutoff_secs {
                         to_drop.insert(p.clone());
                     }
-                }
             }
         }
 
         // --- max_partitions ---
-        if let Some(max) = self.policy.max_partitions {
-            if partitions.len() > max {
+        if let Some(max) = self.policy.max_partitions
+            && partitions.len() > max {
                 let excess = partitions.len() - max;
                 for p in partitions.iter().take(excess) {
                     to_drop.insert(p.clone());
                 }
             }
-        }
 
         // --- max_disk_size ---
         if let Some(max_bytes) = self.policy.max_disk_size {

@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-03-21
+
+### Performance
+- Mmap cache: reuse memory-mapped file handles across queries (eliminates repeated mmap/munmap)
+- Table registry: cache table metadata to avoid re-reading `_meta` on every query
+- Optimizer skip: bypass expensive optimization passes for small tables
+- Limit pushdown: propagate LIMIT into scan cursors to avoid reading unnecessary rows
+- Result: **100-200x speedup** for common queries (SELECT * LIMIT 25: ~2 ms -> ~11 µs)
+
+### Security
+- Path traversal fix: reject `../` and absolute paths in table names
+- Argon2 password hashing for service accounts (replacing plaintext)
+- Auth JSON injection fix: properly escape user input in authentication responses
+
+### CLI
+- New commands: `config generate`, `check`, `replication status`, `debug wal`, `compact`, `status`, `version`
+- Full CLI reference documentation
+
+### Web Console
+- Server-side query timing displayed in results
+
+### Code Quality
+- Zero compiler warnings across all 6 crates
+- Zero clippy warnings (all lints clean)
+
+### Documentation
+- CLI reference guide
+- Documentation index
+- Updated production checklist
+
+---
+
 ## [0.1.0] - 2026-03-21
 
 ### Added
@@ -143,4 +175,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Column read | 590.70 M elements/s |
 | SIMD aggregation | 4.49 G elements/s |
 
+[0.1.1]: https://github.com/iZonex/mg-exchange-db/releases/tag/v0.1.1
 [0.1.0]: https://github.com/iZonex/mg-exchange-db/releases/tag/v0.1.0

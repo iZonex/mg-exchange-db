@@ -1803,7 +1803,7 @@ fn base64_decode(encoded: &str) -> Result<Vec<u8>, String> {
         }
     }
     let bytes: Vec<u8> = encoded.bytes().filter(|b| !b.is_ascii_whitespace()).collect();
-    if bytes.len() % 4 != 0 {
+    if !bytes.len().is_multiple_of(4) {
         return Err("invalid base64 length".into());
     }
     let mut result = Vec::new();
@@ -2009,9 +2009,9 @@ impl ScalarFunction for ToDateFn {
                 if parts.len() != 3 {
                     return Err(format!("to_date: cannot parse '{s}' with format '{fmt}'"));
                 }
-                let year: i64 = parts[0].parse().map_err(|_| format!("to_date: invalid year"))?;
-                let month: i64 = parts[1].parse().map_err(|_| format!("to_date: invalid month"))?;
-                let day: i64 = parts[2].parse().map_err(|_| format!("to_date: invalid day"))?;
+                let year: i64 = parts[0].parse().map_err(|_| "to_date: invalid year".to_string())?;
+                let month: i64 = parts[1].parse().map_err(|_| "to_date: invalid month".to_string())?;
+                let day: i64 = parts[2].parse().map_err(|_| "to_date: invalid day".to_string())?;
                 let days = civil_to_days(year, month, day);
                 Ok(Value::Timestamp(days * NANOS_PER_DAY))
             }
@@ -2133,7 +2133,7 @@ impl ScalarFunction for AsinFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         if matches!(args[0], Value::Null) { return Ok(Value::Null); }
         let x = to_f64(&args[0])?;
-        if x < -1.0 || x > 1.0 {
+        if !(-1.0..=1.0).contains(&x) {
             return Err("asin: argument must be in [-1, 1]".into());
         }
         Ok(Value::F64(x.asin()))
@@ -2147,7 +2147,7 @@ impl ScalarFunction for AcosFn {
     fn evaluate(&self, args: &[Value]) -> Result<Value, String> {
         if matches!(args[0], Value::Null) { return Ok(Value::Null); }
         let x = to_f64(&args[0])?;
-        if x < -1.0 || x > 1.0 {
+        if !(-1.0..=1.0).contains(&x) {
             return Err("acos: argument must be in [-1, 1]".into());
         }
         Ok(Value::F64(x.acos()))
@@ -2436,8 +2436,8 @@ impl ScalarFunction for ExtractWeekFn {
         let jan1_dow = ((jan1_days + 3) % 7 + 7) % 7 + 1; // 1=Monday, 7=Sunday
         // ISO week number
         let _ = days; // suppress warning
-        let week = (doy + jan1_dow as i64 - 2) / 7 + 1;
-        Ok(Value::I64(week.max(1).min(53)))
+        let week = (doy + jan1_dow - 2) / 7 + 1;
+        Ok(Value::I64(week.clamp(1, 53)))
     }
     fn min_args(&self) -> usize { 1 }
     fn max_args(&self) -> usize { 1 }
@@ -2990,7 +2990,7 @@ impl ScalarFunction for RndTimestampFn {
             Some(Value::Timestamp(ns)) => *ns,
             Some(Value::I64(ns)) => *ns,
             Some(Value::Str(s)) => parse_timestamp_str(s).map_err(|e| format!("rnd_timestamp: {e}"))?,
-            _ => lo + 86400_000_000_000, // default: +1 day
+            _ => lo + 86_400_000_000_000, // default: +1 day
         };
         if hi <= lo { return Ok(Value::Timestamp(lo)); }
         let range = (hi - lo) as u64;
@@ -3012,7 +3012,7 @@ fn parse_timestamp_str(s: &str) -> Result<i64, String> {
     let day: i64 = parts[2].parse().map_err(|_| format!("invalid day: {}", parts[2]))?;
     // Simple days-from-epoch calculation.
     let days = civil_to_days(year, month, day);
-    Ok(days * 86400_000_000_000)
+    Ok(days * 86_400_000_000_000)
 }
 
 /// rnd_uuid4() -> random UUID v4 string
@@ -3090,7 +3090,7 @@ fn tz_offset_nanos(tz: &str) -> Result<i64, String> {
         "MDT" => Ok(-6 * NANOS_PER_HOUR),
         "PST" => Ok(-8 * NANOS_PER_HOUR),
         "PDT" => Ok(-7 * NANOS_PER_HOUR),
-        "CET" => Ok(1 * NANOS_PER_HOUR),
+        "CET" => Ok(NANOS_PER_HOUR),
         "CEST" => Ok(2 * NANOS_PER_HOUR),
         "EET" => Ok(2 * NANOS_PER_HOUR),
         "EEST" => Ok(3 * NANOS_PER_HOUR),
@@ -3789,7 +3789,7 @@ impl ScalarFunction for IifFn {
         let cond = match &args[0] {
             Value::I64(v) => *v != 0,
             Value::F64(v) => *v != 0.0,
-            Value::Str(s) => !s.is_empty() && s != "0" && s.to_ascii_lowercase() != "false",
+            Value::Str(s) => !s.is_empty() && s != "0" && !s.eq_ignore_ascii_case("false"),
             Value::Null => false,
             Value::Timestamp(_) => true,
         };
@@ -3937,7 +3937,7 @@ impl ScalarFunction for SoundexFn {
                 'R' => '6',
                 _ => continue,
             };
-            if result.len() < 4 && result.chars().last() != Some(code) {
+            if result.len() < 4 && !result.ends_with(code) {
                 result.push(code);
             }
         }
@@ -4266,7 +4266,7 @@ impl ScalarFunction for ConcatWsFn {
         let sep = to_str(&args[0]);
         let parts: Vec<String> = args[1..].iter()
             .filter(|a| !matches!(a, Value::Null))
-            .map(|a| to_str(a))
+            .map(to_str)
             .collect();
         Ok(Value::Str(parts.join(&sep)))
     }

@@ -102,8 +102,8 @@ impl SubscriptionManager {
         // Send to symbol-specific subscribers.
         // Extract symbol from rows if present.
         for (key, sender) in channels.iter() {
-            if key.table == table {
-                if let Some(ref symbol) = key.symbol {
+            if key.table == table
+                && let Some(ref symbol) = key.symbol {
                     // Filter rows that match this symbol.
                     let matching: Vec<serde_json::Value> = rows
                         .iter()
@@ -123,7 +123,6 @@ impl SubscriptionManager {
                         let _ = sender.send(filtered_event);
                     }
                 }
-            }
         }
     }
 

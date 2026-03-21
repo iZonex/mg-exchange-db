@@ -123,11 +123,10 @@ impl TtlManager {
 
                 // Try to parse the partition timestamp.
                 // Try Day format first, then other common formats.
-                if let Some(partition_secs) = parse_partition_timestamp(&name_str) {
-                    if partition_secs < cutoff_secs {
+                if let Some(partition_secs) = parse_partition_timestamp(&name_str)
+                    && partition_secs < cutoff_secs {
                         expired_partitions.push(path);
                     }
-                }
             }
 
             expired_partitions.sort();
@@ -305,7 +304,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
         if entry.path().is_dir() {
             copy_dir_recursive(&entry.path(), &dest_path)?;
         } else {
-            std::fs::copy(&entry.path(), &dest_path)?;
+            std::fs::copy(entry.path(), &dest_path)?;
         }
     }
     Ok(())

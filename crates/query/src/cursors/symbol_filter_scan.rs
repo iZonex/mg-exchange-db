@@ -39,8 +39,8 @@ impl RecordCursor for SymbolFilterScanCursor {
                 None => break,
                 Some(b) => {
                     for r in 0..b.row_count() {
-                        if let Value::I64(id) = b.get_value(r, self.symbol_col) {
-                            if self.allowed.contains(&id) {
+                        if let Value::I64(id) = b.get_value(r, self.symbol_col)
+                            && self.allowed.contains(&id) {
                                 let row: Vec<Value> =
                                     (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                                 result.append_row(&row);
@@ -48,7 +48,6 @@ impl RecordCursor for SymbolFilterScanCursor {
                                     break;
                                 }
                             }
-                        }
                     }
                 }
             }

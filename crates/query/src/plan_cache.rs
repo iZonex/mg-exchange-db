@@ -94,12 +94,11 @@ impl PlanCache {
                 drop(cache);
 
                 // Upgrade to write lock to update access time.
-                if let Ok(mut cache) = self.cache.write() {
-                    if let Some(entry) = cache.get_mut(&hash) {
+                if let Ok(mut cache) = self.cache.write()
+                    && let Some(entry) = cache.get_mut(&hash) {
                         entry.last_accessed = now;
                         entry.hit_count += 1;
                     }
-                }
 
                 self.hits.fetch_add(1, Ordering::Relaxed);
                 return Some(plan);

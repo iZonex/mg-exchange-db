@@ -568,25 +568,25 @@ fn bytes_as_f64(data: &[u8]) -> &[f64] {
     //
     // On platforms where unaligned access is fine (x86-64, aarch64),
     // this is safe. For strict-alignment platforms we would need to copy.
-    assert!(data.as_ptr() as usize % std::mem::align_of::<f64>() == 0 || count == 0);
+    assert!((data.as_ptr() as usize).is_multiple_of(std::mem::align_of::<f64>()) || count == 0);
     unsafe { std::slice::from_raw_parts(data.as_ptr() as *const f64, count) }
 }
 
 fn bytes_as_i64(data: &[u8]) -> &[i64] {
     let count = data.len() / 8;
-    assert!(data.as_ptr() as usize % std::mem::align_of::<i64>() == 0 || count == 0);
+    assert!((data.as_ptr() as usize).is_multiple_of(std::mem::align_of::<i64>()) || count == 0);
     unsafe { std::slice::from_raw_parts(data.as_ptr() as *const i64, count) }
 }
 
 fn bytes_as_f32(data: &[u8]) -> &[f32] {
     let count = data.len() / 4;
-    assert!(data.as_ptr() as usize % std::mem::align_of::<f32>() == 0 || count == 0);
+    assert!((data.as_ptr() as usize).is_multiple_of(std::mem::align_of::<f32>()) || count == 0);
     unsafe { std::slice::from_raw_parts(data.as_ptr() as *const f32, count) }
 }
 
 fn bytes_as_i32(data: &[u8]) -> &[i32] {
     let count = data.len() / 4;
-    assert!(data.as_ptr() as usize % std::mem::align_of::<i32>() == 0 || count == 0);
+    assert!((data.as_ptr() as usize).is_multiple_of(std::mem::align_of::<i32>()) || count == 0);
     unsafe { std::slice::from_raw_parts(data.as_ptr() as *const i32, count) }
 }
 

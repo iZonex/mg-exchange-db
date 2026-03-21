@@ -130,8 +130,8 @@ impl S3WalReceiver {
         for key in &keys {
             // Extract sequence number from filename like "wal-000042.wal".
             let filename = key.rsplit('/').next().unwrap_or(key);
-            if let Some(seq) = parse_segment_sequence(filename) {
-                if seq > last_applied {
+            if let Some(seq) = parse_segment_sequence(filename)
+                && seq > last_applied {
                     // Download the segment.
                     let data = self.store.get(key)?;
 
@@ -149,7 +149,6 @@ impl S3WalReceiver {
                         max_seq = seq;
                     }
                 }
-            }
         }
 
         Ok(max_seq)

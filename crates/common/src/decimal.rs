@@ -3,6 +3,7 @@
 use crate::error::{ExchangeDbError, Result};
 use std::fmt;
 use std::ops::{Add, Div, Mul, Sub};
+use std::str::FromStr;
 
 /// A 128-bit fixed-point decimal number.
 ///
@@ -21,7 +22,7 @@ impl Decimal128 {
     }
 
     /// Parse a decimal string like "123.456" or "-0.001".
-    pub fn from_str(s: &str) -> Result<Self> {
+    pub fn parse(s: &str) -> Result<Self> {
         let s = s.trim();
         if s.is_empty() {
             return Err(ExchangeDbError::Parse(
@@ -177,13 +178,21 @@ impl Div for Decimal128 {
     }
 }
 
+impl FromStr for Decimal128 {
+    type Err = ExchangeDbError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Self::parse(s)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn parse_and_display() {
-        let d = Decimal128::from_str("123.456").unwrap();
+        let d = Decimal128::parse("123.456").unwrap();
         assert_eq!(d.mantissa, 123456);
         assert_eq!(d.scale, 3);
         assert_eq!(d.to_string(), "123.456");
@@ -191,7 +200,7 @@ mod tests {
 
     #[test]
     fn parse_integer() {
-        let d = Decimal128::from_str("42").unwrap();
+        let d = Decimal128::parse("42").unwrap();
         assert_eq!(d.mantissa, 42);
         assert_eq!(d.scale, 0);
         assert_eq!(d.to_string(), "42");
@@ -199,7 +208,7 @@ mod tests {
 
     #[test]
     fn parse_negative() {
-        let d = Decimal128::from_str("-0.001").unwrap();
+        let d = Decimal128::parse("-0.001").unwrap();
         assert_eq!(d.mantissa, -1);
         assert_eq!(d.scale, 3);
         assert_eq!(d.to_string(), "-0.001");
@@ -207,48 +216,48 @@ mod tests {
 
     #[test]
     fn parse_invalid() {
-        assert!(Decimal128::from_str("").is_err());
-        assert!(Decimal128::from_str("abc").is_err());
-        assert!(Decimal128::from_str("12.34.56").is_err());
+        assert!(Decimal128::parse("").is_err());
+        assert!(Decimal128::parse("abc").is_err());
+        assert!(Decimal128::parse("12.34.56").is_err());
     }
 
     #[test]
     fn to_f64_conversion() {
-        let d = Decimal128::from_str("123.456").unwrap();
+        let d = Decimal128::parse("123.456").unwrap();
         assert!((d.to_f64() - 123.456).abs() < 1e-10);
 
-        let d2 = Decimal128::from_str("-99.99").unwrap();
+        let d2 = Decimal128::parse("-99.99").unwrap();
         assert!((d2.to_f64() - (-99.99)).abs() < 1e-10);
     }
 
     #[test]
     fn addition() {
-        let a = Decimal128::from_str("1.5").unwrap();
-        let b = Decimal128::from_str("2.25").unwrap();
+        let a = Decimal128::parse("1.5").unwrap();
+        let b = Decimal128::parse("2.25").unwrap();
         let c = a + b;
         assert_eq!(c.to_string(), "3.75");
     }
 
     #[test]
     fn subtraction() {
-        let a = Decimal128::from_str("10.00").unwrap();
-        let b = Decimal128::from_str("3.50").unwrap();
+        let a = Decimal128::parse("10.00").unwrap();
+        let b = Decimal128::parse("3.50").unwrap();
         let c = a - b;
         assert_eq!(c.to_string(), "6.50");
     }
 
     #[test]
     fn multiplication() {
-        let a = Decimal128::from_str("2.5").unwrap();
-        let b = Decimal128::from_str("4.0").unwrap();
+        let a = Decimal128::parse("2.5").unwrap();
+        let b = Decimal128::parse("4.0").unwrap();
         let c = a * b;
         assert!((c.to_f64() - 10.0).abs() < 1e-10);
     }
 
     #[test]
     fn division() {
-        let a = Decimal128::from_str("10.0").unwrap();
-        let b = Decimal128::from_str("3.0").unwrap();
+        let a = Decimal128::parse("10.0").unwrap();
+        let b = Decimal128::parse("3.0").unwrap();
         let c = a / b;
         // Should be approximately 3.333...
         assert!((c.to_f64() - 3.333333333).abs() < 1e-6);
@@ -256,26 +265,26 @@ mod tests {
 
     #[test]
     fn rounding() {
-        let d = Decimal128::from_str("3.14159").unwrap();
+        let d = Decimal128::parse("3.14159").unwrap();
         let r = d.round(2);
         assert_eq!(r.to_string(), "3.14");
 
-        let d2 = Decimal128::from_str("2.555").unwrap();
+        let d2 = Decimal128::parse("2.555").unwrap();
         let r2 = d2.round(2);
         assert_eq!(r2.to_string(), "2.56");
     }
 
     #[test]
     fn round_no_change_if_fewer_places() {
-        let d = Decimal128::from_str("3.14").unwrap();
+        let d = Decimal128::parse("3.14").unwrap();
         let r = d.round(5);
         assert_eq!(r, d);
     }
 
     #[test]
     fn add_different_scales() {
-        let a = Decimal128::from_str("1.1").unwrap();
-        let b = Decimal128::from_str("2.222").unwrap();
+        let a = Decimal128::parse("1.1").unwrap();
+        let b = Decimal128::parse("2.222").unwrap();
         let c = a + b;
         assert_eq!(c.to_string(), "3.322");
     }

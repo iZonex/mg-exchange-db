@@ -201,6 +201,9 @@ pub fn squash_partitions(
     // Rename tmp -> part1.
     std::fs::rename(&merged_tmp, table_dir.join(&merged_name))?;
 
+    // Invalidate caches — partition files changed.
+    crate::mmap::invalidate_mmap_cache(table_dir);
+
     Ok(merged_name)
 }
 

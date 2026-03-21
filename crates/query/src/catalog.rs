@@ -226,11 +226,10 @@ fn list_user_tables(db_root: &Path) -> Vec<String> {
     for entry in entries.flatten() {
         if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
             let meta_path = entry.path().join("_meta");
-            if meta_path.exists() {
-                if let Some(name) = entry.file_name().to_str() {
+            if meta_path.exists()
+                && let Some(name) = entry.file_name().to_str() {
                     names.push(name.to_string());
                 }
-            }
         }
     }
     names.sort();
@@ -605,11 +604,11 @@ fn catalog_pg_matviews(db_root: &Path, columns: &[SelectColumn]) -> Result<Query
     let mut all_rows = Vec::new();
     // Check for materialized view metadata files.
     let matview_dir = db_root.join("_matviews");
-    if matview_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&matview_dir) {
+    if matview_dir.exists()
+        && let Ok(entries) = std::fs::read_dir(&matview_dir) {
             for entry in entries.flatten() {
-                if let Some(name) = entry.file_name().to_str() {
-                    if name.ends_with(".sql") {
+                if let Some(name) = entry.file_name().to_str()
+                    && name.ends_with(".sql") {
                         let view_name = name.trim_end_matches(".sql");
                         let definition = std::fs::read_to_string(entry.path())
                             .unwrap_or_default();
@@ -620,10 +619,8 @@ fn catalog_pg_matviews(db_root: &Path, columns: &[SelectColumn]) -> Result<Query
                             Value::Str(definition),
                         ]);
                     }
-                }
             }
         }
-    }
 
     let (col_names, rows) = project(all_cols, &all_rows, columns);
     Ok(QueryResult::Rows { columns: col_names, rows })
@@ -635,7 +632,7 @@ fn catalog_pg_tables(db_root: &Path, columns: &[SelectColumn]) -> Result<QueryRe
     let tables = list_user_tables(db_root);
     let mut all_rows = Vec::new();
     for tbl in &tables {
-        let has_indexes = if let Some(meta) = load_meta(db_root, &tbl) {
+        let has_indexes = if let Some(meta) = load_meta(db_root, tbl) {
             meta.columns.iter().any(|c| c.indexed)
         } else {
             false

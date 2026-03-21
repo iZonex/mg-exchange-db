@@ -278,20 +278,18 @@ impl OAuthProvider {
         }
 
         // Validate audience if configured.
-        if !self.config.client_id.is_empty() {
-            if let Some(ref aud) = claims.aud {
-                if aud != &self.config.client_id {
+        if !self.config.client_id.is_empty()
+            && let Some(ref aud) = claims.aud
+                && aud != &self.config.client_id {
                     return Err(OAuthError::InvalidAudience {
                         expected: self.config.client_id.clone(),
                         actual: aud.clone(),
                     });
                 }
-            }
-        }
 
         // Validate email domain restriction.
-        if !self.config.allowed_domains.is_empty() {
-            if let Some(ref email) = claims.email {
+        if !self.config.allowed_domains.is_empty()
+            && let Some(ref email) = claims.email {
                 let domain = email
                     .rsplit('@')
                     .next()
@@ -301,7 +299,6 @@ impl OAuthProvider {
                     return Err(OAuthError::DomainNotAllowed { domain });
                 }
             }
-        }
 
         Ok(claims)
     }
@@ -377,7 +374,7 @@ impl OAuthProvider {
             .map_err(|_| OAuthError::InvalidSignature)?;
         mac.update(signing_input.as_bytes());
         let signature = mac.finalize().into_bytes();
-        let sig_b64 = URL_SAFE_NO_PAD.encode(&signature);
+        let sig_b64 = URL_SAFE_NO_PAD.encode(signature);
 
         Ok(format!("{}.{}", signing_input, sig_b64))
     }

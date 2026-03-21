@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 /// Execute a standard JOIN between two tables.
+#[allow(clippy::too_many_arguments)]
 pub fn execute_join(
     db_root: &Path,
     left_table: &str,
@@ -122,7 +123,7 @@ pub fn execute_join(
                 }
             } else if join_type == JoinType::Left || join_type == JoinType::FullOuter {
                 let mut combined = left_row.clone();
-                combined.extend(std::iter::repeat(Value::Null).take(right_col_count));
+                combined.extend(std::iter::repeat_n(Value::Null, right_col_count));
                 rows.push(combined);
             }
         }
@@ -131,7 +132,7 @@ pub fn execute_join(
         if join_type == JoinType::Right || join_type == JoinType::FullOuter {
             for (i, matched) in right_matched.iter().enumerate() {
                 if !matched {
-                    let mut combined: Vec<Value> = std::iter::repeat(Value::Null).take(left_col_count).collect();
+                    let mut combined: Vec<Value> = std::iter::repeat_n(Value::Null, left_col_count).collect();
                     combined.extend(right_rows[i].iter().cloned());
                     rows.push(combined);
                 }
@@ -200,6 +201,7 @@ pub fn execute_join(
 }
 
 /// Execute a multi-table JOIN where the left side is a sub-plan (another join result).
+#[allow(clippy::too_many_arguments)]
 pub fn execute_multi_join(
     db_root: &Path,
     left_plan: &QueryPlan,
@@ -298,7 +300,7 @@ pub fn execute_multi_join(
                 }
             } else if join_type == JoinType::Left || join_type == JoinType::FullOuter {
                 let mut combined = left_row.clone();
-                combined.extend(std::iter::repeat(Value::Null).take(right_col_count));
+                combined.extend(std::iter::repeat_n(Value::Null, right_col_count));
                 rows.push(combined);
             }
         }
@@ -306,7 +308,7 @@ pub fn execute_multi_join(
         if join_type == JoinType::Right || join_type == JoinType::FullOuter {
             for (i, matched) in right_matched.iter().enumerate() {
                 if !matched {
-                    let mut combined: Vec<Value> = std::iter::repeat(Value::Null).take(left_col_count).collect();
+                    let mut combined: Vec<Value> = std::iter::repeat_n(Value::Null, left_col_count).collect();
                     combined.extend(right_rows[i].iter().cloned());
                     rows.push(combined);
                 }
@@ -672,15 +674,14 @@ fn project_join_columns(
             }
             JoinSelectColumn::QualifiedWildcard(table) => {
                 if table == left_label {
-                    for i in 0..left_count {
+                    for (i, (_, name)) in all_resolved.iter().enumerate().take(left_count) {
                         output_cols.push(OutputCol::Index(i));
-                        output_names.push(all_resolved[i].1.clone());
+                        output_names.push(name.clone());
                     }
                 } else if table == right_label {
-                    for i in 0..right_resolved.len() {
-                        let idx = left_count + i;
-                        output_cols.push(OutputCol::Index(idx));
-                        output_names.push(all_resolved[idx].1.clone());
+                    for (i, (_, name)) in all_resolved.iter().enumerate().skip(left_count).take(right_resolved.len()) {
+                        output_cols.push(OutputCol::Index(i));
+                        output_names.push(name.clone());
                     }
                 }
             }

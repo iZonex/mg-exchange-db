@@ -56,7 +56,7 @@ impl TieredPartitionReader {
             }),
             StorageTier::Warm => {
                 let temp_dir = TempDir::new().map_err(|e| {
-                    ExchangeDbError::Io(std::io::Error::new(std::io::ErrorKind::Other, e))
+                    ExchangeDbError::Io(std::io::Error::other(e))
                 })?;
                 let native_path = temp_dir.path().to_path_buf();
 
@@ -72,7 +72,7 @@ impl TieredPartitionReader {
             }
             StorageTier::Cold => {
                 let temp_dir = TempDir::new().map_err(|e| {
-                    ExchangeDbError::Io(std::io::Error::new(std::io::ErrorKind::Other, e))
+                    ExchangeDbError::Io(std::io::Error::other(e))
                 })?;
                 let native_path = temp_dir.path().to_path_buf();
 
@@ -255,14 +255,13 @@ fn find_cold_xpqt(partition_path: &Path, table_dir: &Path) -> Result<PathBuf> {
     // Check tier metadata
     let tier_infos = load_tier_info(table_dir)?;
     for info in &tier_infos {
-        if info.partition_name == partition_name {
-            if let Some(ref ppath) = info.parquet_path {
+        if info.partition_name == partition_name
+            && let Some(ref ppath) = info.parquet_path {
                 let p = PathBuf::from(ppath);
                 if p.exists() {
                     return Ok(p);
                 }
             }
-        }
     }
 
     Err(ExchangeDbError::Corruption(format!(

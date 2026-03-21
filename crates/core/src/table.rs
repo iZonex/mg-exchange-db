@@ -210,12 +210,38 @@ impl TableMeta {
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| ExchangeDbError::Corruption(e.to_string()))?;
         std::fs::write(path, json)?;
+        // Update the metadata cache so subsequent loads see the new version.
+        Self::update_cache(path, self.clone());
         Ok(())
     }
 
     pub fn load(path: &Path) -> Result<Self> {
+        let cache = Self::meta_cache();
+        if let Some(cached) = cache.get(path) {
+            return Ok(cached.value().clone());
+        }
+
         let json = std::fs::read_to_string(path)?;
-        serde_json::from_str(&json).map_err(|e| ExchangeDbError::Corruption(e.to_string()))
+        let meta: TableMeta = serde_json::from_str(&json)
+            .map_err(|e| ExchangeDbError::Corruption(e.to_string()))?;
+        cache.insert(path.to_path_buf(), meta.clone());
+        Ok(meta)
+    }
+
+    /// Update the metadata cache entry after a save.
+    fn update_cache(path: &Path, meta: TableMeta) {
+        Self::meta_cache().insert(path.to_path_buf(), meta);
+    }
+
+    /// Invalidate cached metadata (call after DDL operations).
+    pub fn invalidate_cache(path: &Path) {
+        Self::meta_cache().remove(path);
+    }
+
+    fn meta_cache() -> &'static dashmap::DashMap<std::path::PathBuf, TableMeta> {
+        static META_CACHE: std::sync::OnceLock<dashmap::DashMap<std::path::PathBuf, TableMeta>> =
+            std::sync::OnceLock::new();
+        META_CACHE.get_or_init(dashmap::DashMap::new)
     }
 
     /// Add a new column to the table metadata. Bumps version.
@@ -702,16 +728,14 @@ impl TableWriter {
 
     pub fn flush(&self) -> Result<()> {
         if let Some(pw) = &self.current_partition {
-            for slot in &pw.fixed_columns {
-                if let Some(writer) = slot {
-                    writer.flush()?;
-                }
+            for writer in pw.fixed_columns.iter().flatten() {
+                writer.flush()?;
             }
-            for slot in &pw.var_columns {
-                if let Some(writer) = slot {
-                    writer.flush()?;
-                }
+            for writer in pw.var_columns.iter().flatten() {
+                writer.flush()?;
             }
+            // Invalidate mmap cache for this table so readers see new data.
+            crate::mmap::invalidate_mmap_cache(&self.table_dir);
         }
         Ok(())
     }
@@ -804,18 +828,15 @@ pub enum ColumnValue<'a> {
 /// Controls whether writes go through the WAL (durable) or directly to
 /// column files (fastest, but not crash-safe).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum WriteMode {
     /// Write directly to column files (current behavior, fastest).
     Direct,
     /// Write through WAL (durable, default for production).
+    #[default]
     Wal,
 }
 
-impl Default for WriteMode {
-    fn default() -> Self {
-        Self::Wal
-    }
-}
 
 impl<'a> ColumnValue<'a> {
     /// Convert a borrowed `ColumnValue` into an `OwnedColumnValue` for use
@@ -956,8 +977,8 @@ fn list_partition_dirs(table_dir: &Path) -> Result<Vec<PathBuf>> {
 
     // Also discover cold partitions in _cold/ subdirectory.
     let cold_dir = table_dir.join("_cold");
-    if cold_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&cold_dir) {
+    if cold_dir.exists()
+        && let Ok(entries) = std::fs::read_dir(&cold_dir) {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
                 let pname = if name.ends_with(".parquet") {
@@ -967,15 +988,13 @@ fn list_partition_dirs(table_dir: &Path) -> Result<Vec<PathBuf>> {
                 } else {
                     None
                 };
-                if let Some(partition_name) = pname {
-                    if !seen_names.contains(&partition_name) {
+                if let Some(partition_name) = pname
+                    && !seen_names.contains(&partition_name) {
                         dirs.push(entry.path());
                         seen_names.insert(partition_name);
                     }
-                }
             }
         }
-    }
 
     dirs.sort();
     Ok(dirs)
@@ -1125,7 +1144,22 @@ pub fn rewrite_partition(
 /// the query executor). Anything that is a directory and does not start with
 /// `_`.
 pub fn list_partitions(table_dir: &Path) -> Result<Vec<PathBuf>> {
-    list_partition_dirs(table_dir)
+    // Cache partition lists to avoid repeated readdir() syscalls (~33µs each).
+    static PART_CACHE: std::sync::OnceLock<dashmap::DashMap<std::path::PathBuf, (std::time::Instant, Vec<PathBuf>)>> =
+        std::sync::OnceLock::new();
+    let cache = PART_CACHE.get_or_init(dashmap::DashMap::new);
+
+    // Cache with 5-second TTL (partitions change rarely during reads).
+    if let Some(entry) = cache.get(table_dir) {
+        let (ts, parts) = entry.value();
+        if ts.elapsed() < std::time::Duration::from_secs(5) {
+            return Ok(parts.clone());
+        }
+    }
+
+    let parts = list_partition_dirs(table_dir)?;
+    cache.insert(table_dir.to_path_buf(), (std::time::Instant::now(), parts.clone()));
+    Ok(parts)
 }
 
 /// Read all rows from a partition, returning one `Vec<ColumnValue<'static>>`

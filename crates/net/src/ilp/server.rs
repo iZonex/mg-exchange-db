@@ -32,7 +32,7 @@ use std::collections::HashMap;
 /// timestamps. Writers to the SAME partition are serialized.
 static PARTITION_LOCK_MANAGERS: std::sync::LazyLock<
     dashmap::DashMap<String, Arc<PartitionLockManager>>,
-> = std::sync::LazyLock::new(|| dashmap::DashMap::new());
+> = std::sync::LazyLock::new(dashmap::DashMap::new);
 
 /// Get or create the partition lock manager for a given table.
 fn get_partition_lock_manager(table_name: &str) -> Arc<PartitionLockManager> {
@@ -154,7 +154,7 @@ async fn handle_connection(
                     let wm = config.write_mode;
                     tokio::task::spawn_blocking(move || flush_batch(&db_root, to_flush, wm))
                         .await
-                        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))??;
+                        .map_err(io::Error::other)??;
                 }
             }
             Err(e) => {
@@ -169,7 +169,7 @@ async fn handle_connection(
         let wm = config.write_mode;
         tokio::task::spawn_blocking(move || flush_batch(&db_root, batch, wm))
             .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))??;
+            .map_err(io::Error::other)??;
     }
 
     Ok(())
@@ -207,16 +207,16 @@ fn flush_batch(db_root: &Path, lines: Vec<IlpLine>, write_mode: WriteMode) -> io
         if !meta_path.exists() {
             let first = table_lines[0];
             auto_create_table(db_root, table_name, first).map_err(|e| {
-                io::Error::new(io::ErrorKind::Other, format!("auto-create table: {e}"))
+                io::Error::other(format!("auto-create table: {e}"))
             })?;
         }
 
         match write_mode {
             WriteMode::Wal => {
-                flush_table_wal(db_root, table_name, &table_lines)?;
+                flush_table_wal(db_root, table_name, table_lines)?;
             }
             WriteMode::Direct => {
-                flush_table_direct(db_root, table_name, &table_lines)?;
+                flush_table_direct(db_root, table_name, table_lines)?;
             }
         }
     }
@@ -238,7 +238,7 @@ fn flush_table_wal(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]) -
 
     // Load metadata to determine partition scheme.
     let meta = TableMeta::load(&table_dir.join("_meta")).map_err(|e| {
-        io::Error::new(io::ErrorKind::Other, format!("load meta: {e}"))
+        io::Error::other(format!("load meta: {e}"))
     })?;
     let partition_by: PartitionBy = meta.partition_by.into();
 
@@ -262,7 +262,7 @@ fn flush_table_wal(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]) -
         };
 
         let mut writer = WalTableWriter::open(db_root, table_name, config).map_err(|e| {
-            io::Error::new(io::ErrorKind::Other, format!("open WAL writer: {e}"))
+            io::Error::other(format!("open WAL writer: {e}"))
         })?;
 
         for line in part_lines {
@@ -287,12 +287,12 @@ fn flush_table_wal(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]) -
                 .collect();
 
             writer.write_row(ts, owned_values).map_err(|e| {
-                io::Error::new(io::ErrorKind::Other, format!("WAL write row: {e}"))
+                io::Error::other(format!("WAL write row: {e}"))
             })?;
         }
 
         writer.commit().map_err(|e| {
-            io::Error::new(io::ErrorKind::Other, format!("WAL commit: {e}"))
+            io::Error::other(format!("WAL commit: {e}"))
         })?;
     }
 
@@ -308,7 +308,7 @@ fn flush_table_direct(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]
     let table_dir = db_root.join(table_name);
 
     let meta = TableMeta::load(&table_dir.join("_meta")).map_err(|e| {
-        io::Error::new(io::ErrorKind::Other, format!("load meta: {e}"))
+        io::Error::other(format!("load meta: {e}"))
     })?;
     let partition_by: PartitionBy = meta.partition_by.into();
 
@@ -326,7 +326,7 @@ fn flush_table_direct(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]
         let _lock = partition_mgr.lock_partition(part_name);
 
         let mut writer = TableWriter::open(db_root, table_name).map_err(|e| {
-            io::Error::new(io::ErrorKind::Other, format!("open writer: {e}"))
+            io::Error::other(format!("open writer: {e}"))
         })?;
 
         for line in part_lines {
@@ -349,12 +349,12 @@ fn flush_table_direct(db_root: &Path, table_name: &str, table_lines: &[&IlpLine]
                 .collect();
 
             writer.write_row(ts, &col_values).map_err(|e| {
-                io::Error::new(io::ErrorKind::Other, format!("write row: {e}"))
+                io::Error::other(format!("write row: {e}"))
             })?;
         }
 
         writer.flush().map_err(|e| {
-            io::Error::new(io::ErrorKind::Other, format!("flush: {e}"))
+            io::Error::other(format!("flush: {e}"))
         })?;
     }
 

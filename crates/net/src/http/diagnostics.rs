@@ -190,7 +190,7 @@ fn disk_free_bytes(path: &std::path::Path) -> u64 {
         let mut stat = MaybeUninit::<libc::statvfs>::uninit();
         if libc::statvfs(c_path.as_ptr(), stat.as_mut_ptr()) == 0 {
             let stat = stat.assume_init();
-            stat.f_bavail as u64 * stat.f_frsize as u64
+            stat.f_bavail as u64 * stat.f_frsize
         } else {
             0
         }

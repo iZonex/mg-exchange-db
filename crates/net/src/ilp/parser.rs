@@ -357,8 +357,7 @@ fn parse_field_value(s: &str) -> Option<IlpValue> {
     }
 
     // Integer: ends with 'i'
-    if s.ends_with('i') {
-        let num_str = &s[..s.len() - 1];
+    if let Some(num_str) = s.strip_suffix('i') {
         if let Ok(v) = num_str.parse::<i64>() {
             return Some(IlpValue::Integer(v));
         }

@@ -20,7 +20,7 @@ pub fn parallel_sort(
         return;
     }
 
-    let chunk_size = (rows.len() + parallelism - 1) / parallelism;
+    let chunk_size = rows.len().div_ceil(parallelism);
     let order_by_owned: Vec<OrderBy> = order_by.to_vec();
 
     // Drain rows into chunks.
@@ -50,7 +50,7 @@ pub fn parallel_sort(
 }
 
 /// Simple sequential sort using the order_by specification.
-fn sequential_sort(rows: &mut Vec<Vec<Value>>, order_by: &[OrderBy]) {
+fn sequential_sort(rows: &mut [Vec<Value>], order_by: &[OrderBy]) {
     rows.sort_by(|a, b| compare_rows(a, b, order_by));
 }
 
@@ -89,8 +89,8 @@ fn compare_rows(a: &[Value], b: &[Value], order_by: &[OrderBy]) -> std::cmp::Ord
 /// column name for later resolution.
 fn column_index_for_sort(col: &str) -> Option<usize> {
     // If the column name starts with '#', treat the rest as an index.
-    if col.starts_with('#') {
-        col[1..].parse::<usize>().ok()
+    if let Some(rest) = col.strip_prefix('#') {
+        rest.parse::<usize>().ok()
     } else {
         // For named columns, we embed the index in the column name when
         // setting up parallel sort. Try parsing directly as a number.

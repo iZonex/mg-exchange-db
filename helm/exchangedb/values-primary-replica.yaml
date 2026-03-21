@@ -1,0 +1,59 @@
+# Primary + Replica replication configuration
+#
+# Deploy the primary:
+#   helm install exchangedb-primary ./helm/exchangedb \
+#     -f ./helm/exchangedb/values-primary-replica.yaml \
+#     --set replication.mode=primary
+#
+# Deploy replicas:
+#   helm install exchangedb-replica ./helm/exchangedb \
+#     -f ./helm/exchangedb/values-primary-replica.yaml \
+#     --set replication.mode=replica \
+#     --set replication.primary.host=exchangedb-primary \
+#     --set replicaCount=2
+
+replicaCount: 1
+
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "500m"
+  limits:
+    memory: "4Gi"
+    cpu: "2000m"
+
+persistence:
+  enabled: true
+  size: 100Gi
+
+replication:
+  mode: primary
+  primary:
+    host: ""
+    port: 9009
+  replicas: 2
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: "30s"
+
+config: |
+  [server]
+  http_bind = "0.0.0.0:9000"
+  pg_bind = "0.0.0.0:8812"
+  ilp_bind = "0.0.0.0:9009"
+
+  [storage]
+  data_dir = "/data"
+
+  [logging]
+  level = "info"
+
+  [memory]
+  max_query_memory = "1GB"
+
+  [replication]
+  enabled = true
+  wal_streaming = true

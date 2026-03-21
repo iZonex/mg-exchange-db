@@ -1,0 +1,39 @@
+# Standalone single-node configuration
+# Usage: helm install exchangedb ./helm/exchangedb -f ./helm/exchangedb/values-standalone.yaml
+
+replicaCount: 1
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "2Gi"
+    cpu: "2000m"
+
+persistence:
+  enabled: true
+  size: 50Gi
+
+replication:
+  mode: standalone
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+
+config: |
+  [server]
+  http_bind = "0.0.0.0:9000"
+  pg_bind = "0.0.0.0:8812"
+  ilp_bind = "0.0.0.0:9009"
+
+  [storage]
+  data_dir = "/data"
+
+  [logging]
+  level = "info"
+
+  [memory]
+  max_query_memory = "512MB"

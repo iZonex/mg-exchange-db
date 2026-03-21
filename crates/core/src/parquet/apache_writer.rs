@@ -33,6 +33,12 @@ pub struct ApacheParquetWriter {
     _private: (),
 }
 
+impl Default for ApacheParquetWriter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ApacheParquetWriter {
     pub fn new() -> Self {
         Self { _private: () }

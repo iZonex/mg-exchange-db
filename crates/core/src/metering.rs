@@ -93,7 +93,7 @@ impl UsageMeter {
         let entry = self
             .counters
             .entry(tenant.to_string())
-            .or_insert_with(UsageCounters::new);
+            .or_default();
         entry.queries.fetch_add(1, Ordering::Relaxed);
         entry.rows_read.fetch_add(rows_read, Ordering::Relaxed);
         entry
@@ -106,7 +106,7 @@ impl UsageMeter {
         let entry = self
             .counters
             .entry(tenant.to_string())
-            .or_insert_with(UsageCounters::new);
+            .or_default();
         entry.rows_written.fetch_add(rows, Ordering::Relaxed);
     }
 

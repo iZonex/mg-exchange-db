@@ -141,6 +141,7 @@ type PartialResult = HashMap<GroupKey, (Vec<Value>, Vec<AggregateState>)>;
 /// - MAX: max of partial maxes
 /// - FIRST: first from earliest partition
 /// - LAST: last from latest partition
+#[allow(clippy::too_many_arguments)]
 pub fn parallel_group_by(
     db_root: &Path,
     table_name: &str,
@@ -244,11 +245,10 @@ fn aggregate_single_partition(
     let mut partial: PartialResult = HashMap::new();
 
     for row_idx in 0..row_count {
-        if let Some(ref mask) = row_mask {
-            if !mask[row_idx] {
+        if let Some(ref mask) = row_mask
+            && !mask[row_idx] {
                 continue;
             }
-        }
 
         let mut key = GroupKey(Vec::new());
         let mut key_values: Vec<Value> = Vec::with_capacity(group_columns.len());
@@ -438,25 +438,25 @@ fn col_data_len(data: &ColData) -> usize {
 
 fn bytes_as_f64(data: &[u8]) -> &[f64] {
     let count = data.len() / 8;
-    assert!(data.as_ptr() as usize % std::mem::align_of::<f64>() == 0 || count == 0);
+    assert!((data.as_ptr() as usize).is_multiple_of(std::mem::align_of::<f64>()) || count == 0);
     unsafe { std::slice::from_raw_parts(data.as_ptr() as *const f64, count) }
 }
 
 fn bytes_as_i64(data: &[u8]) -> &[i64] {
     let count = data.len() / 8;
-    assert!(data.as_ptr() as usize % std::mem::align_of::<i64>() == 0 || count == 0);
+    assert!((data.as_ptr() as usize).is_multiple_of(std::mem::align_of::<i64>()) || count == 0);
     unsafe { std::slice::from_raw_parts(data.as_ptr() as *const i64, count) }
 }
 
 fn bytes_as_f32(data: &[u8]) -> &[f32] {
     let count = data.len() / 4;
-    assert!(data.as_ptr() as usize % std::mem::align_of::<f32>() == 0 || count == 0);
+    assert!((data.as_ptr() as usize).is_multiple_of(std::mem::align_of::<f32>()) || count == 0);
     unsafe { std::slice::from_raw_parts(data.as_ptr() as *const f32, count) }
 }
 
 fn bytes_as_i32(data: &[u8]) -> &[i32] {
     let count = data.len() / 4;
-    assert!(data.as_ptr() as usize % std::mem::align_of::<i32>() == 0 || count == 0);
+    assert!((data.as_ptr() as usize).is_multiple_of(std::mem::align_of::<i32>()) || count == 0);
     unsafe { std::slice::from_raw_parts(data.as_ptr() as *const i32, count) }
 }
 

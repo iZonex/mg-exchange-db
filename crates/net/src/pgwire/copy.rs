@@ -42,7 +42,7 @@ impl CopyInOptions {
             return None;
         }
 
-        let tokens: Vec<&str> = sql.trim().split_whitespace().collect();
+        let tokens: Vec<&str> = sql.split_whitespace().collect();
         if tokens.len() < 4 {
             return None;
         }

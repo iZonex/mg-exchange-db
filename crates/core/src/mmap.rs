@@ -6,8 +6,10 @@ use std::time::Duration;
 
 /// Controls how and when data is synced to disk.
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub enum SyncMode {
     /// fsync on every flush — strongest durability guarantee.
+    #[default]
     Full,
     /// fdatasync equivalent — metadata not synced, slightly faster.
     DataOnly,
@@ -17,11 +19,6 @@ pub enum SyncMode {
     None,
 }
 
-impl Default for SyncMode {
-    fn default() -> Self {
-        SyncMode::Full
-    }
-}
 
 /// Configuration for opening a memory-mapped file.
 #[derive(Debug, Clone)]
@@ -255,8 +252,8 @@ impl MmapFile {
         let additional = new_capacity.saturating_sub(self.capacity);
 
         // Check available disk space before attempting to grow the file.
-        if additional > 0 {
-            if let Some(available) = available_disk_space(&self.path) {
+        if additional > 0
+            && let Some(available) = available_disk_space(&self.path) {
                 // Require at least the growth amount plus a small safety margin
                 // (1 MB) to avoid filling the disk completely.
                 let needed = additional + 1024 * 1024;
@@ -272,7 +269,6 @@ impl MmapFile {
                     });
                 }
             }
-        }
 
         self.file.set_len(new_capacity).map_err(|e| {
             // Convert ENOSPC to our DiskFull error for better diagnostics.
@@ -363,19 +359,46 @@ impl Drop for MmapFile {
 
 /// Read-only memory-mapped file for column readers.
 pub struct MmapReadOnly {
-    mmap: memmap2::Mmap,
+    mmap: std::sync::Arc<memmap2::Mmap>,
     len: u64,
+}
+
+/// Global cache of read-only mmap handles to avoid repeated mmap() syscalls.
+/// Each mmap() costs ~10µs; for 7 partitions × 8 columns = 56 calls = ~560µs
+/// overhead per query. With caching, subsequent queries pay ~0µs for file opens.
+static MMAP_CACHE: std::sync::OnceLock<dashmap::DashMap<PathBuf, std::sync::Arc<memmap2::Mmap>>> =
+    std::sync::OnceLock::new();
+
+fn mmap_cache() -> &'static dashmap::DashMap<PathBuf, std::sync::Arc<memmap2::Mmap>> {
+    MMAP_CACHE.get_or_init(dashmap::DashMap::new)
+}
+
+/// Invalidate cached mmap handles under a directory (e.g., after compaction or DDL).
+pub fn invalidate_mmap_cache(prefix: &Path) {
+    mmap_cache().retain(|k, _| !k.starts_with(prefix));
 }
 
 impl MmapReadOnly {
     pub fn open(path: &Path) -> Result<Self> {
+        let cache = mmap_cache();
+
+        // Check cache first.
+        if let Some(cached) = cache.get(path) {
+            let arc = cached.value().clone();
+            let len = arc.len() as u64;
+            return Ok(Self { mmap: arc, len });
+        }
+
         let file = File::open(path)?;
         let len = file.metadata()?.len();
 
         // SAFETY: Read-only mapping, no mutations possible.
         let mmap = unsafe { MmapOptions::new().map(&file)? };
+        let arc = std::sync::Arc::new(mmap);
 
-        Ok(Self { mmap, len })
+        cache.insert(path.to_path_buf(), arc.clone());
+
+        Ok(Self { mmap: arc, len })
     }
 
     #[inline(always)]

@@ -93,13 +93,13 @@ impl serde::Serialize for ByteSize {
 
         let s = if self.0 == 0 {
             "0".to_string()
-        } else if self.0 % TB == 0 {
+        } else if self.0.is_multiple_of(TB) {
             format!("{}TB", self.0 / TB)
-        } else if self.0 % GB == 0 {
+        } else if self.0.is_multiple_of(GB) {
             format!("{}GB", self.0 / GB)
-        } else if self.0 % MB == 0 {
+        } else if self.0.is_multiple_of(MB) {
             format!("{}MB", self.0 / MB)
-        } else if self.0 % KB == 0 {
+        } else if self.0.is_multiple_of(KB) {
             format!("{}KB", self.0 / KB)
         } else {
             self.0.to_string()
@@ -177,13 +177,13 @@ impl serde::Serialize for HumanDuration {
         let secs = self.0.as_secs();
         let s = if secs == 0 {
             "0s".to_string()
-        } else if secs % (7 * 86400) == 0 {
+        } else if secs.is_multiple_of(7 * 86400) {
             format!("{}w", secs / (7 * 86400))
-        } else if secs % 86400 == 0 {
+        } else if secs.is_multiple_of(86400) {
             format!("{}d", secs / 86400)
-        } else if secs % 3600 == 0 {
+        } else if secs.is_multiple_of(3600) {
             format!("{}h", secs / 3600)
-        } else if secs % 60 == 0 {
+        } else if secs.is_multiple_of(60) {
             format!("{}m", secs / 60)
         } else {
             format!("{secs}s")
@@ -210,6 +210,7 @@ fn split_numeric_suffix(s: &str) -> (&str, &str) {
 /// Top-level ExchangeDB configuration.
 #[derive(Debug, Clone, Deserialize, serde::Serialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct ExchangeDbConfig {
     pub server: ServerSection,
     pub http: HttpSection,
@@ -482,33 +483,6 @@ impl Default for TlsSection {
     }
 }
 
-impl Default for ExchangeDbConfig {
-    fn default() -> Self {
-        Self {
-            server: ServerSection::default(),
-            http: HttpSection::default(),
-            pgwire: PgwireSection::default(),
-            ilp: IlpSection::default(),
-            storage: StorageSection::default(),
-            retention: RetentionSection::default(),
-            performance: PerformanceSection::default(),
-            tls: TlsSection::default(),
-            replication: ReplicationSection::default(),
-            cairo: CairoSection::default(),
-            wal: WalSection::default(),
-            o3: O3Section::default(),
-            memory: MemorySection::default(),
-            telemetry: TelemetrySection::default(),
-            security: SecuritySection::default(),
-            cluster: ClusterSection::default(),
-            backup: BackupSection::default(),
-            tiering: TieringSection::default(),
-            pitr: PitrSection::default(),
-            ttl: TtlSection::default(),
-            downsampling: DownsamplingSection::default(),
-        }
-    }
-}
 
 impl Default for ServerSection {
     fn default() -> Self {
@@ -825,7 +799,7 @@ impl ExchangeDbConfig {
     /// - `EXCHANGEDB_WAL_ENABLED`
     /// - `EXCHANGEDB_QUERY_PARALLELISM`
     /// - `EXCHANGEDB_WRITER_COMMIT_MODE`
-    pub fn from_env(mut self) -> Self {
+    pub fn with_env(mut self) -> Self {
         if let Ok(v) = std::env::var("EXCHANGEDB_DATA_DIR") {
             self.server.data_dir = PathBuf::from(v);
         }
@@ -838,50 +812,43 @@ impl ExchangeDbConfig {
         if let Ok(v) = std::env::var("EXCHANGEDB_HTTP_BIND") {
             self.http.bind = v;
         }
-        if let Ok(v) = std::env::var("EXCHANGEDB_HTTP_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_HTTP_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.http.enabled = b;
             }
-        }
         if let Ok(v) = std::env::var("EXCHANGEDB_PGWIRE_BIND") {
             self.pgwire.bind = v;
         }
-        if let Ok(v) = std::env::var("EXCHANGEDB_PGWIRE_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_PGWIRE_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.pgwire.enabled = b;
             }
-        }
         if let Ok(v) = std::env::var("EXCHANGEDB_ILP_BIND") {
             self.ilp.bind = v;
         }
-        if let Ok(v) = std::env::var("EXCHANGEDB_ILP_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_ILP_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.ilp.enabled = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_ILP_BATCH_SIZE") {
-            if let Ok(n) = v.parse::<usize>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_ILP_BATCH_SIZE")
+            && let Ok(n) = v.parse::<usize>() {
                 self.ilp.batch_size = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.storage.wal_enabled = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_QUERY_PARALLELISM") {
-            if let Ok(n) = v.parse::<usize>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_QUERY_PARALLELISM")
+            && let Ok(n) = v.parse::<usize>() {
                 self.performance.query_parallelism = n;
             }
-        }
         if let Ok(v) = std::env::var("EXCHANGEDB_WRITER_COMMIT_MODE") {
             self.performance.writer_commit_mode = v;
         }
-        if let Ok(v) = std::env::var("EXCHANGEDB_TLS_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_TLS_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.tls.enabled = b;
             }
-        }
         if let Ok(v) = std::env::var("EXCHANGEDB_TLS_CERT_PATH") {
             self.tls.cert_path = v;
         }
@@ -898,328 +865,270 @@ impl ExchangeDbConfig {
             self.replication.sync_mode = v;
         }
         // Cairo section
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_MAX_UNCOMMITTED_ROWS") {
-            if let Ok(n) = v.parse::<u64>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_MAX_UNCOMMITTED_ROWS")
+            && let Ok(n) = v.parse::<u64>() {
                 self.cairo.max_uncommitted_rows = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_COMMIT_LAG") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_COMMIT_LAG")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.cairo.commit_lag = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_O3_MAX_LAG") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_O3_MAX_LAG")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.cairo.o3_max_lag = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_WRITER_DATA_APPEND_PAGE_SIZE") {
-            if let Ok(b) = v.parse::<ByteSize>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_WRITER_DATA_APPEND_PAGE_SIZE")
+            && let Ok(b) = v.parse::<ByteSize>() {
                 self.cairo.writer_data_append_page_size = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_READER_POOL_MAX_SEGMENTS") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_READER_POOL_MAX_SEGMENTS")
+            && let Ok(n) = v.parse::<u32>() {
                 self.cairo.reader_pool_max_segments = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_SPIN_LOCK_TIMEOUT") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_SPIN_LOCK_TIMEOUT")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.cairo.spin_lock_timeout = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_CHARACTER_STORE_CAPACITY") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_CHARACTER_STORE_CAPACITY")
+            && let Ok(n) = v.parse::<u32>() {
                 self.cairo.character_store_capacity = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_CHARACTER_STORE_SEQUENCE_POOL_CAPACITY") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_CHARACTER_STORE_SEQUENCE_POOL_CAPACITY")
+            && let Ok(n) = v.parse::<u32>() {
                 self.cairo.character_store_sequence_pool_capacity = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_COLUMN_POOL_CAPACITY") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_COLUMN_POOL_CAPACITY")
+            && let Ok(n) = v.parse::<u32>() {
                 self.cairo.column_pool_capacity = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_COMPACT_MAP_LOAD_FACTOR") {
-            if let Ok(n) = v.parse::<f64>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_COMPACT_MAP_LOAD_FACTOR")
+            && let Ok(n) = v.parse::<f64>() {
                 self.cairo.compact_map_load_factor = n;
             }
-        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_DEFAULT_MAP_TYPE") {
             self.cairo.default_map_type = v;
         }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_DEFAULT_SYMBOL_CACHE_FLAG") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_DEFAULT_SYMBOL_CACHE_FLAG")
+            && let Ok(b) = v.parse::<bool>() {
                 self.cairo.default_symbol_cache_flag = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_DEFAULT_SYMBOL_CAPACITY") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_DEFAULT_SYMBOL_CAPACITY")
+            && let Ok(n) = v.parse::<u32>() {
                 self.cairo.default_symbol_capacity = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_FILE_OPERATION_RETRY_COUNT") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_FILE_OPERATION_RETRY_COUNT")
+            && let Ok(n) = v.parse::<u32>() {
                 self.cairo.file_operation_retry_count = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_INACTIVE_READER_TTL") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_INACTIVE_READER_TTL")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.cairo.inactive_reader_ttl = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_INACTIVE_WRITER_TTL") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_INACTIVE_WRITER_TTL")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.cairo.inactive_writer_ttl = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_INDEX_VALUE_BLOCK_SIZE") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_INDEX_VALUE_BLOCK_SIZE")
+            && let Ok(n) = v.parse::<u32>() {
                 self.cairo.index_value_block_size = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_MAX_SWAP_FILE_COUNT") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_MAX_SWAP_FILE_COUNT")
+            && let Ok(n) = v.parse::<u32>() {
                 self.cairo.max_swap_file_count = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_MKDIR_MODE") {
-            if let Ok(n) = u32::from_str_radix(v.trim_start_matches("0o").trim_start_matches("0"), 8) {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_MKDIR_MODE")
+            && let Ok(n) = u32::from_str_radix(v.trim_start_matches("0o").trim_start_matches("0"), 8) {
                 self.cairo.mkdir_mode = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_PARALLEL_INDEX_THRESHOLD") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_PARALLEL_INDEX_THRESHOLD")
+            && let Ok(n) = v.parse::<u32>() {
                 self.cairo.parallel_index_threshold = n;
             }
-        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_SNAPSHOT_INSTANCE_ID") {
             self.cairo.snapshot_instance_id = v;
         }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_SQL_COPY_BUFFER_SIZE") {
-            if let Ok(b) = v.parse::<ByteSize>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_SQL_COPY_BUFFER_SIZE")
+            && let Ok(b) = v.parse::<ByteSize>() {
                 self.cairo.sql_copy_buffer_size = b;
             }
-        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CAIRO_SYSTEM_TABLE_PREFIX") {
             self.cairo.system_table_prefix = v;
         }
         // WAL section
-        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_WAL_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_WAL_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.wal.enabled = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_MAX_SEGMENT_SIZE") {
-            if let Ok(b) = v.parse::<ByteSize>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_MAX_SEGMENT_SIZE")
+            && let Ok(b) = v.parse::<ByteSize>() {
                 self.wal.max_segment_size = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_APPLY_TABLE_TIME_QUOTA") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_APPLY_TABLE_TIME_QUOTA")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.wal.apply_table_time_quota = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_PURGE_INTERVAL") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_PURGE_INTERVAL")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.wal.purge_interval = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_SEGMENT_ROLLOVER_ROW_COUNT") {
-            if let Ok(n) = v.parse::<u64>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_SEGMENT_ROLLOVER_ROW_COUNT")
+            && let Ok(n) = v.parse::<u64>() {
                 self.wal.segment_rollover_row_count = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_SQUASH_UNCOMMITTED_ROWS_MULTIPLIER") {
-            if let Ok(n) = v.parse::<f64>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_WAL_SQUASH_UNCOMMITTED_ROWS_MULTIPLIER")
+            && let Ok(n) = v.parse::<f64>() {
                 self.wal.squash_uncommitted_rows_multiplier = n;
             }
-        }
         // O3 section
-        if let Ok(v) = std::env::var("EXCHANGEDB_O3_PARTITION_SPLIT_MIN_SIZE") {
-            if let Ok(b) = v.parse::<ByteSize>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_O3_PARTITION_SPLIT_MIN_SIZE")
+            && let Ok(b) = v.parse::<ByteSize>() {
                 self.o3.partition_split_min_size = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_O3_LAST_PARTITION_MAX_SPLITS") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_O3_LAST_PARTITION_MAX_SPLITS")
+            && let Ok(n) = v.parse::<u32>() {
                 self.o3.last_partition_max_splits = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_O3_COLUMN_MEMORY_SIZE") {
-            if let Ok(b) = v.parse::<ByteSize>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_O3_COLUMN_MEMORY_SIZE")
+            && let Ok(b) = v.parse::<ByteSize>() {
                 self.o3.column_memory_size = b;
             }
-        }
         // Memory section
-        if let Ok(v) = std::env::var("EXCHANGEDB_MEMORY_MAX_PER_QUERY") {
-            if let Ok(b) = v.parse::<ByteSize>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_MEMORY_MAX_PER_QUERY")
+            && let Ok(b) = v.parse::<ByteSize>() {
                 self.memory.max_per_query = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_MEMORY_MAX_TOTAL") {
-            if let Ok(b) = v.parse::<ByteSize>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_MEMORY_MAX_TOTAL")
+            && let Ok(b) = v.parse::<ByteSize>() {
                 self.memory.max_total = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_MEMORY_SORT_KEY_MAX_SIZE") {
-            if let Ok(b) = v.parse::<ByteSize>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_MEMORY_SORT_KEY_MAX_SIZE")
+            && let Ok(b) = v.parse::<ByteSize>() {
                 self.memory.sort_key_max_size = b;
             }
-        }
         // Telemetry section
-        if let Ok(v) = std::env::var("EXCHANGEDB_TELEMETRY_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_TELEMETRY_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.telemetry.enabled = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_TELEMETRY_QUEUE_CAPACITY") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_TELEMETRY_QUEUE_CAPACITY")
+            && let Ok(n) = v.parse::<u32>() {
                 self.telemetry.queue_capacity = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_TELEMETRY_HIDE_TABLES") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_TELEMETRY_HIDE_TABLES")
+            && let Ok(b) = v.parse::<bool>() {
                 self.telemetry.hide_tables = b;
             }
-        }
         // Security section
-        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_AUTH_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_AUTH_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.security.auth_enabled = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_RBAC_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_RBAC_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.security.rbac_enabled = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_AUDIT_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_AUDIT_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.security.audit_enabled = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_PASSWORD_MIN_LENGTH") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_PASSWORD_MIN_LENGTH")
+            && let Ok(n) = v.parse::<u32>() {
                 self.security.password_min_length = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_SESSION_TIMEOUT") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_SESSION_TIMEOUT")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.security.session_timeout = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_MAX_FAILED_LOGIN_ATTEMPTS") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_MAX_FAILED_LOGIN_ATTEMPTS")
+            && let Ok(n) = v.parse::<u32>() {
                 self.security.max_failed_login_attempts = n;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_LOCKOUT_DURATION") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_SECURITY_LOCKOUT_DURATION")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.security.lockout_duration = d;
             }
-        }
         // Cluster section
-        if let Ok(v) = std::env::var("EXCHANGEDB_CLUSTER_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CLUSTER_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.cluster.enabled = b;
             }
-        }
         if let Ok(v) = std::env::var("EXCHANGEDB_CLUSTER_NODE_ID") {
             self.cluster.node_id = v;
         }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CLUSTER_HEARTBEAT_INTERVAL") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CLUSTER_HEARTBEAT_INTERVAL")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.cluster.heartbeat_interval = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_CLUSTER_FAILURE_THRESHOLD") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_CLUSTER_FAILURE_THRESHOLD")
+            && let Ok(n) = v.parse::<u32>() {
                 self.cluster.failure_threshold = n;
             }
-        }
         // Backup section
-        if let Ok(v) = std::env::var("EXCHANGEDB_BACKUP_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_BACKUP_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.backup.enabled = b;
             }
-        }
         if let Ok(v) = std::env::var("EXCHANGEDB_BACKUP_SCHEDULE") {
             self.backup.schedule = v;
         }
         if let Ok(v) = std::env::var("EXCHANGEDB_BACKUP_DESTINATION") {
             self.backup.destination = v;
         }
-        if let Ok(v) = std::env::var("EXCHANGEDB_BACKUP_RETENTION_COUNT") {
-            if let Ok(n) = v.parse::<u32>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_BACKUP_RETENTION_COUNT")
+            && let Ok(n) = v.parse::<u32>() {
                 self.backup.retention_count = n;
             }
-        }
         // Tiering section
-        if let Ok(v) = std::env::var("EXCHANGEDB_TIERING_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_TIERING_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.tiering.enabled = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_TIERING_HOT_RETENTION") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_TIERING_HOT_RETENTION")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.tiering.hot_retention = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_TIERING_WARM_RETENTION") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_TIERING_WARM_RETENTION")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.tiering.warm_retention = d;
             }
-        }
         if let Ok(v) = std::env::var("EXCHANGEDB_TIERING_COLD_STORAGE_PATH") {
             self.tiering.cold_storage_path = v;
         }
         // PITR section
-        if let Ok(v) = std::env::var("EXCHANGEDB_PITR_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_PITR_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.pitr.enabled = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_PITR_RETENTION_WINDOW") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_PITR_RETENTION_WINDOW")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.pitr.retention_window = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_PITR_SNAPSHOT_INTERVAL") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_PITR_SNAPSHOT_INTERVAL")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.pitr.snapshot_interval = d;
             }
-        }
         // TTL section
-        if let Ok(v) = std::env::var("EXCHANGEDB_TTL_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_TTL_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.ttl.enabled = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_TTL_DEFAULT_MAX_AGE") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_TTL_DEFAULT_MAX_AGE")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.ttl.default_max_age = d;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_TTL_CHECK_INTERVAL") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_TTL_CHECK_INTERVAL")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.ttl.check_interval = d;
             }
-        }
         // Downsampling section
-        if let Ok(v) = std::env::var("EXCHANGEDB_DOWNSAMPLING_ENABLED") {
-            if let Ok(b) = v.parse::<bool>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_DOWNSAMPLING_ENABLED")
+            && let Ok(b) = v.parse::<bool>() {
                 self.downsampling.enabled = b;
             }
-        }
-        if let Ok(v) = std::env::var("EXCHANGEDB_DOWNSAMPLING_CHECK_INTERVAL") {
-            if let Ok(d) = v.parse::<HumanDuration>() {
+        if let Ok(v) = std::env::var("EXCHANGEDB_DOWNSAMPLING_CHECK_INTERVAL")
+            && let Ok(d) = v.parse::<HumanDuration>() {
                 self.downsampling.check_interval = d;
             }
-        }
         self
     }
 

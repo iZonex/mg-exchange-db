@@ -321,20 +321,15 @@ pub fn extract_credentials(headers: &axum::http::HeaderMap) -> Option<(String, S
     }
 
     // Try Authorization: Basic.
-    if let Some(auth) = headers.get("authorization").and_then(|v| v.to_str().ok()) {
-        if let Some(encoded) = auth.strip_prefix("Basic ") {
-            if let Ok(decoded) = URL_SAFE_NO_PAD
+    if let Some(auth) = headers.get("authorization").and_then(|v| v.to_str().ok())
+        && let Some(encoded) = auth.strip_prefix("Basic ")
+            && let Ok(decoded) = URL_SAFE_NO_PAD
                 .decode(encoded)
                 .or_else(|_| base64::engine::general_purpose::STANDARD.decode(encoded))
-            {
-                if let Ok(cred_str) = String::from_utf8(decoded) {
-                    if let Some((key, secret)) = cred_str.split_once(':') {
+                && let Ok(cred_str) = String::from_utf8(decoded)
+                    && let Some((key, secret)) = cred_str.split_once(':') {
                         return Some((key.to_string(), secret.to_string()));
                     }
-                }
-            }
-        }
-    }
 
     None
 }

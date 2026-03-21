@@ -11,6 +11,10 @@ path = "src/main.rs"
 name = "exchangedb-bench"
 path = "src/bench.rs"
 
+[[bin]]
+name = "profile-query"
+path = "src/profile_query.rs"
+
 [dependencies]
 exchange-common = { workspace = true }
 exchange-core = { workspace = true }

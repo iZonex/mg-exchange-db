@@ -171,8 +171,7 @@ impl PitrManager {
         // Find the latest checkpoint BEFORE (or at) target_time.
         let checkpoint = checkpoints
             .iter()
-            .filter(|cp| cp.timestamp <= target_time)
-            .last()
+            .rfind(|cp| cp.timestamp <= target_time)
             .ok_or_else(|| {
                 ExchangeDbError::Corruption(format!(
                     "no checkpoint found before target time {target_time}"

@@ -42,6 +42,11 @@ impl ColumnData {
         }
     }
 
+    /// Returns `true` if the column contains no values.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Number of values stored.
     pub fn len(&self) -> usize {
         match self {
@@ -223,14 +228,13 @@ impl RecordBatch {
 
         let schema = batches[0].schema.clone();
         let total_rows: usize = batches.iter().map(|b| b.row_count).sum();
-        let num_cols = schema.len();
 
         let mut columns: Vec<ColumnData> = schema.iter().map(|(_, ct)| ColumnData::empty_for(*ct)).collect();
 
         for batch in batches {
             for row in 0..batch.row_count {
-                for col_idx in 0..num_cols {
-                    columns[col_idx].push(&batch.columns[col_idx].get(row));
+                for (col_idx, column) in columns.iter_mut().enumerate() {
+                    column.push(&batch.columns[col_idx].get(row));
                 }
             }
         }

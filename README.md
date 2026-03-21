@@ -44,6 +44,8 @@ ExchangeDB is a columnar time-series database optimized for exchange workloads: 
 
 ### Performance Highlights
 
+- **Sub-20 µs query latency** for simple scans (KDB+ competitive)
+- **100-200x faster** query execution in v0.1.1 (mmap cache, limit pushdown, optimizer skip)
 - **18.80 M rows/s** batch write throughput (1M rows, columnar)
 - **590.70 M elements/s** column read throughput (mmap, zero-copy)
 - **4.49 G elements/s** SIMD-accelerated aggregation (3.97x over scalar)
@@ -153,6 +155,10 @@ cat data.ilp | nc localhost 9009
 ### Open the Web Console
 
 Navigate to [http://localhost:9000](http://localhost:9000) in your browser to access the built-in SQL editor with table browser and result viewer.
+
+### Web Console
+
+![ExchangeDB Web Console](docs/ui.png)
 
 ---
 

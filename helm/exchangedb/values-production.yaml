@@ -1,0 +1,89 @@
+# Production configuration with high resources and full monitoring
+# Usage: helm install exchangedb ./helm/exchangedb -f ./helm/exchangedb/values-production.yaml
+
+replicaCount: 1
+
+image:
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    memory: "4Gi"
+    cpu: "2000m"
+  limits:
+    memory: "16Gi"
+    cpu: "8000m"
+
+persistence:
+  enabled: true
+  size: 500Gi
+  storageClass: ""
+
+replication:
+  mode: standalone
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: "15s"
+    scrapeTimeout: "10s"
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 6
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+podAnnotations:
+  cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - exchangedb
+          topologyKey: kubernetes.io/hostname
+
+tolerations: []
+
+nodeSelector: {}
+
+config: |
+  [server]
+  http_bind = "0.0.0.0:9000"
+  pg_bind = "0.0.0.0:8812"
+  ilp_bind = "0.0.0.0:9009"
+
+  [storage]
+  data_dir = "/data"
+
+  [logging]
+  level = "warn"
+
+  [memory]
+  max_query_memory = "8GB"
+
+  [performance]
+  # Production-tuned settings
+  write_buffer_size = "256MB"
+  max_concurrent_queries = 64
+  page_cache_size = "4GB"

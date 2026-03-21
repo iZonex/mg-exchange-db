@@ -138,7 +138,7 @@ pub fn partition_to_parquet(
     // Go back and fix up the data_offset fields in the metadata section
     let mut offset_in_meta = meta_start;
     for (i, cm) in column_metas.iter().enumerate() {
-        let name_len = cm.name.as_bytes().len();
+        let name_len = cm.name.len();
         // Skip: name_len(4) + name(N) + col_type(1) = 5 + name_len
         let offset_field_pos = offset_in_meta + 4 + name_len + 1;
         let offset_bytes = data_offsets[i].to_le_bytes();
@@ -288,7 +288,7 @@ pub fn parquet_to_partition(
         let col_def = meta.columns.iter().find(|c| c.name == cm.name);
         let col_type: Option<ColumnType> = col_def.map(|c| c.col_type.into());
 
-        if col_type.map_or(false, |ct| ct.is_variable_length()) {
+        if col_type.is_some_and(|ct| ct.is_variable_length()) {
             // Variable-length: data is stored as [4 bytes data_len][data][4 bytes index_len][index]
             let mut reader = Cursor::new(&decompressed);
 

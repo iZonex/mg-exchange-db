@@ -180,6 +180,9 @@ pub fn merge_sorted_into_partition(
         w.flush()?;
     }
 
+    // Invalidate mmap cache for this partition — data files were rewritten.
+    crate::mmap::invalidate_mmap_cache(partition_path);
+
     Ok(total_rows)
 }
 

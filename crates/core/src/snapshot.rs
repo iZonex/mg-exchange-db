@@ -147,6 +147,10 @@ pub fn restore_snapshot(snapshot_dir: &Path, db_root: &Path) -> Result<()> {
         }
 
         copy_dir_recursive(&src_table_dir, &dest_table_dir)?;
+
+        // Invalidate caches for restored table.
+        crate::mmap::invalidate_mmap_cache(&dest_table_dir);
+        crate::table::TableMeta::invalidate_cache(&dest_table_dir.join("_meta"));
     }
 
     Ok(())
@@ -187,7 +191,7 @@ pub fn verify_snapshot(snapshot_dir: &Path) -> Result<SnapshotInfo> {
     let manifest_path = snapshot_dir.join(MANIFEST_FILENAME);
     if !manifest_path.exists() {
         return Err(ExchangeDbError::Snapshot {
-            detail: format!("manifest.json not found"),
+            detail: "manifest.json not found".to_string(),
             path: snapshot_dir.display().to_string(),
         });
     }

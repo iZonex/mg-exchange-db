@@ -11,6 +11,7 @@ pub mod batch;
 pub mod casts;
 pub mod catalog;
 pub mod columnar;
+pub mod table_registry;
 pub mod compiled_filter;
 pub mod context;
 pub mod cursor_executor;

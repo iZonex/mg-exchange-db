@@ -141,16 +141,45 @@ pub async fn start_http_server(config: &ServerConfig) -> std::io::Result<()> {
         exchange_core::tenant::TenantManager::new(config.db_root.clone()),
     ));
 
+    // Initialize hot table registry — keeps all tables open in memory.
+    exchange_query::table_registry::init_global(config.db_root.clone());
+
+    // Pre-warm the query engine: parse a dummy query to force-load sqlparser
+    // code paths and populate instruction caches. This eliminates the ~1ms
+    // cold-start penalty on the first real query.
+    {
+        let _ = exchange_query::plan_query("SELECT 1");
+        // Pre-warm table metadata and column readers for existing tables.
+        if let Ok(entries) = std::fs::read_dir(&config.db_root) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    let meta_path = entry.path().join("_meta");
+                    if meta_path.exists() {
+                        let table_name = entry.file_name().to_string_lossy().to_string();
+                        let sql = format!("SELECT * FROM {table_name} LIMIT 1");
+                        if let Ok(plan) = exchange_query::plan_query(&sql) {
+                            let _ = exchange_query::execute(&config.db_root, &plan);
+                            // Cache the plan too.
+                            if let Some(ref cache) = app_state.plan_cache {
+                                cache.put(&sql, plan);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        tracing::info!("query engine pre-warmed");
+    }
+
     let state = Arc::new(app_state);
     let router = http::router(state);
 
     // Check if TLS is enabled.
-    if let Some(ref tls_config) = config.tls {
-        if tls_config.enabled {
+    if let Some(ref tls_config) = config.tls
+        && tls_config.enabled {
             let rustls_config = tls::load_tls_config(tls_config).await?;
             return tls::serve_tls(config.bind_addr, router, rustls_config).await;
         }
-    }
 
     // Plain HTTP fallback.
     tracing::info!(addr = %config.bind_addr, "starting HTTP server");
@@ -259,7 +288,7 @@ pub async fn start_all_servers(config: ServerConfig) -> std::io::Result<()> {
         result = async {
             // Poll all handles; return as soon as any completes.
             let (result, _index, _remaining) = futures::future::select_all(
-                handles.iter_mut().map(|h| Box::pin(async { h.await }))
+                handles.iter_mut().map(Box::pin)
             ).await;
             result
         } => {
@@ -274,7 +303,7 @@ pub async fn start_all_servers(config: ServerConfig) -> std::io::Result<()> {
                 }
                 Err(e) => {
                     tracing::error!(error = %e, "a server task panicked");
-                    Some(std::io::Error::new(std::io::ErrorKind::Other, e))
+                    Some(std::io::Error::other(e))
                 }
             }
         }

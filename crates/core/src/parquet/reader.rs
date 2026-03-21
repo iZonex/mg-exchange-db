@@ -228,9 +228,9 @@ impl ParquetReader {
             // Write empty column files.
             for col_def in &meta.columns {
                 let col_type: ColumnType = col_def.col_type.into();
-                std::fs::write(output_dir.join(format!("{}.d", col_def.name)), &[])?;
+                std::fs::write(output_dir.join(format!("{}.d", col_def.name)), [])?;
                 if col_type.is_variable_length() {
-                    std::fs::write(output_dir.join(format!("{}.i", col_def.name)), &[])?;
+                    std::fs::write(output_dir.join(format!("{}.i", col_def.name)), [])?;
                 }
             }
             return Ok(0);
@@ -248,7 +248,7 @@ impl ParquetReader {
             let col_def = meta.columns.iter().find(|c| c.name == cm.name);
             let col_type: Option<ColumnType> = col_def.map(|c| c.col_type.into());
 
-            if col_type.map_or(false, |ct| ct.is_variable_length()) {
+            if col_type.is_some_and(|ct| ct.is_variable_length()) {
                 // Variable-length: stored as [4 bytes data_len][data][4 bytes index_len][index]
                 let mut cursor = Cursor::new(&decompressed);
 

@@ -725,15 +725,11 @@ impl AggregateFunction for RegrIntercept {
 
 /// `BOOL_AND` aggregate. Returns 1 if all non-null values are truthy, 0 otherwise.
 #[derive(Debug)]
+#[derive(Default)]
 pub struct BoolAnd {
     result: Option<bool>,
 }
 
-impl Default for BoolAnd {
-    fn default() -> Self {
-        Self { result: None }
-    }
-}
 
 impl AggregateFunction for BoolAnd {
     fn add(&mut self, value: &Value) {
@@ -741,7 +737,7 @@ impl AggregateFunction for BoolAnd {
             Value::Null => return,
             Value::I64(v) => *v != 0,
             Value::F64(v) => *v != 0.0,
-            Value::Str(s) => !s.is_empty() && s != "0" && s.to_ascii_lowercase() != "false",
+            Value::Str(s) => !s.is_empty() && s != "0" && !s.eq_ignore_ascii_case("false"),
             Value::Timestamp(_) => true,
         };
         self.result = Some(self.result.unwrap_or(true) && truthy);
@@ -761,15 +757,11 @@ impl AggregateFunction for BoolAnd {
 
 /// `BOOL_OR` aggregate. Returns 1 if any non-null value is truthy.
 #[derive(Debug)]
+#[derive(Default)]
 pub struct BoolOr {
     result: Option<bool>,
 }
 
-impl Default for BoolOr {
-    fn default() -> Self {
-        Self { result: None }
-    }
-}
 
 impl AggregateFunction for BoolOr {
     fn add(&mut self, value: &Value) {
@@ -777,7 +769,7 @@ impl AggregateFunction for BoolOr {
             Value::Null => return,
             Value::I64(v) => *v != 0,
             Value::F64(v) => *v != 0.0,
-            Value::Str(s) => !s.is_empty() && s != "0" && s.to_ascii_lowercase() != "false",
+            Value::Str(s) => !s.is_empty() && s != "0" && !s.eq_ignore_ascii_case("false"),
             Value::Timestamp(_) => true,
         };
         self.result = Some(self.result.unwrap_or(false) || truthy);
@@ -883,7 +875,7 @@ impl AggregateFunction for Sma {
     fn result(&self) -> Value {
         if self.values.is_empty() { return Value::Null; }
         let n = self.values.len();
-        let start = if n > self.period { n - self.period } else { 0 };
+        let start = n.saturating_sub(self.period);
         let window = &self.values[start..];
         let avg = window.iter().sum::<f64>() / window.len() as f64;
         Value::F64(avg)
@@ -957,7 +949,7 @@ impl AggregateFunction for Wma {
     fn result(&self) -> Value {
         if self.values.is_empty() { return Value::Null; }
         let n = self.values.len();
-        let start = if n > self.period { n - self.period } else { 0 };
+        let start = n.saturating_sub(self.period);
         let window = &self.values[start..];
         let len = window.len();
         let denom = (len * (len + 1)) as f64 / 2.0;
@@ -1100,7 +1092,7 @@ impl AggregateFunction for BollingerUpper {
     fn result(&self) -> Value {
         if self.values.is_empty() { return Value::Null; }
         let n = self.values.len();
-        let start = if n > self.period { n - self.period } else { 0 };
+        let start = n.saturating_sub(self.period);
         let window = &self.values[start..];
         let mean = window.iter().sum::<f64>() / window.len() as f64;
         let var = window.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / window.len() as f64;
@@ -1140,7 +1132,7 @@ impl AggregateFunction for BollingerLower {
     fn result(&self) -> Value {
         if self.values.is_empty() { return Value::Null; }
         let n = self.values.len();
-        let start = if n > self.period { n - self.period } else { 0 };
+        let start = n.saturating_sub(self.period);
         let window = &self.values[start..];
         let mean = window.iter().sum::<f64>() / window.len() as f64;
         let var = window.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / window.len() as f64;
@@ -1180,7 +1172,7 @@ impl AggregateFunction for Atr {
         if self.values.len() < 2 { return Value::Null; }
         let trs: Vec<f64> = self.values.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
         let n = trs.len();
-        let start = if n > self.period { n - self.period } else { 0 };
+        let start = n.saturating_sub(self.period);
         let window = &trs[start..];
         Value::F64(window.iter().sum::<f64>() / window.len() as f64)
     }

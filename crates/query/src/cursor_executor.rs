@@ -75,17 +75,11 @@ pub fn execute_via_cursors(db_root: &Path, plan: &QueryPlan) -> Result<QueryResu
 ///
 /// When `use_cursor_engine` is true, queries are routed through the
 /// cursor pipeline instead of the traditional executor.
+#[derive(Default)]
 pub struct CursorEngineConfig {
     pub use_cursor_engine: bool,
 }
 
-impl Default for CursorEngineConfig {
-    fn default() -> Self {
-        Self {
-            use_cursor_engine: false,
-        }
-    }
-}
 
 /// Execute a query plan, routing through the cursor engine when configured.
 ///

@@ -46,11 +46,10 @@ impl SpillCursor {
             }
         }
         // Check if source has more data.
-        if !self.spilled {
-            if let Some(_) = source.next_batch(1)? {
+        if !self.spilled
+            && source.next_batch(1)?.is_some() {
                 self.spilled = true;
             }
-        }
         self.materialized = Some(result);
         Ok(())
     }

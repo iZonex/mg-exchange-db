@@ -35,7 +35,7 @@ impl WalSegment {
         let mut mmap = MmapFile::open(&path, SEGMENT_INITIAL_CAPACITY)?;
 
         // Write segment header.
-        if mmap.len() == 0 {
+        if mmap.is_empty() {
             let mut header = [0u8; SEGMENT_HEADER_SIZE];
             header[0..4].copy_from_slice(SEGMENT_MAGIC);
             header[4..6].copy_from_slice(&SEGMENT_VERSION.to_le_bytes());

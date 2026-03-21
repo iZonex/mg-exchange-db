@@ -157,7 +157,7 @@ fn interpret_as_source(v: &Value, source: &str) -> Result<Intermediate, String> 
             let s = match v {
                 Value::Str(s) => s.clone(),
                 Value::I64(n) => format!("{:032x}", n),
-                _ => format!("{}", value_display(v)),
+                _ => value_display(v).to_string(),
             };
             Ok(Intermediate::Str(s))
         }

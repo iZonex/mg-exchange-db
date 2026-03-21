@@ -16,6 +16,7 @@ type HmacSha256 = Hmac<Sha256>;
 
 /// Configuration for ILP TCP authentication.
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct IlpAuthConfig {
     /// Whether authentication is enabled.
     pub enabled: bool,
@@ -23,14 +24,6 @@ pub struct IlpAuthConfig {
     pub auth_keys: HashMap<String, String>,
 }
 
-impl Default for IlpAuthConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            auth_keys: HashMap::new(),
-        }
-    }
-}
 
 /// Authenticator that manages challenge-response handshakes.
 pub struct IlpAuthenticator {

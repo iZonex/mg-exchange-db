@@ -116,7 +116,7 @@ fn run_query(db_root: &Path, sql: &str) -> (Duration, u64) {
 
     let row_count = match &result {
         QueryResult::Rows { rows, .. } => rows.len() as u64,
-        QueryResult::Ok { affected_rows } => *affected_rows as u64,
+        QueryResult::Ok { affected_rows } => *affected_rows,
     };
 
     (elapsed, row_count)

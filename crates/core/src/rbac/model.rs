@@ -80,8 +80,6 @@ impl SecurityContext {
     /// Full table-level `Read` or `Admin` grants implicitly allow all columns.
     /// A `ColumnRead` grant restricts access to the listed columns only.
     pub fn can_read_column(&self, table: &str, column: &str) -> bool {
-        let mut has_column_read_for_table = false;
-
         for p in &self.permissions {
             match p {
                 Permission::Admin => return true,
@@ -93,7 +91,6 @@ impl SecurityContext {
                     table: t,
                     columns,
                 } if t == table => {
-                    has_column_read_for_table = true;
                     if columns.iter().any(|c| c == column) {
                         return true;
                     }
@@ -104,7 +101,7 @@ impl SecurityContext {
 
         // If there is a ColumnRead for this table but the column is not listed,
         // access is denied. If there is no grant at all, access is also denied.
-        !has_column_read_for_table && false
+        false
     }
 
     /// Returns `true` if DDL operations (CREATE/DROP/ALTER TABLE) are allowed.

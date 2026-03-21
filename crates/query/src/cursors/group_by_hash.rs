@@ -121,6 +121,7 @@ impl HashGroupByCursor {
         // Use a u64 hash as the primary key for O(1) lookup, falling back
         // to full key comparison on collision via the stored `Vec<Value>`.
         // This avoids allocating a `Vec<u8>` serialized key per row.
+        #[allow(clippy::type_complexity)]
         let mut groups: HashMap<u64, Vec<(Vec<Value>, Vec<HashAccumulator>)>> = HashMap::new();
         let mut key_order: Vec<u64> = Vec::new();
         let mut unique_keys: Vec<Vec<Value>> = Vec::new();

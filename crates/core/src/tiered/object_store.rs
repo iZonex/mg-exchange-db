@@ -49,11 +49,10 @@ impl ObjectStore for LocalObjectStore {
     fn put(&self, key: &str, data: &[u8]) -> Result<()> {
         let path = self.key_path(key);
         // Ensure parent directory exists
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
+        if let Some(parent) = path.parent()
+            && !parent.exists() {
                 std::fs::create_dir_all(parent)?;
             }
-        }
         std::fs::write(&path, data)?;
         Ok(())
     }
@@ -416,12 +415,6 @@ pub fn sha256_hex(data: &[u8]) -> String {
     hex_encode(&hash)
 }
 
-/// Generate a UTC timestamp in the format required by AWS Signature V4.
-/// Format: "20060102T150405Z"
-fn utc_timestamp() -> String {
-    "20260320T000000Z".to_string()
-}
-
 /// Generate a real UTC timestamp for S3 requests.
 fn utc_timestamp_now() -> String {
     let now = std::time::SystemTime::now();
@@ -483,6 +476,7 @@ fn extract_host(url: &str) -> String {
 ///
 /// # Returns
 /// The full Authorization header value string.
+#[allow(clippy::too_many_arguments)]
 pub fn sign_aws_v4(
     method: &str,
     url: &str,

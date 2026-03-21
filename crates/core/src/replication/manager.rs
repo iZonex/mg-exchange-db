@@ -59,7 +59,7 @@ impl From<&ReplicationLag> for ReplicationLagInfo {
 /// - **Standalone**: no-op.
 pub struct ReplicationManager {
     config: ReplicationConfig,
-    db_root: PathBuf,
+    _db_root: PathBuf,
     shipper: Option<RwLock<WalShipper>>,
     _receiver: Option<WalReceiver>,
     failover: FailoverManager,
@@ -75,7 +75,7 @@ impl ReplicationManager {
 
         Self {
             config,
-            db_root,
+            _db_root: db_root,
             shipper: None,
             _receiver: None,
             failover,

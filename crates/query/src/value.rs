@@ -35,7 +35,7 @@ impl CompactValue {
     /// Create a `CompactValue` from a string slice. Strings up to 22 bytes
     /// are stored inline; longer strings are heap-allocated.
     #[inline]
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_string(s: &str) -> Self {
         if s.len() <= INLINE_MAX {
             let mut buf = [0u8; INLINE_MAX];
             buf[..s.len()].copy_from_slice(s.as_bytes());
@@ -51,7 +51,7 @@ impl CompactValue {
         match self {
             Self::InlineStr(buf, len) => {
                 // SAFETY: The bytes were copied from a valid UTF-8 `&str` in
-                // `from_str`, so they are guaranteed to be valid UTF-8.
+                // `from_string`, so they are guaranteed to be valid UTF-8.
                 Some(unsafe { std::str::from_utf8_unchecked(&buf[..*len as usize]) })
             }
             Self::HeapStr(s) => Some(s.as_str()),
@@ -83,7 +83,7 @@ impl CompactValue {
             Value::I64(n) => Self::I64(*n),
             Value::F64(n) => Self::F64(*n),
             Value::Timestamp(n) => Self::Timestamp(*n),
-            Value::Str(s) => Self::from_str(s),
+            Value::Str(s) => Self::from_string(s),
         }
     }
 
@@ -168,7 +168,7 @@ impl std::hash::Hash for CompactValue {
             Self::F64(v) => v.to_bits().hash(state),
             Self::Timestamp(v) => v.hash(state),
             Self::InlineStr(_, len) => {
-                let s = unsafe { std::str::from_utf8_unchecked(&self.as_str().unwrap().as_bytes()) };
+                let s = unsafe { std::str::from_utf8_unchecked(self.as_str().unwrap().as_bytes()) };
                 s.hash(state);
                 len.hash(state);
             }
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn sso_short_string() {
-        let cv = CompactValue::from_str("BTC/USD");
+        let cv = CompactValue::from_string("BTC/USD");
         assert!(matches!(cv, CompactValue::InlineStr(_, 7)));
         assert_eq!(cv.as_str(), Some("BTC/USD"));
     }
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn sso_exact_max() {
         let s = "a".repeat(INLINE_MAX);
-        let cv = CompactValue::from_str(&s);
+        let cv = CompactValue::from_string(&s);
         assert!(matches!(cv, CompactValue::InlineStr(_, _)));
         assert_eq!(cv.as_str(), Some(s.as_str()));
     }
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn sso_overflow_to_heap() {
         let s = "a".repeat(INLINE_MAX + 1);
-        let cv = CompactValue::from_str(&s);
+        let cv = CompactValue::from_string(&s);
         assert!(matches!(cv, CompactValue::HeapStr(_)));
         assert_eq!(cv.as_str(), Some(s.as_str()));
     }

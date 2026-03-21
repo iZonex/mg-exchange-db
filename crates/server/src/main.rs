@@ -410,7 +410,7 @@ fn cmd_server(
     // Load config: file -> env vars -> CLI overrides
     let mut cfg = ExchangeDbConfig::load(config_path.as_deref())
         .context("failed to load configuration")?;
-    cfg = cfg.from_env();
+    cfg = cfg.with_env();
 
     // CLI flags take highest precedence.
     if let Some(bind) = bind_override {
@@ -512,8 +512,8 @@ fn cmd_server(
 
         // Start the health monitor for automatic failover if this is a replica
         // with failover enabled.
-        if is_replica && repl_config.failover_enabled {
-            if let Some(ref repl_mgr_arc) = repl_mgr {
+        if is_replica && repl_config.failover_enabled
+            && let Some(ref repl_mgr_arc) = repl_mgr {
                 let primary_addr = repl_config
                     .primary_addr
                     .clone()
@@ -539,7 +539,6 @@ fn cmd_server(
                     "automatic failover health monitor started"
                 );
             }
-        }
 
         // Update server config with replication manager.
         let mut server_config = server_config;
@@ -924,7 +923,7 @@ fn cmd_info(data_dir: &Path, table_name: &str) -> Result<()> {
 
 fn cmd_version() -> Result<()> {
     println!("ExchangeDB v{}", env!("CARGO_PKG_VERSION"));
-    println!("  Rust edition: {}", "2024");
+    println!("  Rust edition: 2024");
     println!("  Min Rust version: 1.85");
     println!("  Target: {}", std::env::consts::ARCH);
     println!("  OS: {}", std::env::consts::OS);
@@ -942,7 +941,7 @@ fn cmd_version() -> Result<()> {
 fn cmd_config_show(config_path: Option<PathBuf>, format: &str) -> Result<()> {
     let mut cfg = ExchangeDbConfig::load(config_path.as_deref())
         .context("failed to load configuration")?;
-    cfg = cfg.from_env();
+    cfg = cfg.with_env();
 
     match format {
         "json" => {
@@ -972,21 +971,18 @@ fn cmd_config_validate(config_path: &Path) -> Result<()> {
             // Validate addresses are parseable.
             let mut warnings = Vec::new();
 
-            if cfg.http.enabled {
-                if let Err(e) = cfg.http_bind_addr() {
+            if cfg.http.enabled
+                && let Err(e) = cfg.http_bind_addr() {
                     warnings.push(format!("http.bind: {e}"));
                 }
-            }
-            if cfg.pgwire.enabled {
-                if let Err(e) = cfg.pgwire_bind_addr() {
+            if cfg.pgwire.enabled
+                && let Err(e) = cfg.pgwire_bind_addr() {
                     warnings.push(format!("pgwire.bind: {e}"));
                 }
-            }
-            if cfg.ilp.enabled {
-                if let Err(e) = cfg.ilp_bind_addr() {
+            if cfg.ilp.enabled
+                && let Err(e) = cfg.ilp_bind_addr() {
                     warnings.push(format!("ilp.bind: {e}"));
                 }
-            }
 
             if cfg.tls.enabled {
                 if !Path::new(&cfg.tls.cert_path).exists() {
@@ -1238,7 +1234,7 @@ fn cmd_check_disk_usage(data_dir: &Path) -> Result<()> {
 fn cmd_replication_status(config_path: Option<PathBuf>) -> Result<()> {
     let mut cfg = ExchangeDbConfig::load(config_path.as_deref())
         .context("failed to load configuration")?;
-    cfg = cfg.from_env();
+    cfg = cfg.with_env();
 
     let repl = &cfg.replication;
 
@@ -1269,7 +1265,7 @@ fn cmd_replication_status(config_path: Option<PathBuf>) -> Result<()> {
 fn cmd_replication_promote(config_path: Option<PathBuf>, data_dir: &Path) -> Result<()> {
     let mut cfg = ExchangeDbConfig::load(config_path.as_deref())
         .context("failed to load configuration")?;
-    cfg = cfg.from_env();
+    cfg = cfg.with_env();
 
     if cfg.replication.role != "replica" {
         anyhow::bail!("can only promote a replica (current role: {})", cfg.replication.role);
@@ -1391,7 +1387,7 @@ fn cmd_debug_partition_info(data_dir: &Path, table_name: &str) -> Result<()> {
 
                 // List column files.
                 let mut col_files = Vec::new();
-                if let Ok(files) = std::fs::read_dir(&entry.path()) {
+                if let Ok(files) = std::fs::read_dir(entry.path()) {
                     for f in files.flatten() {
                         let fname = f.file_name().to_string_lossy().to_string();
                         let fsize = f.metadata().map(|m| m.len()).unwrap_or(0);
@@ -1483,7 +1479,6 @@ fn cmd_debug_column_dump(
         // Read raw bytes and display first `limit` values.
         let data = std::fs::read(&col_file)?;
         if let Some(es) = elem_size {
-            let es = es as usize;
             let count = data.len() / es;
             let show = count.min(limit);
             for i in 0..show {
@@ -1578,13 +1573,12 @@ fn cmd_status(host: &str) -> Result<()> {
                 println!("Server: UNHEALTHY (HTTP {status})");
             }
 
-            if let Ok(body) = resp.into_json::<serde_json::Value>() {
-                if let Some(obj) = body.as_object() {
+            if let Ok(body) = resp.into_json::<serde_json::Value>()
+                && let Some(obj) = body.as_object() {
                     for (k, v) in obj {
                         println!("  {k}: {v}");
                     }
                 }
-            }
         }
         Err(e) => {
             println!("Server: UNREACHABLE ({e})");
@@ -1598,20 +1592,18 @@ fn cmd_status(host: &str) -> Result<()> {
     let tables_url = format!("{host}/api/v1/tables");
     match ureq::get(&tables_url).call() {
         Ok(resp) => {
-            if let Ok(body) = resp.into_json::<serde_json::Value>() {
-                if let Some(tables) = body.get("tables").and_then(|t| t.as_array()) {
+            if let Ok(body) = resp.into_json::<serde_json::Value>()
+                && let Some(tables) = body.get("tables").and_then(|t| t.as_array()) {
                     println!("Tables: {}", tables.len());
                     for t in tables {
                         if let Some(name) = t.as_str() {
                             println!("  - {name}");
-                        } else if let Some(obj) = t.as_object() {
-                            if let Some(name) = obj.get("name").and_then(|n| n.as_str()) {
+                        } else if let Some(obj) = t.as_object()
+                            && let Some(name) = obj.get("name").and_then(|n| n.as_str()) {
                                 println!("  - {name}");
                             }
-                        }
                     }
                 }
-            }
         }
         Err(_) => {
             println!("Tables: (could not fetch)");
@@ -1647,7 +1639,7 @@ async fn watch_config_reload(config_path: PathBuf) {
 
         match ExchangeDbConfig::load(Some(&config_path)) {
             Ok(new_cfg) => {
-                let new_cfg = new_cfg.from_env();
+                let new_cfg = new_cfg.with_env();
 
                 // Apply runtime-safe settings.
                 // Log level can be updated dynamically.

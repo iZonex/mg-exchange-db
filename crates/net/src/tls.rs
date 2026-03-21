@@ -41,7 +41,7 @@ fn build_rustls_server_config(
     config: &TlsConfig,
 ) -> io::Result<rustls::ServerConfig> {
     use rustls::crypto::ring::default_provider;
-    use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+    use rustls::pki_types::CertificateDer;
 
     // Select protocol versions based on config
     let versions: Vec<&'static rustls::SupportedProtocolVersion> = match config.min_version.as_str()
@@ -83,7 +83,7 @@ fn build_rustls_server_config(
         })?;
 
     builder
-        .with_single_cert(certs, PrivateKeyDer::from(key))
+        .with_single_cert(certs, key)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("TLS config: {e}")))
 }
 
@@ -96,7 +96,7 @@ pub async fn load_tls_config(
     let tls_config = config.clone();
     let server_config = tokio::task::spawn_blocking(move || build_rustls_server_config(&tls_config))
         .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))??;
+        .map_err(io::Error::other)??;
 
     Ok(axum_server::tls_rustls::RustlsConfig::from_config(
         Arc::new(server_config),

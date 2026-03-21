@@ -10,6 +10,7 @@ use crate::service_account::{ServiceAccountStore, extract_credentials};
 
 /// Configuration for token-based authentication.
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct AuthConfig {
     /// Whether authentication is enabled.
     pub enabled: bool,
@@ -17,14 +18,6 @@ pub struct AuthConfig {
     pub tokens: Vec<String>,
 }
 
-impl Default for AuthConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            tokens: Vec::new(),
-        }
-    }
-}
 
 impl AuthConfig {
     /// Create a new auth config with the given tokens. Enables auth automatically

@@ -394,12 +394,12 @@ fn poly1305_aead_construct(aad: &[u8], ciphertext: &[u8]) -> Vec<u8> {
     // AAD padded to 16-byte boundary
     msg.extend_from_slice(aad);
     let aad_pad = (16 - (aad.len() % 16)) % 16;
-    msg.extend(std::iter::repeat(0u8).take(aad_pad));
+    msg.extend(std::iter::repeat_n(0u8, aad_pad));
 
     // Ciphertext padded to 16-byte boundary
     msg.extend_from_slice(ciphertext);
     let ct_pad = (16 - (ciphertext.len() % 16)) % 16;
-    msg.extend(std::iter::repeat(0u8).take(ct_pad));
+    msg.extend(std::iter::repeat_n(0u8, ct_pad));
 
     // Lengths as 64-bit little-endian
     msg.extend_from_slice(&(aad.len() as u64).to_le_bytes());

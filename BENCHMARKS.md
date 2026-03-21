@@ -247,6 +247,27 @@ Below is an approximate comparison using publicly available QuestDB TSBS numbers
 
 ---
 
+## Query Latency (v0.1.1)
+
+Measured with `profile-query` on real OHLCV data (504 rows, mmap cache warm).
+These numbers reflect the full SQL pipeline: parse + plan + optimize + execute.
+
+| Query | Execute (p50) | Notes |
+|-------|--------------|-------|
+| SELECT * LIMIT 1 | 4.0 µs | Single-row fetch |
+| SELECT * LIMIT 25 | 11.6 µs | ~100-200x faster than v0.1.0 (~2 ms) |
+| SELECT * LIMIT 100 | 20.4 µs | Sub-25 µs for 100-row scan |
+| SELECT * (all 504 rows) | 58.6 µs | Full table scan |
+| COUNT(*) | 21.4 µs | Aggregate pushdown |
+| SAMPLE BY 4h | 88.8 µs | Time-bucketed aggregation |
+| LATEST ON | 72.1 µs | Last value per symbol |
+
+**Key improvements over v0.1.0:**
+- Simple scans (LIMIT 25/100): **~2 ms -> ~11-20 µs** (100-200x speedup)
+- Achieved via: mmap cache, table registry, optimizer skip for small tables, limit pushdown
+
+---
+
 ## Key Highlights
 
 - **Batch write (columnar)** achieves **18.80 M rows/s** for 1M rows -- 4.3x faster than row-at-a-time writer.

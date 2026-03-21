@@ -290,8 +290,8 @@ impl TieringManager {
 
         // Scan _cold/ directory for XPQT files not already known
         let cold_dir = self.table_dir.join("_cold");
-        if cold_dir.exists() {
-            if let Ok(entries) = std::fs::read_dir(&cold_dir) {
+        if cold_dir.exists()
+            && let Ok(entries) = std::fs::read_dir(&cold_dir) {
                 for entry in entries.flatten() {
                     let name = entry.file_name().to_string_lossy().to_string();
                     let pname = if name.ends_with(".parquet") {
@@ -301,14 +301,12 @@ impl TieringManager {
                     } else {
                         None
                     };
-                    if let Some(partition_name) = pname {
-                        if !result.iter().any(|r| r.0 == partition_name) {
+                    if let Some(partition_name) = pname
+                        && !result.iter().any(|r| r.0 == partition_name) {
                             result.push((partition_name, StorageTier::Cold));
                         }
-                    }
                 }
             }
-        }
 
         result.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(result)
@@ -341,15 +339,8 @@ impl TieringManager {
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
 
-            // Compress .d files (both fixed and variable data files)
-            if name.ends_with(".d") && path.is_file() {
-                let original_size = std::fs::metadata(&path)?.len();
-                original_total += original_size;
-                let compressed_size = compress_column_file(&path)?;
-                compressed_total += compressed_size;
-            }
-            // Also compress .i index files
-            else if name.ends_with(".i") && path.is_file() {
+            // Compress .d files (both fixed and variable data files) and .i index files
+            if (name.ends_with(".d") || name.ends_with(".i")) && path.is_file() {
                 let original_size = std::fs::metadata(&path)?.len();
                 original_total += original_size;
                 let compressed_size = compress_column_file(&path)?;
@@ -648,8 +639,8 @@ pub fn list_all_partitions(table_dir: &Path) -> Result<Vec<(PathBuf, StorageTier
 
     // 2. Scan _cold/ directory for XPQT and PAR1XCHG (.parquet) files.
     let cold_dir = table_dir.join("_cold");
-    if cold_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&cold_dir) {
+    if cold_dir.exists()
+        && let Ok(entries) = std::fs::read_dir(&cold_dir) {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
                 let partition_name = if name.ends_with(".parquet") {
@@ -659,27 +650,24 @@ pub fn list_all_partitions(table_dir: &Path) -> Result<Vec<(PathBuf, StorageTier
                 } else {
                     None
                 };
-                if let Some(pname) = partition_name {
-                    if !seen_names.contains(&pname) {
+                if let Some(pname) = partition_name
+                    && !seen_names.contains(&pname) {
                         result.push((entry.path(), StorageTier::Cold));
                         seen_names.insert(pname);
                     }
-                }
             }
         }
-    }
 
     // 3. Include cold partitions from tier metadata that we haven't found yet.
     for info in &tier_infos {
-        if info.tier == StorageTier::Cold && !seen_names.contains(&info.partition_name) {
-            if let Some(ref ppath) = info.parquet_path {
+        if info.tier == StorageTier::Cold && !seen_names.contains(&info.partition_name)
+            && let Some(ref ppath) = info.parquet_path {
                 let p = PathBuf::from(ppath);
                 if p.exists() {
                     result.push((p, StorageTier::Cold));
                     seen_names.insert(info.partition_name.clone());
                 }
             }
-        }
     }
 
     result.sort_by(|a, b| a.0.cmp(&b.0));

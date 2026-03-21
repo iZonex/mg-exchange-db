@@ -175,8 +175,8 @@ impl HashJoinCursor {
         self.right_emitted = true;
 
         for (key, matched) in &self.right_matched {
-            if !matched {
-                if let Some(right_rows) = self.right_table.get(key) {
+            if !matched
+                && let Some(right_rows) = self.right_table.get(key) {
                     for right_row in right_rows {
                         let mut combined = Vec::with_capacity(self.left_col_count + self.right_col_count);
                         for _ in 0..self.left_col_count {
@@ -186,7 +186,6 @@ impl HashJoinCursor {
                         self.buffer.push_back(combined);
                     }
                 }
-            }
         }
     }
 }

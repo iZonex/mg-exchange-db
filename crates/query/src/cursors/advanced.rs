@@ -733,6 +733,7 @@ impl RecordCursor for AdaptiveJoinCursor {
 
 /// Partitioned hash join. In a single-threaded model, partitions data by key
 /// hash and joins each partition sequentially.
+#[allow(clippy::type_complexity)]
 pub struct ParallelHashJoinCursor {
     partitions: Vec<(Vec<Vec<Value>>, Vec<Vec<Value>>)>,
     current_part: usize,
@@ -758,6 +759,7 @@ impl ParallelHashJoinCursor {
 
     fn build(&mut self) -> Result<()> {
         let np = self.num_partitions;
+        #[allow(clippy::type_complexity)]
         let mut parts: Vec<(Vec<Vec<Value>>, Vec<Vec<Value>>)> = (0..np).map(|_| (Vec::new(), Vec::new())).collect();
 
         let mut left = self.left.take().unwrap();
@@ -1072,7 +1074,7 @@ impl RecordCursor for PartialAggregateCursor {
                 let mut seen: HashSet<Vec<u8>> = HashSet::new();
                 for r in 0..b.row_count() {
                     let gv = b.get_value(r, self.group_col);
-                    let gk = row_key(&[gv.clone()]);
+                    let gk = row_key(std::slice::from_ref(&gv));
                     if seen.insert(gk.clone()) {
                         let (sum, cnt) = groups[&gk];
                         result.append_row(&[gv, Value::F64(sum), Value::I64(cnt)]);
@@ -1121,7 +1123,7 @@ impl RecordCursor for MergeAggregateCursor {
                 None => break,
                 Some(b) => for r in 0..b.row_count() {
                     let gv = b.get_value(r, 0);
-                    let gk = row_key(&[gv.clone()]);
+                    let gk = row_key(std::slice::from_ref(&gv));
                     let ps = value_to_f64(&b.get_value(r, 1));
                     let pc = match b.get_value(r, 2) { Value::I64(n) => n, _ => 0 };
                     let e = groups.entry(gk).or_insert((gv, 0.0, 0));
@@ -1373,7 +1375,7 @@ impl RecordCursor for TopKAggregateCursor {
                 None => break,
                 Some(b) => for r in 0..b.row_count() {
                     let gv = b.get_value(r, self.group_col);
-                    let gk = row_key(&[gv.clone()]);
+                    let gk = row_key(std::slice::from_ref(&gv));
                     let v = value_to_f64(&b.get_value(r, self.agg_col));
                     let e = groups.entry(gk).or_insert((gv, 0.0));
                     e.1 += v;
@@ -1973,7 +1975,7 @@ impl PivotCursor {
         let mut pivot_vals: Vec<Value> = Vec::new();
         let mut seen: HashSet<Vec<u8>> = HashSet::new();
         for (_, pv, _) in &all {
-            let k = row_key(&[pv.clone()]);
+            let k = row_key(std::slice::from_ref(pv));
             if seen.insert(k) { pivot_vals.push(pv.clone()); }
         }
 
@@ -1983,19 +1985,20 @@ impl PivotCursor {
         self.schema = schema.clone();
 
         // Group by row value.
+        #[allow(clippy::type_complexity)]
         let mut groups: HashMap<Vec<u8>, (Value, HashMap<Vec<u8>, Value>)> = HashMap::new();
         for (rv, pv, vv) in &all {
-            let rk = row_key(&[rv.clone()]);
-            let pk = row_key(&[pv.clone()]);
+            let rk = row_key(std::slice::from_ref(rv));
+            let pk = row_key(std::slice::from_ref(pv));
             let e = groups.entry(rk).or_insert((rv.clone(), HashMap::new()));
             e.1.insert(pk, vv.clone());
         }
 
         let mut batch = RecordBatch::new(schema);
-        for (_, (rv, vals)) in &groups {
+        for (rv, vals) in groups.values() {
             let mut row = vec![rv.clone()];
             for pv in &pivot_vals {
-                let pk = row_key(&[pv.clone()]);
+                let pk = row_key(std::slice::from_ref(pv));
                 row.push(vals.get(&pk).cloned().unwrap_or(Value::Null));
             }
             batch.append_row(&row);

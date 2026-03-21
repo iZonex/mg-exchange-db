@@ -120,12 +120,11 @@ impl SlowQueryLog {
         );
 
         // Write to file if configured.
-        if let Some(ref file) = self.log_file {
-            if let Ok(mut writer) = file.lock() {
+        if let Some(ref file) = self.log_file
+            && let Ok(mut writer) = file.lock() {
                 let _ = writer.write_all(line.as_bytes());
                 let _ = writer.flush();
             }
-        }
     }
 
     /// Returns the configured threshold.

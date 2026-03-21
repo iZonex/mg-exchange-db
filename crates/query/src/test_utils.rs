@@ -91,7 +91,7 @@ impl TestDb {
             "CREATE TABLE trades (timestamp TIMESTAMP, symbol VARCHAR, price DOUBLE, volume DOUBLE, side VARCHAR)",
         );
 
-        let base_ts: i64 = 1710460800_000_000_000; // 2024-03-15 00:00:00 UTC in nanos
+        let base_ts: i64 = 1_710_460_800_000_000_000; // 2024-03-15 00:00:00 UTC in nanos
         let symbols = ["BTC/USD", "ETH/USD", "SOL/USD"];
         let sides = ["buy", "sell"];
 
@@ -129,7 +129,7 @@ impl TestDb {
             "CREATE TABLE quotes (timestamp TIMESTAMP, symbol VARCHAR, bid DOUBLE, ask DOUBLE)",
         );
 
-        let base_ts: i64 = 1710460800_000_000_000;
+        let base_ts: i64 = 1_710_460_800_000_000_000;
         let symbols = ["BTC/USD", "ETH/USD", "SOL/USD"];
 
         for i in 0..20u64 {

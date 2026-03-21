@@ -52,11 +52,10 @@ impl ExchangeDbHandler {
 
         // Detect pg_class queries by OID (e.g. WHERE c.oid = '12345') - used by \d table
         if upper.contains("PG_CATALOG.PG_CLASS") {
-            if let Some(oid) = extract_oid_from_query(query) {
-                if let Some(name) = self.resolve_oid_to_table(oid) {
+            if let Some(oid) = extract_oid_from_query(query)
+                && let Some(name) = self.resolve_oid_to_table(oid) {
                     return Some(self.handle_pg_class_by_oid(&name));
                 }
-            }
             // Try to extract table name from relname pattern
             let table_name = extract_table_name_from_describe(query);
             if let Some(name) = table_name {
@@ -66,11 +65,10 @@ impl ExchangeDbHandler {
 
         // Detect \d <table> attribute query: SELECT ... FROM pg_catalog.pg_attribute
         if upper.contains("PG_CATALOG.PG_ATTRIBUTE") {
-            if let Some(oid) = extract_oid_from_query(query) {
-                if let Some(name) = self.resolve_oid_to_table(oid) {
+            if let Some(oid) = extract_oid_from_query(query)
+                && let Some(name) = self.resolve_oid_to_table(oid) {
                     return Some(self.handle_describe_table(&name));
                 }
-            }
             let table_name = extract_table_name_from_describe(query);
             if let Some(name) = table_name {
                 return Some(self.handle_describe_table(&name));
@@ -289,7 +287,7 @@ impl ExchangeDbHandler {
         ];
 
         let rows: Vec<Vec<Value>> = meta.columns.iter().map(|col| {
-            let type_name = col_type_to_pg_name(ColumnType::from(col.col_type.clone()));
+            let type_name = col_type_to_pg_name(ColumnType::from(col.col_type));
             vec![
                 Value::Str(col.name.clone()),
                 Value::Str(type_name),
@@ -325,11 +323,10 @@ fn extract_oid_from_query(query: &str) -> Option<i64> {
     for marker in &["oid = '", "attrelid = '"] {
         if let Some(pos) = query.find(marker) {
             let start = pos + marker.len();
-            if let Some(end) = query[start..].find('\'') {
-                if let Ok(oid) = query[start..start + end].parse::<i64>() {
+            if let Some(end) = query[start..].find('\'')
+                && let Ok(oid) = query[start..start + end].parse::<i64>() {
                     return Some(oid);
                 }
-            }
         }
     }
     None

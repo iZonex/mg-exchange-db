@@ -90,7 +90,7 @@ fn decompose_ts(ns: i64) -> (i64, u32, u32, u32, u32, u32, u64) {
     let m = ((total_secs % 3600 + 3600) % 3600) / 60;
     let s = ((total_secs % 60) + 60) % 60;
     let days = if ns >= 0 {
-        (total_secs / 86400) as i64
+        total_secs / 86400
     } else {
         (total_secs / 86400) - if total_secs % 86400 != 0 { 1 } else { 0 }
     };
@@ -304,7 +304,7 @@ scalar_fn!(GeohashToStrFn, 2, 2, |args: &[Value]| {
     let hash = val_to_i64(&args[0])?;
     let bits = val_to_i64(&args[1])? as u32;
     let (lat, lon) = geohash_int_decode(hash, bits);
-    let precision = (bits as usize + 4) / 5;
+    let precision = (bits as usize).div_ceil(5);
     Ok(Value::Str(geohash_encode(lat, lon, precision.max(1))))
 });
 
@@ -441,7 +441,7 @@ scalar_fn!(GeohashNeighborsStrFn, 2, 2, |args: &[Value]| {
     let hash = val_to_i64(&args[0])?;
     let bits = val_to_i64(&args[1])? as u32;
     let (lat, lon) = geohash_int_decode(hash, bits);
-    let precision = ((bits as usize) + 4) / 5;
+    let precision = (bits as usize).div_ceil(5);
     let prec = precision.max(1);
     // Compute lat/lon step size for the given precision
     let mut lat_err = 90.0f64;

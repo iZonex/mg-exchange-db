@@ -33,7 +33,7 @@ impl RecordCursor for SampledScanCursor {
                 None => break,
                 Some(b) => {
                     for r in 0..b.row_count() {
-                        if self.counter % self.step == 0 {
+                        if self.counter.is_multiple_of(self.step) {
                             let row: Vec<Value> =
                                 (0..b.columns.len()).map(|c| b.get_value(r, c)).collect();
                             result.append_row(&row);

@@ -12,8 +12,10 @@ use crate::mmap::MmapReadOnly;
 
 /// Available I/O backends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum IoBackend {
     /// Memory-mapped files (default, best for large sequential scans).
+    #[default]
     Mmap,
     /// Standard blocking I/O with `read` syscalls (fallback / comparison).
     StdIo,
@@ -22,11 +24,6 @@ pub enum IoBackend {
     IoUring,
 }
 
-impl Default for IoBackend {
-    fn default() -> Self {
-        IoBackend::Mmap
-    }
-}
 
 /// Trait for reading column data from storage.
 ///

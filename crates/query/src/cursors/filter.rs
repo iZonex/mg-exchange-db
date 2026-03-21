@@ -133,10 +133,7 @@ fn evaluate_filter(filter: &Filter, row: &[Value], schema: &[(String, ColumnType
         Filter::And(parts) => parts.iter().all(|p| evaluate_filter(p, row, schema)),
         Filter::Or(parts) => parts.iter().any(|p| evaluate_filter(p, row, schema)),
         Filter::IsNull(col) => {
-            match get_col_value(col, row, schema) {
-                None | Some(Value::Null) => true,
-                _ => false,
-            }
+            matches!(get_col_value(col, row, schema), None | Some(Value::Null))
         }
         Filter::IsNotNull(col) => {
             matches!(get_col_value(col, row, schema), Some(v) if *v != Value::Null)

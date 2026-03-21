@@ -78,7 +78,7 @@ fn evaluate_plan_expr_standalone(expr: &PlanExpr) -> Value {
             apply_unary_op(*op, &evaluate_plan_expr_standalone(expr))
         }
         PlanExpr::Function { name, args } => {
-            let func_args: Vec<Value> = args.iter().map(|a| evaluate_plan_expr_standalone(a)).collect();
+            let func_args: Vec<Value> = args.iter().map(evaluate_plan_expr_standalone).collect();
             crate::scalar::evaluate_scalar(name, &func_args).unwrap_or(Value::Null)
         }
         PlanExpr::Column(_) => Value::Null,
@@ -114,17 +114,13 @@ pub fn execute_with_context(ctx: &crate::context::ExecutionContext, plan: &Query
     let token = ctx.admit_query()?;
 
     // ── MVCC snapshot ────────────────────────────────────────────
-    // Begin a snapshot for read operations so that concurrent writes
-    // are invisible to this query. The snapshot is automatically
-    // released when the guard is dropped at the end of this function.
     let _snapshot_guard = ctx.begin_snapshot();
 
     // ── RLS filter injection ─────────────────────────────────────
-    // If row-level security policies exist for the current user and
-    // the table being queried, merge the RLS filter into the plan.
     let plan_with_rls = inject_rls_filter(ctx, plan);
     let plan = plan_with_rls.as_ref().unwrap_or(plan);
 
+    let t0 = std::time::Instant::now();
     let result = if ctx.use_cursor_engine {
         crate::cursor_executor::execute_via_cursors(&ctx.db_root, plan)
     } else if ctx.use_wal {
@@ -132,12 +128,14 @@ pub fn execute_with_context(ctx: &crate::context::ExecutionContext, plan: &Query
     } else {
         execute(&ctx.db_root, plan)
     };
+    let t_inner = t0.elapsed();
+    tracing::debug!(engine_us = t_inner.as_micros(), cursor = ctx.use_cursor_engine, wal = ctx.use_wal, "inner execute");
 
     // ── MVCC commit for write operations ─────────────────────────
     // After a successful write, record the new row counts in the MVCC
     // manager so subsequent snapshots reflect the committed data.
-    if let Ok(ref qr) = result {
-        if let Some(ref mvcc) = ctx.mvcc {
+    if let Ok(ref qr) = result
+        && let Some(ref mvcc) = ctx.mvcc {
             let affected = match qr {
                 QueryResult::Ok { affected_rows } => *affected_rows,
                 _ => 0,
@@ -155,7 +153,6 @@ pub fn execute_with_context(ctx: &crate::context::ExecutionContext, plan: &Query
                 }
             }
         }
-    }
 
     // ── Audit logging ────────────────────────────────────────────
     if let Some(ref audit) = ctx.audit_log {
@@ -421,14 +418,31 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
         }
         QueryPlan::Select { .. } => {
             // Check if the table is actually a view and redirect.
-            if let QueryPlan::Select { table, columns, filter, order_by, limit, offset, .. } = plan {
-                if let Some(view_plan) = resolve_view(db_root, table, columns, filter.as_ref(), order_by, *limit, *offset) {
+            if let QueryPlan::Select { table, columns, filter, order_by, limit, offset, .. } = plan
+                && let Some(view_plan) = resolve_view(db_root, table, columns, filter.as_ref(), order_by, *limit, *offset) {
                     return execute(db_root, &view_plan);
                 }
-            }
-            // Run the optimizer to get pruned partitions and execution hints.
-            let optimized = crate::optimizer::optimize(plan.clone(), db_root)?;
-            match &optimized.plan {
+            // Skip optimizer for simple queries (no filter = no partition pruning needed,
+            // no ORDER BY = no sort optimization needed). This saves ~100µs per query.
+            let can_skip_optimizer = if let QueryPlan::Select { filter, order_by, .. } = plan {
+                filter.is_none() && order_by.is_empty()
+            } else {
+                false
+            };
+            let optimized;
+            let (opt_plan, pruned, limit_pd) = if can_skip_optimizer {
+                // Build a trivial limit pushdown directly.
+                let lp = if let QueryPlan::Select { limit: Some(l), .. } = plan {
+                    Some(crate::optimizer::LimitPushdown { limit: *l, reverse_scan: false })
+                } else {
+                    None
+                };
+                (plan, None, lp)
+            } else {
+                optimized = crate::optimizer::optimize(plan.clone(), db_root)?;
+                (&optimized.plan, optimized.pruned_partitions.as_deref(), optimized.limit_pushdown)
+            };
+            match opt_plan {
                 QueryPlan::Select {
                     table,
                     columns,
@@ -458,8 +472,8 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
                     having.as_ref(),
                     *distinct,
                     distinct_on,
-                    optimized.pruned_partitions.as_deref(),
-                    optimized.limit_pushdown.as_ref(),
+                    pruned,
+                    limit_pd.as_ref(),
                 ),
                 _ => unreachable!("optimizer returned non-Select for Select input"),
             }
@@ -730,11 +744,10 @@ fn execute_show_tables(db_root: &Path) -> Result<QueryResult> {
         for entry in entries.flatten() {
             if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
                 let meta_path = entry.path().join("_meta");
-                if meta_path.exists() {
-                    if let Some(name) = entry.file_name().to_str() {
+                if meta_path.exists()
+                    && let Some(name) = entry.file_name().to_str() {
                         names.push(name.to_string());
                     }
-                }
             }
         }
     }
@@ -1553,6 +1566,10 @@ fn execute_insert(db_root: &Path, table: &str, values: &[Vec<Value>], upsert: bo
         }
     }
 
+    // Invalidate mmap cache so subsequent reads see the new data.
+    exchange_core::mmap::invalidate_mmap_cache(&table_dir);
+    if let Some(reg) = crate::table_registry::global() { reg.invalidate(table); }
+
     Ok(QueryResult::Ok {
         affected_rows: count,
     })
@@ -1849,6 +1866,10 @@ fn execute_delete(
         }
     }
 
+    // Invalidate caches after data modification.
+    exchange_core::mmap::invalidate_mmap_cache(&table_dir);
+    if let Some(reg) = crate::table_registry::global() { reg.invalidate(table); }
+
     Ok(QueryResult::Ok {
         affected_rows: deleted_count,
     })
@@ -1910,7 +1931,7 @@ fn execute_update(
             if matches {
                 // Apply assignments to this row, evaluating expressions.
                 let mut new_row = row.clone();
-                for &(col_idx, ref expr) in &assignment_indices {
+                for &(col_idx, expr) in &assignment_indices {
                     let val = evaluate_plan_expr(expr, &values, &meta);
                     new_row[col_idx] = plan_value_to_static_column_value(&val, &meta, col_idx);
                 }
@@ -1931,24 +1952,23 @@ fn execute_update(
         }
     }
 
+    // Invalidate caches after data modification.
+    exchange_core::mmap::invalidate_mmap_cache(&table_dir);
+    if let Some(reg) = crate::table_registry::global() { reg.invalidate(table); }
+
     Ok(QueryResult::Ok {
         affected_rows: updated_count,
     })
 }
 
 /// Convert a ColumnValue back to a plan Value (for use in filter evaluation).
-fn column_value_to_plan_value(cv: &ColumnValue<'_>, meta: &TableMeta, col_idx: usize) -> Value {
-    let col_type: ColumnType = meta.columns[col_idx].col_type.into();
+fn column_value_to_plan_value(cv: &ColumnValue<'_>, _meta: &TableMeta, _col_idx: usize) -> Value {
     match cv {
         ColumnValue::I64(v) => Value::I64(*v),
         ColumnValue::F64(v) if v.is_nan() => Value::Null,
         ColumnValue::F64(v) => Value::F64(*v),
         ColumnValue::I32(v) => {
-            if col_type == ColumnType::Symbol {
-                Value::I64(*v as i64)
-            } else {
-                Value::I64(*v as i64)
-            }
+            Value::I64(*v as i64)
         }
         ColumnValue::Timestamp(t) => Value::Timestamp(t.as_nanos()),
         ColumnValue::Str(s) => Value::Str(s.to_string()),
@@ -1988,6 +2008,7 @@ fn execute_drop_table(db_root: &Path, table: &str) -> Result<QueryResult> {
     Ok(QueryResult::Ok { affected_rows: 0 })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_select(
     db_root: &Path,
     table: &str,
@@ -2275,7 +2296,7 @@ fn execute_select(
     if !order_by.is_empty() {
         let resolved_cols = if !group_by.is_empty() || has_aggregates || sample_by.is_some() {
             let result_cols = result_column_names(columns, &selected_cols);
-            result_cols.into_iter().enumerate().map(|(i, n)| (i, n)).collect::<Vec<_>>()
+            result_cols.into_iter().enumerate().collect::<Vec<_>>()
         } else {
             selected_cols.clone()
         };
@@ -2344,8 +2365,9 @@ fn execute_select(
 }
 
 /// Shared helper: compute window functions, project, then apply ORDER BY / OFFSET / LIMIT.
+#[allow(clippy::too_many_arguments)]
 fn execute_window_projection(
-    all_rows: &mut Vec<Vec<Value>>,
+    all_rows: &mut [Vec<Value>],
     columns: &[SelectColumn],
     selected_cols: &[(usize, String)],
     window_fns: &[crate::window::WindowFunction],
@@ -2411,6 +2433,123 @@ fn execute_window_projection(
 
 /// Like `execute_select` but accepts optimizer hints for pruned partitions
 /// and limit pushdown.
+/// Scan rows directly from pre-opened table handles (zero file-open overhead).
+fn scan_from_open_table(
+    open_table: &std::sync::Arc<crate::table_registry::OpenTable>,
+    selected_cols: &[(usize, String)],
+    filter: Option<&Filter>,
+    row_limit: Option<u64>,
+    meta: &TableMeta,
+) -> Result<Vec<Vec<Value>>> {
+    let limit = row_limit.unwrap_or(u64::MAX) as usize;
+    let mut rows = Vec::with_capacity(limit.min(1024));
+
+    for part in &open_table.partitions {
+        if rows.len() >= limit {
+            break;
+        }
+        let remaining = limit - rows.len();
+        let scan_count = (part.row_count as usize).min(remaining);
+
+        // Build column index map: selected col index -> position in part.columns
+        let col_positions: Vec<Option<usize>> = selected_cols
+            .iter()
+            .map(|(_, name)| part.columns.iter().position(|(cn, _)| cn == name))
+            .collect();
+
+        for row_idx in 0..scan_count {
+            // Read all values for filter evaluation if needed.
+            if let Some(f) = filter {
+                let filter_values: Vec<(usize, Value)> = part.columns
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (_, col))| {
+                        let meta_idx = meta.columns.iter().position(|c| c.name == part.columns[i].0).unwrap_or(i);
+                        (meta_idx, read_open_column_value(col, row_idx as u64))
+                    })
+                    .collect();
+                if !crate::parallel::evaluate_filter(f, &filter_values, meta) {
+                    continue;
+                }
+            }
+
+            let mut row = Vec::with_capacity(selected_cols.len());
+            for pos in &col_positions {
+                match pos {
+                    Some(p) => row.push(read_open_column_value(&part.columns[*p].1, row_idx as u64)),
+                    None => row.push(Value::Null),
+                }
+            }
+            rows.push(row);
+        }
+    }
+
+    Ok(rows)
+}
+
+/// Read a value from an OpenColumn.
+#[inline]
+fn read_open_column_value(col: &crate::table_registry::OpenColumn, row: u64) -> Value {
+    use crate::table_registry::OpenColumn;
+    match col {
+        OpenColumn::Fixed(reader, ct) => match ct {
+            ColumnType::I64 | ColumnType::Timestamp => Value::I64(reader.read_i64(row)),
+            ColumnType::F64 => Value::F64(reader.read_f64(row)),
+            ColumnType::F32 => {
+                let raw = reader.read_raw(row);
+                Value::F64(f32::from_le_bytes(raw.try_into().unwrap_or_default()) as f64)
+            }
+            ColumnType::I32 | ColumnType::Symbol => Value::I64(reader.read_i32(row) as i64),
+            ColumnType::I16 => {
+                let raw = reader.read_raw(row);
+                Value::I64(i16::from_le_bytes(raw.try_into().unwrap_or_default()) as i64)
+            }
+            ColumnType::I8 | ColumnType::Boolean => {
+                let raw = reader.read_raw(row);
+                Value::I64(raw[0] as i8 as i64)
+            }
+            _ => Value::I64(reader.read_i64(row)),
+        },
+        OpenColumn::Var(reader, _) => {
+            let bytes = reader.read(row);
+            if bytes.is_empty() {
+                Value::Null
+            } else {
+                Value::Str(String::from_utf8_lossy(bytes).to_string())
+            }
+        }
+    }
+}
+
+/// Fallback: scan from disk with file-based readers.
+fn scan_from_disk(
+    table_dir: &Path,
+    meta: &TableMeta,
+    selected_cols: &[(usize, String)],
+    filter: Option<&Filter>,
+    pruned_partitions: Option<&[PathBuf]>,
+    limit_pushdown: Option<&crate::optimizer::LimitPushdown>,
+) -> Result<Vec<Vec<Value>>> {
+    let mut partitions_list = if let Some(pp) = pruned_partitions {
+        pp.to_vec()
+    } else {
+        exchange_core::table::list_partitions(table_dir)?
+    };
+    if let Some(lp) = limit_pushdown
+        && lp.reverse_scan {
+            partitions_list.reverse();
+        }
+    crate::parallel::parallel_scan_partitions_pruned_tiered(
+        &partitions_list,
+        meta,
+        selected_cols,
+        filter,
+        limit_pushdown.map(|lp| lp.limit),
+        Some(table_dir),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
 fn execute_select_with_hints(
     db_root: &Path,
     table: &str,
@@ -2689,26 +2828,22 @@ fn execute_select_with_hints(
     // Determine which columns to read.
     let selected_cols = resolve_columns(&meta, &scan_columns)?;
 
-    // Scan partitions — use pruned partition list from the optimizer when
-    // available, otherwise fall back to scanning all partitions.
-    let mut all_rows = if let Some(partitions) = pruned_partitions {
-        let mut partitions = partitions.to_vec();
-        // Apply limit pushdown: scan in reverse order if applicable.
-        if let Some(lp) = limit_pushdown {
-            if lp.reverse_scan {
-                partitions.reverse();
-            }
+    // Try the hot table registry first for zero-overhead scanning.
+    // Falls back to standard file-based scan if registry is not initialized.
+    let mut all_rows = if let Some(registry) = crate::table_registry::global() {
+        if let Ok(open_table) = registry.get(table) {
+            scan_from_open_table(
+                &open_table,
+                &selected_cols,
+                filter,
+                limit_pushdown.map(|lp| lp.limit),
+                &meta,
+            )?
+        } else {
+            scan_from_disk(&table_dir, &meta, &selected_cols, filter, pruned_partitions, limit_pushdown)?
         }
-        crate::parallel::parallel_scan_partitions_pruned_tiered(
-            &partitions,
-            &meta,
-            &selected_cols,
-            filter,
-            limit_pushdown.map(|lp| lp.limit),
-            Some(&table_dir),
-        )?
     } else {
-        crate::parallel::parallel_scan_partitions(&table_dir, &meta, &selected_cols, filter)?
+        scan_from_disk(&table_dir, &meta, &selected_cols, filter, pruned_partitions, limit_pushdown)?
     };
 
     // If LATEST ON is requested, keep only the most recent row per partition.
@@ -2781,7 +2916,7 @@ fn execute_select_with_hints(
     if !order_by.is_empty() {
         let resolved_cols = if !group_by.is_empty() || has_aggregates || sample_by.is_some() {
             let result_cols = result_column_names(columns, &selected_cols);
-            result_cols.into_iter().enumerate().map(|(i, n)| (i, n)).collect::<Vec<_>>()
+            result_cols.into_iter().enumerate().collect::<Vec<_>>()
         } else {
             selected_cols.clone()
         };
@@ -2875,6 +3010,7 @@ fn execute_select_with_hints(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_asof_join(
     db_root: &Path,
     left_table: &str,
@@ -3000,19 +3136,18 @@ fn execute_asof_join(
 
     if left_has_wildcard {
         // Include all left columns.
-        for i in 0..left_count {
+        for (i, name) in all_col_names.iter().enumerate().take(left_count) {
             output_indices.push(i);
-            col_names.push(all_col_names[i].clone());
+            col_names.push(name.clone());
         }
     } else {
         // Include only the explicitly requested left columns.
         for lc in left_columns {
-            if let SelectColumn::Name(name) = lc {
-                if let Some(i) = left_resolved.iter().position(|(_, n)| n == name) {
+            if let SelectColumn::Name(name) = lc
+                && let Some(i) = left_resolved.iter().position(|(_, n)| n == name) {
                     output_indices.push(i);
                     col_names.push(name.clone());
                 }
-            }
         }
     }
 
@@ -3024,12 +3159,11 @@ fn execute_asof_join(
         }
     } else {
         for rc in right_columns {
-            if let SelectColumn::Name(name) = rc {
-                if let Some(i) = right_output_cols.iter().position(|&idx| right_resolved[idx].1 == *name) {
+            if let SelectColumn::Name(name) = rc
+                && let Some(i) = right_output_cols.iter().position(|&idx| right_resolved[idx].1 == *name) {
                     output_indices.push(left_count + i);
                     col_names.push(name.clone());
                 }
-            }
         }
     }
 
@@ -3094,11 +3228,10 @@ pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Res
                     let refs = collect_plan_expr_column_names(expr);
                     for ref_col in refs {
                         let already = result.iter().any(|(_, n)| n == &ref_col);
-                        if !already {
-                            if let Some(idx) = meta.columns.iter().position(|c| c.name == ref_col) {
+                        if !already
+                            && let Some(idx) = meta.columns.iter().position(|c| c.name == ref_col) {
                                 result.push((idx, ref_col));
                             }
-                        }
                     }
                 }
             }
@@ -3172,11 +3305,10 @@ pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Res
                         let refs = collect_plan_expr_column_names(expr);
                         for col_name in refs {
                             let already = result.iter().any(|(_, n)| n == &col_name);
-                            if !already {
-                                if let Some(idx) = meta.columns.iter().position(|c| c.name == col_name) {
+                            if !already
+                                && let Some(idx) = meta.columns.iter().position(|c| c.name == col_name) {
                                     result.push((idx, col_name));
                                 }
-                            }
                         }
                     }
                 }
@@ -3184,11 +3316,10 @@ pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Res
                     let refs = collect_plan_expr_column_names(expr);
                     for col_name in refs {
                         let already = result.iter().any(|(_, n)| n == &col_name);
-                        if !already {
-                            if let Some(idx) = meta.columns.iter().position(|c| c.name == col_name) {
+                        if !already
+                            && let Some(idx) = meta.columns.iter().position(|c| c.name == col_name) {
                                 result.push((idx, col_name));
                             }
-                        }
                     }
                 }
             }
@@ -3198,11 +3329,10 @@ pub(crate) fn resolve_columns(meta: &TableMeta, columns: &[SelectColumn]) -> Res
                 expr.collect_columns(&mut cols);
                 for col_name in &cols {
                     let already = result.iter().any(|(_, n)| n == col_name);
-                    if !already {
-                        if let Some(idx) = meta.columns.iter().position(|c| c.name == *col_name) {
+                    if !already
+                        && let Some(idx) = meta.columns.iter().position(|c| c.name == *col_name) {
                             result.push((idx, col_name.clone()));
                         }
-                    }
                 }
                 // If the expression is constant (no column refs), ensure at least
                 // one column is scanned so rows are materialized.
@@ -3230,21 +3360,19 @@ fn collect_filter_column_refs(filter: &Filter, meta: &TableMeta, result: &mut Ve
         | Filter::IsNull(col) | Filter::IsNotNull(col)
         | Filter::Like(col, _) | Filter::NotLike(col, _) | Filter::ILike(col, _) => {
             let already = result.iter().any(|(_, n)| n == col);
-            if !already {
-                if let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
+            if !already
+                && let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
                     result.push((idx, col.clone()));
                 }
-            }
         }
         Filter::Between(col, _, _)
         | Filter::BetweenSymmetric(col, _, _)
         | Filter::In(col, _) | Filter::NotIn(col, _) => {
             let already = result.iter().any(|(_, n)| n == col);
-            if !already {
-                if let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
+            if !already
+                && let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
                     result.push((idx, col.clone()));
                 }
-            }
         }
         Filter::And(parts) | Filter::Or(parts) => {
             for p in parts {
@@ -3256,11 +3384,10 @@ fn collect_filter_column_refs(filter: &Filter, meta: &TableMeta, result: &mut Ve
         }
         Filter::NotEq(col, _) => {
             let already = result.iter().any(|(_, n)| n == col);
-            if !already {
-                if let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
+            if !already
+                && let Some(idx) = meta.columns.iter().position(|c| c.name == *col) {
                     result.push((idx, col.clone()));
                 }
-            }
         }
         Filter::Expression { left, right, .. } => {
             // Collect columns from both sides of the expression.
@@ -3269,11 +3396,10 @@ fn collect_filter_column_refs(filter: &Filter, meta: &TableMeta, result: &mut Ve
             right.collect_columns(&mut cols);
             for col_name in cols {
                 let already = result.iter().any(|(_, n)| n == &col_name);
-                if !already {
-                    if let Some(idx) = meta.columns.iter().position(|c| c.name == col_name) {
+                if !already
+                    && let Some(idx) = meta.columns.iter().position(|c| c.name == col_name) {
                         result.push((idx, col_name));
                     }
-                }
             }
         }
         _ => {}
@@ -3415,11 +3541,10 @@ fn scan_table(
             }
 
             // Apply filter.
-            if let Some(f) = filter {
-                if !evaluate_filter(f, &all_values, meta) {
+            if let Some(f) = filter
+                && !evaluate_filter(f, &all_values, meta) {
                     continue;
                 }
-            }
 
             // Extract only selected columns in order.
             let row: Vec<Value> = selected_cols
@@ -3920,9 +4045,7 @@ fn collect_aggregates_from_expr(
                     _ => "*".to_string(),
                 };
                 let key = format!("{:?}({})", kind, args.iter().map(|a| format!("{a:?}")).collect::<Vec<_>>().join(","));
-                if !agg_map.contains_key(&key) {
-                    agg_map.insert(key, (kind, col_name, functions::create_aggregate(kind)));
-                }
+                agg_map.entry(key).or_insert_with(|| (kind, col_name, functions::create_aggregate(kind)));
             } else {
                 for a in args {
                     collect_aggregates_from_expr(a, agg_map);
@@ -3958,9 +4081,7 @@ fn apply_aggregates(
             match col {
                 SelectColumn::Aggregate { function, column, .. } => {
                     let key = format!("{:?}(Column({:?}))", function, column);
-                    if !agg_map.contains_key(&key) {
-                        agg_map.insert(key, (*function, column.clone(), functions::create_aggregate(*function)));
-                    }
+                    agg_map.entry(key).or_insert_with(|| (*function, column.clone(), functions::create_aggregate(*function)));
                 }
                 SelectColumn::Expression { expr, .. } => {
                     collect_aggregates_from_expr(expr, &mut agg_map);
@@ -3979,11 +4100,10 @@ fn apply_aggregates(
             for (_, (_, col_name, func)) in agg_map.iter_mut() {
                 if col_name == "*" {
                     func.add(&Value::I64(1));
-                } else if let Some(&pos) = col_positions.get(col_name.as_str()) {
-                    if pos < row.len() {
+                } else if let Some(&pos) = col_positions.get(col_name.as_str())
+                    && pos < row.len() {
                         func.add(&row[pos]);
                     }
-                }
             }
         }
 
@@ -4030,11 +4150,10 @@ fn apply_aggregates(
         for (i, func) in agg_funcs.iter_mut().enumerate() {
             if let Some(f) = func {
                 // Check FILTER (WHERE ...) clause if present.
-                if let SelectColumn::Aggregate { filter: Some(flt), .. } = &select_cols[i] {
-                    if !evaluate_filter_virtual(flt, row, &col_names_for_filter) {
+                if let SelectColumn::Aggregate { filter: Some(flt), .. } = &select_cols[i]
+                    && !evaluate_filter_virtual(flt, row, &col_names_for_filter) {
                         continue;
                     }
-                }
                 // Use arg_expr if present.
                 if let SelectColumn::Aggregate { arg_expr: Some(expr), .. } = &select_cols[i] {
                     let val = evaluate_plan_expr_by_name(expr, row, &col_names_for_filter);
@@ -4099,16 +4218,15 @@ fn apply_sample_by(
             Value::Timestamp(ns) | Value::I64(ns) => Some(*ns), _ => None,
         }).unwrap_or(0);
         let bucket = bucket_fn(ts_ns);
-        if let Some(last) = bucket_map.last_mut() {
-            if last.0 == bucket { last.1.push(row.clone()); continue; }
-        }
+        if let Some(last) = bucket_map.last_mut()
+            && last.0 == bucket { last.1.push(row.clone()); continue; }
         bucket_map.push((bucket, vec![row.clone()]));
     }
 
     let aggregate_bucket = |bucket_ts: i64, bucket_rows: &[Vec<Value>]| -> Vec<Value> {
         let mut agg_funcs: Vec<Option<Box<dyn AggregateFunction>>> = select_cols.iter()
             .map(|c| match c { SelectColumn::Aggregate { function, .. } => Some(functions::create_aggregate(*function)), _ => None }).collect();
-        for row in bucket_rows { for (i, func) in agg_funcs.iter_mut().enumerate() { if let Some(f) = func { if i < row.len() { f.add(&row[i]); } } } }
+        for row in bucket_rows { for (i, func) in agg_funcs.iter_mut().enumerate() { if let Some(f) = func && i < row.len() { f.add(&row[i]); } } }
         select_cols.iter().enumerate().map(|(i, col)| match col {
             SelectColumn::Aggregate { .. } => agg_funcs[i].as_ref().map(|f| f.result()).unwrap_or(Value::Null),
             SelectColumn::Name(name) => {
@@ -4153,11 +4271,9 @@ fn apply_sample_by(
                 else if let Some(prev) = &last_known {
                     let mut filled = prev.clone();
                     for (i, col) in select_cols.iter().enumerate() {
-                        if let SelectColumn::Name(name) = col {
-                            if let Some(pos) = resolved.iter().position(|(_, n)| n == name) {
-                                if resolved[pos].0 == ts_col_idx { filled[i] = Value::Timestamp(bts); }
-                            }
-                        }
+                        if let SelectColumn::Name(name) = col
+                            && let Some(pos) = resolved.iter().position(|(_, n)| n == name)
+                                && resolved[pos].0 == ts_col_idx { filled[i] = Value::Timestamp(bts); }
                     }
                     result.push(filled);
                 } else { result.push(empty_row(bts)); }
@@ -4358,11 +4474,10 @@ fn apply_group_by(
                     };
 
                     // Check FILTER (WHERE ...) clause if present.
-                    if let Some(flt) = agg_filter {
-                        if !evaluate_filter_virtual(flt, row, &col_names_for_filter) {
+                    if let Some(flt) = agg_filter
+                        && !evaluate_filter_virtual(flt, row, &col_names_for_filter) {
                             continue;
                         }
-                    }
 
                     if let Some(expr) = arg_expr {
                         // Evaluate expression and feed result to aggregate.
@@ -4370,11 +4485,10 @@ fn apply_group_by(
                         f.add(&val);
                     } else if col_name == "*" {
                         f.add(&Value::I64(1));
-                    } else if let Some(pos) = resolved.iter().position(|(_, n)| n == col_name) {
-                        if pos < row.len() {
+                    } else if let Some(pos) = resolved.iter().position(|(_, n)| n == col_name)
+                        && pos < row.len() {
                             f.add(&row[pos]);
                         }
-                    }
                 }
             }
         }
@@ -4409,22 +4523,20 @@ fn apply_group_by(
                 SelectColumn::Wildcard => Value::Null,
                 SelectColumn::Expression { expr, alias, .. } => {
                     // Check if this expression is a group-by key (by alias).
-                    if let Some(a) = alias {
-                        if let Some(gb_idx) = group_by.iter().position(|gb| gb == a) {
+                    if let Some(a) = alias
+                        && let Some(gb_idx) = group_by.iter().position(|gb| gb == a) {
                             return key_values[gb_idx].clone();
                         }
-                    }
                     // Evaluate the expression against the first row of the group.
                     let col_names: Vec<String> = resolved.iter().map(|(_, n)| n.clone()).collect();
                     evaluate_plan_expr_by_name(expr, group_rows.first().unwrap_or(&vec![]), &col_names)
                 }
                 SelectColumn::CaseWhen { alias, .. } => {
                     // Check if this CASE WHEN is a group-by key (by alias).
-                    if let Some(a) = alias {
-                        if let Some(gb_idx) = group_by.iter().position(|gb| gb == a) {
+                    if let Some(a) = alias
+                        && let Some(gb_idx) = group_by.iter().position(|gb| gb == a) {
                             return key_values[gb_idx].clone();
                         }
-                    }
                     // Evaluate CASE WHEN against the first row of the group.
                     evaluate_case_when_select_col(col, group_rows.first().unwrap_or(&vec![]), resolved)
                 }
@@ -4434,11 +4546,10 @@ fn apply_group_by(
             .collect();
 
         // Apply HAVING filter if present.
-        if let Some(having_filter) = having {
-            if !evaluate_having(having_filter, select_cols, &result_row) {
+        if let Some(having_filter) = having
+            && !evaluate_having(having_filter, select_cols, &result_row) {
                 continue;
             }
-        }
 
         result.push(result_row);
     }
@@ -4494,9 +4605,9 @@ fn expand_cube(cols: &[String]) -> Vec<Vec<String>> {
     // Iterate from all bits set to none (so full set comes first).
     for mask in (0..(1u64 << n)).rev() {
         let mut set = Vec::new();
-        for i in 0..n {
+        for (i, col) in cols.iter().enumerate() {
             if mask & (1 << i) != 0 {
-                set.push(cols[i].clone());
+                set.push(col.clone());
             }
         }
         sets.push(set);
@@ -4545,11 +4656,10 @@ fn apply_group_by_with_nulls(
         // Set all group-by columns to NULL.
         if let Some(row) = result_row.first_mut() {
             for (i, col) in select_cols.iter().enumerate() {
-                if let SelectColumn::Name(name) = col {
-                    if all_group_cols.contains(name) {
+                if let SelectColumn::Name(name) = col
+                    && all_group_cols.contains(name) {
                         row[i] = Value::Null;
                     }
-                }
             }
         }
         return Ok(result_row);
@@ -4560,11 +4670,10 @@ fn apply_group_by_with_nulls(
     // For group-by columns not in active_group_cols, set to NULL.
     for row in &mut grouped {
         for (i, col) in select_cols.iter().enumerate() {
-            if let SelectColumn::Name(name) = col {
-                if all_group_cols.contains(name) && !active_group_cols.contains(name) {
+            if let SelectColumn::Name(name) = col
+                && all_group_cols.contains(name) && !active_group_cols.contains(name) {
                     row[i] = Value::Null;
                 }
-            }
         }
     }
 
@@ -4733,7 +4842,7 @@ fn apply_scalar_functions(
                         })
                         .collect();
                     let result = crate::scalar::evaluate_scalar(name, &func_args)
-                        .map_err(|e| ExchangeDbError::Query(e))?;
+                        .map_err(ExchangeDbError::Query)?;
                     new_row.push(result);
                 }
                 SelectColumn::Wildcard => {
@@ -5035,7 +5144,7 @@ fn materialize_cte_tables(
             if !rows.is_empty() {
                 let mut writer = exchange_core::table::TableWriter::open(db_root, name.as_str())?;
                 for (i, row) in rows.iter().enumerate() {
-                    let ts = exchange_common::types::Timestamp(1710460800_000_000_000 + i as i64);
+                    let ts = exchange_common::types::Timestamp(1_710_460_800_000_000_000 + i as i64);
                     let col_values: Vec<exchange_core::table::ColumnValue<'_>> = row
                         .iter()
                         .map(|v| plan_value_to_column_value(v))
@@ -5234,6 +5343,7 @@ fn evaluate_scalar_subqueries_in_result(
 }
 
 /// Execute a SELECT against virtual (in-memory) rows, such as CTE results or subquery results.
+#[allow(clippy::too_many_arguments)]
 fn execute_select_from_virtual(
     source_cols: &[String],
     source_rows: &[Vec<Value>],
@@ -5320,7 +5430,7 @@ fn execute_select_from_virtual(
                             // For aggregates, project the underlying column.
                             if column == "*" {
                                 if !source_cols.is_empty() {
-                                    result_row.push(row.get(0).cloned().unwrap_or(Value::Null));
+                                    result_row.push(row.first().cloned().unwrap_or(Value::Null));
                                 }
                             } else if let Some(idx) = source_cols.iter().position(|n| n == column) {
                                 result_row.push(row.get(idx).cloned().unwrap_or(Value::Null));
@@ -5361,7 +5471,7 @@ fn execute_select_from_virtual(
     if !order_by.is_empty() {
         if !group_by.is_empty() || has_aggregates {
             let result_cols = result_column_names(columns, &selected_cols);
-            let fake_resolved: Vec<(usize, String)> = result_cols.into_iter().enumerate().map(|(i, n)| (i, n)).collect();
+            let fake_resolved: Vec<(usize, String)> = result_cols.into_iter().enumerate().collect();
             apply_order_by(&mut all_rows, &fake_resolved, order_by);
         } else {
             apply_order_by(&mut all_rows, &selected_cols, order_by);
@@ -5438,11 +5548,10 @@ fn resolve_virtual_columns(
                     expr.collect_columns(&mut cols);
                     for col_name in &cols {
                         let already = result.iter().any(|(_, n)| n == col_name);
-                        if !already {
-                            if let Some((idx, resolved)) = find_virtual_col(source_cols, col_name) {
+                        if !already
+                            && let Some((idx, resolved)) = find_virtual_col(source_cols, col_name) {
                                 result.push((idx, resolved));
                             }
-                        }
                     }
                 }
             }
@@ -5474,11 +5583,10 @@ fn resolve_virtual_columns(
                 expr.collect_columns(&mut cols);
                 for col_name in &cols {
                     let already = result.iter().any(|(_, n)| n == col_name);
-                    if !already {
-                        if let Some(idx) = source_cols.iter().position(|n| n == col_name) {
+                    if !already
+                        && let Some(idx) = source_cols.iter().position(|n| n == col_name) {
                             result.push((idx, col_name.clone()));
                         }
-                    }
                 }
             }
         }
@@ -5497,11 +5605,10 @@ fn collect_virtual_filter_cols(filter: &Filter, source_cols: &[String], result: 
         | Filter::Between(col, _, _) | Filter::BetweenSymmetric(col, _, _)
         | Filter::In(col, _) | Filter::NotIn(col, _) => {
             let already = result.iter().any(|(_, n)| n == col);
-            if !already {
-                if let Some(idx) = source_cols.iter().position(|n| n == col) {
+            if !already
+                && let Some(idx) = source_cols.iter().position(|n| n == col) {
                     result.push((idx, col.clone()));
                 }
-            }
         }
         Filter::And(parts) | Filter::Or(parts) => {
             for p in parts {
@@ -5708,6 +5815,7 @@ fn execute_set_operation(
 }
 
 /// Execute a derived scan (subquery in FROM).
+#[allow(clippy::too_many_arguments)]
 fn execute_derived_scan(
     db_root: &Path,
     subquery: &QueryPlan,
@@ -6096,7 +6204,36 @@ fn execute_explain_analyze(db_root: &Path, query: &QueryPlan) -> Result<QueryRes
 }
 fn fmt_plan(plan: &QueryPlan) -> String {
     match plan {
-        QueryPlan::Select { table, columns, filter, order_by, limit, sample_by, group_by, .. } => { let mut p = vec![format!("SELECT on table: {table}")]; let cs: Vec<String> = columns.iter().map(|c| match c { SelectColumn::Wildcard => "*".into(), SelectColumn::Name(n) => n.clone(), SelectColumn::Aggregate { function, column, alias, .. } => { if let Some(a) = alias { a.clone() } else { format!("{function:?}({column})") } }, SelectColumn::ScalarFunction { name, .. } => name.clone(), SelectColumn::WindowFunction(wf) => wf.name.clone(), SelectColumn::CaseWhen { alias, .. } => alias.clone().unwrap_or_else(|| "case".to_string()), SelectColumn::Expression { alias, .. } => alias.clone().unwrap_or_else(|| "expr".to_string()), SelectColumn::ScalarSubquery { alias, .. } => alias.clone().unwrap_or_else(|| "subquery".to_string()) }).collect(); p.push(format!("  columns: [{}]", cs.join(", "))); if let Some(f) = filter { p.push(format!("  filter: {f:?}")); } if !order_by.is_empty() { let ob: Vec<String> = order_by.iter().map(|o| if o.descending { format!("{} DESC", o.column) } else { format!("{} ASC", o.column) }).collect(); p.push(format!("  order_by: [{}]", ob.join(", "))); } if let Some(l) = limit { p.push(format!("  limit: {l}")); } if let Some(sb) = sample_by { p.push(format!("  sample_by: {:?}", sb.interval)); } if !group_by.is_empty() { p.push(format!("  group_by: [{}]", group_by.join(", "))); } p.join("\n") }
+        QueryPlan::Select { table, columns, filter, order_by, limit, sample_by, group_by, .. } => {
+            let mut p = vec![format!("SELECT on table: {table}")];
+            let cs: Vec<String> = columns.iter().map(|c| match c {
+                SelectColumn::Wildcard => "*".into(),
+                SelectColumn::Name(n) => n.clone(),
+                SelectColumn::Aggregate { function, column, alias, .. } => {
+                    if let Some(a) = alias { a.clone() } else { format!("{function:?}({column})") }
+                },
+                SelectColumn::ScalarFunction { name, .. } => name.clone(),
+                SelectColumn::WindowFunction(wf) => wf.name.clone(),
+                SelectColumn::CaseWhen { alias, .. } => alias.clone().unwrap_or_else(|| "case".to_string()),
+                SelectColumn::Expression { alias, .. } => alias.clone().unwrap_or_else(|| "expr".to_string()),
+                SelectColumn::ScalarSubquery { alias, .. } => alias.clone().unwrap_or_else(|| "subquery".to_string()),
+            }).collect();
+            p.push(format!("  columns: [{}]", cs.join(", ")));
+
+            if let Some(f) = filter { p.push(format!("  filter: {f:?}")); }
+
+            if !order_by.is_empty() {
+                let ob: Vec<String> = order_by.iter().map(|o| if o.descending { format!("{} DESC", o.column) } else { format!("{} ASC", o.column) }).collect();
+                p.push(format!("  order_by: [{}]", ob.join(", ")));
+            }
+
+            if let Some(l) = limit { p.push(format!("  limit: {l}")); }
+
+            if let Some(sb) = sample_by { p.push(format!("  sample_by: {:?}", sb.interval)); }
+
+            if !group_by.is_empty() { p.push(format!("  group_by: [{}]", group_by.join(", "))); }
+            p.join("\n")
+        }
         QueryPlan::Insert { table, values, .. } => format!("INSERT into table: {table}, rows: {}", values.len()),
         QueryPlan::CreateTable { name, columns, .. } => format!("CREATE TABLE {name} with {} columns", columns.len()),
         QueryPlan::Join { left_table, right_table, join_type, .. } => format!("{join_type:?} JOIN {left_table} x {right_table}"),
@@ -6870,7 +7007,7 @@ fn execute_insert_on_conflict(
                 }
             }
         } else {
-            execute_insert(db_root, table, &[row.clone()], false, false)?;
+            execute_insert(db_root, table, std::slice::from_ref(row), false, false)?;
             affected += 1;
         }
     }
@@ -6882,11 +7019,10 @@ fn execute_insert_on_conflict(
 fn resolve_excluded_refs(expr: &PlanExpr, meta: &TableMeta, row: &[Value]) -> PlanExpr {
     match expr {
         PlanExpr::Column(name) => {
-            if let Some(idx) = meta.columns.iter().position(|c| c.name == *name) {
-                if let Some(val) = row.get(idx) {
+            if let Some(idx) = meta.columns.iter().position(|c| c.name == *name)
+                && let Some(val) = row.get(idx) {
                     return PlanExpr::Literal(val.clone());
                 }
-            }
             expr.clone()
         }
         PlanExpr::BinaryOp { left, op, right } => PlanExpr::BinaryOp {
@@ -7062,7 +7198,7 @@ fn substitute_lateral_expr(expr: &PlanExpr, left_cols: &[String], left_row: &[Va
     match expr {
         PlanExpr::Column(name) => {
             // Check if this column is from the left table (qualified or unqualified).
-            let bare = name.split('.').last().unwrap_or(name);
+            let bare = name.split('.').next_back().unwrap_or(name);
             if let Some(idx) = left_cols.iter().position(|c| c == bare || c == name) {
                 PlanExpr::Literal(left_row[idx].clone())
             } else {
@@ -7103,7 +7239,7 @@ fn execute_create_index(db_root: &Path, name: &str, table: &str, columns: &[Stri
     let index_meta = serde_json::json!({ "name": name, "table": table, "columns": columns });
     let meta_path = index_dir.join(format!("{}.json", name));
     std::fs::write(&meta_path, serde_json::to_string_pretty(&index_meta).unwrap())
-        .map_err(|e| ExchangeDbError::Io(e))?;
+        .map_err(ExchangeDbError::Io)?;
     for col_name in columns {
         if meta.columns.iter().any(|c| c.name == *col_name) {
             let _ = exchange_core::index_builder::rebuild_index(&table_dir, col_name, &meta);
@@ -7130,14 +7266,13 @@ fn execute_rename_table(db_root: &Path, old_name: &str, new_name: &str) -> Resul
     if new_dir.exists() {
         return Err(ExchangeDbError::Query(format!("table '{}' already exists", new_name)));
     }
-    std::fs::rename(&old_dir, &new_dir).map_err(|e| ExchangeDbError::Io(e))?;
+    std::fs::rename(&old_dir, &new_dir).map_err(ExchangeDbError::Io)?;
     let meta_path = new_dir.join("_meta");
-    if meta_path.exists() {
-        if let Ok(mut meta) = TableMeta::load(&meta_path) {
+    if meta_path.exists()
+        && let Ok(mut meta) = TableMeta::load(&meta_path) {
             meta.name = new_name.to_string();
             let _ = meta.save(&meta_path);
         }
-    }
     Ok(QueryResult::Ok { affected_rows: 0 })
 }
 
@@ -7146,7 +7281,7 @@ fn validate_check_constraints(db_root: &Path, table: &str, values: &[Vec<Value>]
     if !constraints_path.exists() {
         return Ok(());
     }
-    let data = std::fs::read_to_string(&constraints_path).map_err(|e| ExchangeDbError::Io(e))?;
+    let data = std::fs::read_to_string(&constraints_path).map_err(ExchangeDbError::Io)?;
     let constraints: Vec<CheckConstraint> = serde_json::from_str(&data)
         .map_err(|e| ExchangeDbError::Query(format!("invalid check constraints: {e}")))?;
     if constraints.is_empty() {
@@ -7169,14 +7304,13 @@ fn validate_check_constraints(db_root: &Path, table: &str, values: &[Vec<Value>]
 
     for (row_idx, row) in values.iter().enumerate() {
         for (col_name, filter) in &parsed_filters {
-            if let Some(f) = filter {
-                if !evaluate_filter_virtual(f, row, &col_names) {
+            if let Some(f) = filter
+                && !evaluate_filter_virtual(f, row, &col_names) {
                     return Err(ExchangeDbError::Query(format!(
                         "CHECK constraint on column '{}' violated by row {}",
                         col_name, row_idx
                     )));
                 }
-            }
         }
     }
     Ok(())
@@ -7344,14 +7478,13 @@ fn resolve_view(
     let mut inner_plan = crate::planner::plan_query(view_sql).ok()?;
 
     // Merge outer filter into the inner plan if present.
-    if let Some(outer_f) = outer_filter {
-        if let QueryPlan::Select { ref mut filter, .. } = inner_plan {
+    if let Some(outer_f) = outer_filter
+        && let QueryPlan::Select { ref mut filter, .. } = inner_plan {
             *filter = Some(match filter.take() {
                 Some(existing) => Filter::And(vec![existing, outer_f.clone()]),
                 None => outer_f.clone(),
             });
         }
-    }
 
     Some(inner_plan)
 }
@@ -7398,14 +7531,12 @@ fn fire_triggers_after_insert(db_root: &Path, table: &str) {
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
             continue;
         }
-        if let Ok(data) = std::fs::read_to_string(&path) {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
-                if let Some(proc_name) = json.get("procedure").and_then(|v| v.as_str()) {
+        if let Ok(data) = std::fs::read_to_string(&path)
+            && let Ok(json) = serde_json::from_str::<serde_json::Value>(&data)
+                && let Some(proc_name) = json.get("procedure").and_then(|v| v.as_str()) {
                     // Call the stored procedure (best-effort).
                     let _ = execute_call_procedure(db_root, proc_name);
                 }
-            }
-        }
     }
 }
 

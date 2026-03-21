@@ -1,0 +1,66 @@
+
+ExchangeDB has been deployed successfully!
+
+{{- if eq .Values.replication.mode "standalone" }}
+Mode: Standalone
+{{- else if eq .Values.replication.mode "primary" }}
+Mode: Primary (replication enabled)
+{{- else if eq .Values.replication.mode "replica" }}
+Mode: Replica (replicating from {{ .Values.replication.primary.host }})
+{{- end }}
+
+=== Accessing ExchangeDB ===
+
+1. HTTP REST API & Web Console (port {{ .Values.service.ports.http }}):
+
+   kubectl port-forward svc/{{ include "exchangedb.fullname" . }} {{ .Values.service.ports.http }}:{{ .Values.service.ports.http }}
+
+   Then open: http://localhost:{{ .Values.service.ports.http }}
+
+2. PostgreSQL Wire Protocol (port {{ .Values.service.ports.postgresql }}):
+
+   kubectl port-forward svc/{{ include "exchangedb.fullname" . }} {{ .Values.service.ports.postgresql }}:{{ .Values.service.ports.postgresql }}
+
+   Connect with: psql -h localhost -p {{ .Values.service.ports.postgresql }}
+
+3. ILP Ingestion (port {{ .Values.service.ports.ilp }}):
+
+   kubectl port-forward svc/{{ include "exchangedb.fullname" . }} {{ .Values.service.ports.ilp }}:{{ .Values.service.ports.ilp }}
+
+=== Health Check ===
+
+   kubectl exec -it {{ include "exchangedb.fullname" . }}-0 -- curl -s http://localhost:{{ .Values.service.ports.http }}/health
+
+{{- if .Values.ingress.enabled }}
+
+=== Ingress ===
+
+The HTTP API is available at:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- end }}
+
+{{- if and .Values.monitoring.enabled .Values.monitoring.serviceMonitor.enabled }}
+
+=== Monitoring ===
+
+A Prometheus ServiceMonitor has been created. Metrics are available at /metrics on the HTTP port.
+{{- else if .Values.monitoring.enabled }}
+
+=== Monitoring ===
+
+Prometheus scrape annotations are enabled on the pod. To use ServiceMonitor, set:
+  monitoring.serviceMonitor.enabled=true
+{{- end }}
+
+{{- if .Values.persistence.enabled }}
+
+=== Persistence ===
+
+Data is persisted to a {{ .Values.persistence.size }} PVC mounted at /data.
+{{- else }}
+
+WARNING: Persistence is DISABLED. Data will be lost when the pod restarts!
+         Set persistence.enabled=true for production use.
+{{- end }}

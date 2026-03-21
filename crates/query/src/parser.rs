@@ -387,8 +387,8 @@ fn parse_grant(_sql: &str, tokens: &[&str], orig_tokens: &[&str]) -> Option<Rbac
     {
         // Collect privilege keywords between GRANT and ON
         let on_pos = tokens.iter().position(|t| *t == "ON");
-        if let Some(on_idx) = on_pos {
-            if on_idx > 1 && on_idx + 1 < to_idx {
+        if let Some(on_idx) = on_pos
+            && on_idx > 1 && on_idx + 1 < to_idx {
                 let table = orig_tokens[on_idx + 1].to_string();
                 // Parse the privilege list between GRANT (idx 0) and ON (on_idx)
                 let priv_str = tokens[1..on_idx].join(" ");
@@ -418,7 +418,6 @@ fn parse_grant(_sql: &str, tokens: &[&str], orig_tokens: &[&str]) -> Option<Rbac
                     }
                 }
             }
-        }
     }
 
     // GRANT <role_name> TO <user> — role assignment
@@ -514,8 +513,8 @@ fn parse_revoke(_sql: &str, tokens: &[&str], orig_tokens: &[&str]) -> Option<Rba
     //               REVOKE ALL ON <table> FROM <target>
     {
         let on_pos = tokens.iter().position(|t| *t == "ON");
-        if let Some(on_idx) = on_pos {
-            if on_idx > 1 && on_idx + 1 < from_idx {
+        if let Some(on_idx) = on_pos
+            && on_idx > 1 && on_idx + 1 < from_idx {
                 let table = orig_tokens[on_idx + 1].to_string();
                 let priv_str = tokens[1..on_idx].join(" ");
                 let privs: Vec<&str> = priv_str.split(',').map(|s| s.trim()).collect();
@@ -541,7 +540,6 @@ fn parse_revoke(_sql: &str, tokens: &[&str], orig_tokens: &[&str]) -> Option<Rba
                     }
                 }
             }
-        }
     }
 
     // REVOKE <role_name> FROM <user>
@@ -778,7 +776,7 @@ fn extract_sample_by(sql: &str) -> (String, Option<String>, Option<String>, bool
         // The entire SAMPLE BY clause (interval + FILL + ALIGN) runs until
         // the next SQL keyword or semicolon or end.
         let end = after_trimmed
-            .find(|c: char| c == ';' || c == '\n')
+            .find([';', '\n'])
             .unwrap_or(after_trimmed.len());
 
         // Also stop at known keywords that might follow: ORDER, LIMIT, GROUP.
@@ -1014,11 +1012,10 @@ fn find_keyword_boundary(s: &str) -> usize {
     let keywords = ["WHERE", "ORDER", "LIMIT", "GROUP", "HAVING"];
     let mut best = s.len();
     for kw in &keywords {
-        if let Some(pos) = upper.find(kw) {
-            if pos < best {
+        if let Some(pos) = upper.find(kw)
+            && pos < best {
                 best = pos;
             }
-        }
     }
     best
 }
@@ -1050,24 +1047,22 @@ fn extract_partition_command(sql: &str) -> Option<PartitionCommand> {
     let table = orig_tokens[2].to_string();
 
     // ALTER TABLE <table> DETACH PARTITION '<name>'
-    if tokens.len() >= 5 && tokens[3] == "DETACH" && tokens[4] == "PARTITION" {
-        if tokens.len() >= 6 {
+    if tokens.len() >= 5 && tokens[3] == "DETACH" && tokens[4] == "PARTITION"
+        && tokens.len() >= 6 {
             let partition = strip_quotes(orig_tokens[5]);
             return Some(PartitionCommand::Detach { table, partition });
         }
-    }
 
     // ALTER TABLE <table> ATTACH PARTITION '<name>'
-    if tokens.len() >= 5 && tokens[3] == "ATTACH" && tokens[4] == "PARTITION" {
-        if tokens.len() >= 6 {
+    if tokens.len() >= 5 && tokens[3] == "ATTACH" && tokens[4] == "PARTITION"
+        && tokens.len() >= 6 {
             let partition = strip_quotes(orig_tokens[5]);
             return Some(PartitionCommand::Attach { table, partition });
         }
-    }
 
     // ALTER TABLE <table> SQUASH PARTITIONS '<p1>', '<p2>'
-    if tokens.len() >= 5 && tokens[3] == "SQUASH" && tokens[4] == "PARTITIONS" {
-        if tokens.len() >= 6 {
+    if tokens.len() >= 5 && tokens[3] == "SQUASH" && tokens[4] == "PARTITIONS"
+        && tokens.len() >= 6 {
             // The rest is "'p1', 'p2'" or "'p1','p2'" — parse from original string.
             let rest_start = trimmed
                 .to_ascii_uppercase()
@@ -1085,7 +1080,6 @@ fn extract_partition_command(sql: &str) -> Option<PartitionCommand> {
                 });
             }
         }
-    }
 
     None
 }
@@ -1300,7 +1294,7 @@ fn extract_pivot(sql: &str) -> (String, Option<PivotInfo>) {
         } else {
             // No alias: use the value itself as alias.
             let value = part.trim_matches('\'').to_string();
-            let alias = value.replace('/', "_").replace(' ', "_");
+            let alias = value.replace(['/', ' '], "_");
             values.push((value, alias));
         }
     }
@@ -1550,7 +1544,7 @@ fn rewrite_mysql_limit(sql: &str) -> String {
 
     // Find the end of the LIMIT clause (next keyword or end of string).
     let end_pos = rest_upper
-        .find(|c: char| c == ';')
+        .find(';')
         .unwrap_or(rest.len());
     let limit_clause = rest[..end_pos].trim();
 

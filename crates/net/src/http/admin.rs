@@ -581,11 +581,10 @@ pub async fn audit_log(
         let filtered: Vec<_> = all
             .into_iter()
             .filter(|e| {
-                if let Some(ref u) = user_filter {
-                    if !e.user.eq_ignore_ascii_case(u) {
+                if let Some(ref u) = user_filter
+                    && !e.user.eq_ignore_ascii_case(u) {
                         return false;
                     }
-                }
                 if let Some(ref a) = action_filter {
                     let action_str = format!("{:?}", e.action);
                     if !action_str.eq_ignore_ascii_case(a) {

@@ -77,9 +77,7 @@ pub fn parse_ipv6(s: &str) -> Result<[u8; 16]> {
         }
         let zeros_needed = 8 - total;
         let mut all_groups = left_groups;
-        for _ in 0..zeros_needed {
-            all_groups.push("0");
-        }
+        all_groups.extend(std::iter::repeat_n("0", zeros_needed));
         all_groups.extend(right_groups);
         (all_groups, None)
     } else {

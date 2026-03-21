@@ -63,18 +63,18 @@ pub fn min_f64(data: &[f64]) -> f64 {
 
     let mut mins = [f64::INFINITY; 4];
     for chunk in chunks {
-        for i in 0..4 {
+        for (i, &val) in chunk.iter().enumerate() {
             // Use a branchless comparison that skips NaN.
-            if chunk[i] < mins[i] {
-                mins[i] = chunk[i];
+            if val < mins[i] {
+                mins[i] = val;
             }
         }
     }
 
     let mut result = mins[0];
-    for i in 1..4 {
-        if mins[i] < result {
-            result = mins[i];
+    for item in &mins[1..] {
+        if *item < result {
+            result = *item;
         }
     }
     for &v in remainder {
@@ -99,17 +99,17 @@ pub fn max_f64(data: &[f64]) -> f64 {
 
     let mut maxs = [f64::NEG_INFINITY; 4];
     for chunk in chunks {
-        for i in 0..4 {
-            if chunk[i] > maxs[i] {
-                maxs[i] = chunk[i];
+        for (i, &val) in chunk.iter().enumerate() {
+            if val > maxs[i] {
+                maxs[i] = val;
             }
         }
     }
 
     let mut result = maxs[0];
-    for i in 1..4 {
-        if maxs[i] > result {
-            result = maxs[i];
+    for item in &maxs[1..] {
+        if *item > result {
+            result = *item;
         }
     }
     for &v in remainder {
@@ -133,17 +133,17 @@ pub fn min_i64(data: &[i64]) -> i64 {
 
     let mut mins = [i64::MAX; 4];
     for chunk in chunks {
-        for i in 0..4 {
-            if chunk[i] < mins[i] {
-                mins[i] = chunk[i];
+        for (i, &val) in chunk.iter().enumerate() {
+            if val < mins[i] {
+                mins[i] = val;
             }
         }
     }
 
     let mut result = mins[0];
-    for i in 1..4 {
-        if mins[i] < result {
-            result = mins[i];
+    for item in &mins[1..] {
+        if *item < result {
+            result = *item;
         }
     }
     for &v in remainder {
@@ -167,17 +167,17 @@ pub fn max_i64(data: &[i64]) -> i64 {
 
     let mut maxs = [i64::MIN; 4];
     for chunk in chunks {
-        for i in 0..4 {
-            if chunk[i] > maxs[i] {
-                maxs[i] = chunk[i];
+        for (i, &val) in chunk.iter().enumerate() {
+            if val > maxs[i] {
+                maxs[i] = val;
             }
         }
     }
 
     let mut result = maxs[0];
-    for i in 1..4 {
-        if maxs[i] > result {
-            result = maxs[i];
+    for item in &maxs[1..] {
+        if *item > result {
+            result = *item;
         }
     }
     for &v in remainder {
@@ -220,8 +220,8 @@ pub fn filter_gt_f64(data: &[f64], threshold: f64) -> Vec<u32> {
 
     let mut base: u32 = 0;
     for chunk in chunks {
-        for j in 0..4 {
-            if chunk[j] > threshold {
+        for (j, &val) in chunk.iter().enumerate() {
+            if val > threshold {
                 result.push(base + j as u32);
             }
         }
@@ -246,8 +246,8 @@ pub fn filter_eq_i64(data: &[i64], value: i64) -> Vec<u32> {
 
     let mut base: u32 = 0;
     for chunk in chunks {
-        for j in 0..4 {
-            if chunk[j] == value {
+        for (j, &val) in chunk.iter().enumerate() {
+            if val == value {
                 result.push(base + j as u32);
             }
         }

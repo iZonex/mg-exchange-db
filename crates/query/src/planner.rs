@@ -241,18 +241,16 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
             for opt in sequence_options {
                 match opt {
                     ast::SequenceOptions::StartWith(expr, _) => {
-                        if let Ok(v) = expr_to_value(expr) {
-                            if let Value::I64(n) = v {
+                        if let Ok(v) = expr_to_value(expr)
+                            && let Value::I64(n) = v {
                                 start = n;
                             }
-                        }
                     }
                     ast::SequenceOptions::IncrementBy(expr, _) => {
-                        if let Ok(v) = expr_to_value(expr) {
-                            if let Value::I64(n) = v {
+                        if let Ok(v) = expr_to_value(expr)
+                            && let Value::I64(n) = v {
                                 increment = n;
                             }
-                        }
                     }
                     _ => {}
                 }
@@ -317,13 +315,11 @@ fn plan_copy(
     }
 
     // Auto-detect parquet format from file extension.
-    if copy_opts.format != CopyFormat::Parquet {
-        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            if ext.eq_ignore_ascii_case("parquet") {
+    if copy_opts.format != CopyFormat::Parquet
+        && let Some(ext) = path.extension().and_then(|e| e.to_str())
+            && ext.eq_ignore_ascii_case("parquet") {
                 copy_opts.format = CopyFormat::Parquet;
             }
-        }
-    }
 
     if to {
         Ok(QueryPlan::CopyTo { table, path, options: copy_opts })
@@ -871,11 +867,10 @@ fn plan_select(query: &ast::Query, sample_by_raw: Option<&str>, sample_by_fill: 
             let mut plan = plan_select(inner_query, sample_by_raw, sample_by_fill, sample_by_align_calendar, latest_on_info)?;
             // Apply outer LIMIT if present.
             let outer_limit = extract_limit(query)?;
-            if let Some(lim) = outer_limit {
-                if let QueryPlan::SetOperation { ref mut limit, .. } = plan {
+            if let Some(lim) = outer_limit
+                && let QueryPlan::SetOperation { ref mut limit, .. } = plan {
                     *limit = Some(lim);
                 }
-            }
             return Ok(plan);
         }
         _ => {
@@ -899,6 +894,7 @@ fn plan_select(query: &ast::Query, sample_by_raw: Option<&str>, sample_by_fill: 
 
 /// Inner helper for planning a SELECT: takes the parsed Select node and
 /// ORDER BY / LIMIT / OFFSET already extracted from the outer Query.
+#[allow(clippy::too_many_arguments)]
 fn plan_select_inner(
     select: &ast::Select,
     sample_by_raw: Option<&str>,
@@ -910,11 +906,11 @@ fn plan_select_inner(
     offset: Option<u64>,
 ) -> Result<QueryPlan> {
     // Check for sequence functions: nextval('seq'), currval('seq'), setval('seq', N).
-    if select.projection.len() == 1 {
-        if let SelectItem::UnnamedExpr(Expr::Function(func)) = &select.projection[0] {
+    if select.projection.len() == 1
+        && let SelectItem::UnnamedExpr(Expr::Function(func)) = &select.projection[0] {
             let fname = func.name.to_string().to_ascii_lowercase();
-            if matches!(fname.as_str(), "nextval" | "currval" | "setval") {
-                if let ast::FunctionArguments::List(arg_list) = &func.args {
+            if matches!(fname.as_str(), "nextval" | "currval" | "setval")
+                && let ast::FunctionArguments::List(arg_list) = &func.args {
                     let seq_name = match arg_list.args.first() {
                         Some(ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(expr))) => {
                             expr_to_value(expr).ok().and_then(|v| match v {
@@ -945,13 +941,11 @@ fn plan_select_inner(
                         return Ok(QueryPlan::SequenceOp { op });
                     }
                 }
-            }
         }
-    }
 
     // Check for derived table (subquery in FROM).
-    if !select.from.is_empty() {
-        if let TableFactor::Derived { subquery, alias, .. } = &select.from[0].relation {
+    if !select.from.is_empty()
+        && let TableFactor::Derived { subquery, alias, .. } = &select.from[0].relation {
             let sub_plan = plan_select(subquery, None, None, false, None)?;
             let alias_name = alias.as_ref()
                 .map(|a| a.name.value.clone())
@@ -999,14 +993,12 @@ fn plan_select_inner(
                 distinct,
             });
         }
-    }
 
     // Check for table-valued functions: long_sequence(N), generate_series(start, stop, step).
-    if !select.from.is_empty() {
-        if let Some(ls_plan) = try_plan_table_function(&select.from[0].relation, select, order_by, limit)? {
+    if !select.from.is_empty()
+        && let Some(ls_plan) = try_plan_table_function(&select.from[0].relation, select, order_by, limit)? {
             return Ok(ls_plan);
         }
-    }
 
     // Table name
     let (table, left_alias) = if select.from.is_empty() {
@@ -1029,8 +1021,8 @@ fn plan_select_inner(
     };
 
     // Check for LATERAL JOIN: SELECT ... FROM table t, LATERAL (SELECT ...) l
-    if select.from.len() == 2 {
-        if let TableFactor::Derived { lateral: true, subquery, alias } = &select.from[1].relation {
+    if select.from.len() == 2
+        && let TableFactor::Derived { lateral: true, subquery, alias } = &select.from[1].relation {
             let sub_plan = plan_select(subquery, None, None, false, None)?;
             let sub_alias = alias.as_ref()
                 .map(|a| a.name.value.clone())
@@ -1052,7 +1044,6 @@ fn plan_select_inner(
                 limit,
             });
         }
-    }
 
     // Implicit cross join: SELECT * FROM a, b  (multiple FROM entries).
     if select.from.len() > 1 {
@@ -1961,11 +1952,10 @@ fn build_single_join_plan_helper(left_table: &str, left_alias: Option<&str>, joi
 /// Convert a SQL expression to a `SelectColumn`, with optional alias for window functions.
 fn select_expr_to_column_with_alias(expr: &Expr, alias: Option<String>) -> Result<SelectColumn> {
     // Check for window function (function with OVER clause).
-    if let Expr::Function(func) = expr {
-        if func.over.is_some() {
+    if let Expr::Function(func) = expr
+        && func.over.is_some() {
             return plan_window_function(func, alias);
         }
-    }
     select_expr_to_column(expr, alias)
 }
 
@@ -1992,11 +1982,10 @@ fn select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<SelectCol
                 let (col_name, arg_expr_parsed) = match args {
                     ast::FunctionArguments::List(arg_list) => {
                         // Handle count(DISTINCT col) syntax.
-                        if let Some(ast::DuplicateTreatment::Distinct) = arg_list.duplicate_treatment {
-                            if matches!(kind, AggregateKind::Count) {
+                        if let Some(ast::DuplicateTreatment::Distinct) = arg_list.duplicate_treatment
+                            && matches!(kind, AggregateKind::Count) {
                                 kind = AggregateKind::CountDistinct;
                             }
-                        }
                         if arg_list.args.len() != 1 {
                             return Err(ExchangeDbError::Query(format!(
                                 "{func_name} expects exactly one argument"
@@ -2617,7 +2606,7 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
             let col = expr_to_col_name(expr)?;
             let values: Vec<Value> = list
                 .iter()
-                .map(|e| expr_to_value(e))
+                .map(expr_to_value)
                 .collect::<Result<Vec<_>>>()?;
             if *negated {
                 Ok(Filter::NotIn(col, values))
@@ -2861,11 +2850,10 @@ where
     }
 
     // Numbers
-    if s.contains('.') || s.contains('e') || s.contains('E') {
-        if let Ok(f) = s.parse::<f64>() {
+    if (s.contains('.') || s.contains('e') || s.contains('E'))
+        && let Ok(f) = s.parse::<f64>() {
             return Ok(Value::F64(f));
         }
-    }
     if let Ok(i) = s.parse::<i64>() {
         return Ok(Value::I64(i));
     }
@@ -3107,8 +3095,8 @@ fn table_func_arg_to_i64(expr: &Expr) -> Option<i64> {
     if let Expr::Cast { expr: inner, data_type, .. } = expr {
         let dt_str = format!("{data_type}").to_ascii_lowercase();
 
-        if let Ok(inner_val) = expr_to_value(inner) {
-            if let Value::Str(s) = inner_val {
+        if let Ok(inner_val) = expr_to_value(inner)
+            && let Value::Str(s) = inner_val {
                 if dt_str.contains("timestamp") {
                     return parse_timestamp_str(&s);
                 }
@@ -3116,7 +3104,6 @@ fn table_func_arg_to_i64(expr: &Expr) -> Option<i64> {
                     return parse_interval_str(&s);
                 }
             }
-        }
     }
 
     None

@@ -44,7 +44,7 @@ impl RollupCursor {
             let k = format!("{row:?}");
             groups.entry(k).or_insert_with(|| (row.clone(), 0)).1 += 1;
         }
-        for (_, (key, cnt)) in &groups {
+        for (key, cnt) in groups.values() {
             let mut r = key.clone();
             r.push(Value::I64(*cnt));
             result.append_row(&r);

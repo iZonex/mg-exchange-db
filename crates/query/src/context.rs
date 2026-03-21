@@ -218,53 +218,49 @@ impl ExecutionContext {
     /// If no security context is set (anonymous mode), access is allowed
     /// for backwards compatibility.
     pub fn check_read(&self, table: &str) -> Result<()> {
-        if let Some(ref sec) = self.security {
-            if !sec.can_read_table(table) {
+        if let Some(ref sec) = self.security
+            && !sec.can_read_table(table) {
                 return Err(ExchangeDbError::PermissionDenied(format!(
                     "user '{}' does not have READ permission on table '{}'",
                     sec.user, table
                 )));
             }
-        }
         Ok(())
     }
 
     /// Check that the current user has write access to the given table.
     pub fn check_write(&self, table: &str) -> Result<()> {
-        if let Some(ref sec) = self.security {
-            if !sec.can_write_table(table) {
+        if let Some(ref sec) = self.security
+            && !sec.can_write_table(table) {
                 return Err(ExchangeDbError::PermissionDenied(format!(
                     "user '{}' does not have WRITE permission on table '{}'",
                     sec.user, table
                 )));
             }
-        }
         Ok(())
     }
 
     /// Check that the current user has DDL privileges (CREATE/ALTER/DROP TABLE).
     pub fn check_ddl(&self) -> Result<()> {
-        if let Some(ref sec) = self.security {
-            if !sec.can_ddl() {
+        if let Some(ref sec) = self.security
+            && !sec.can_ddl() {
                 return Err(ExchangeDbError::PermissionDenied(format!(
                     "user '{}' does not have DDL permission",
                     sec.user
                 )));
             }
-        }
         Ok(())
     }
 
     /// Check that the current user has admin privileges.
     pub fn check_admin(&self) -> Result<()> {
-        if let Some(ref sec) = self.security {
-            if !sec.can_admin() {
+        if let Some(ref sec) = self.security
+            && !sec.can_admin() {
                 return Err(ExchangeDbError::PermissionDenied(format!(
                     "user '{}' does not have ADMIN permission",
                     sec.user
                 )));
             }
-        }
         Ok(())
     }
 

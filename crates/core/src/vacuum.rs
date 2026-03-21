@@ -127,11 +127,7 @@ impl VacuumJob {
                 // Column files have extensions .d or .i
                 let col_name = if let Some(base) = name_str.strip_suffix(".d") {
                     Some(base)
-                } else if let Some(base) = name_str.strip_suffix(".i") {
-                    Some(base)
-                } else {
-                    None
-                };
+                } else { name_str.strip_suffix(".i") };
 
                 if let Some(col) = col_name {
                     if current_columns.contains(col) {

@@ -429,16 +429,14 @@ fn find_latest_wal_segment(wal_dir: &Path) -> Option<PathBuf> {
     for entry in entries.flatten() {
         let name = entry.file_name();
         let name = name.to_string_lossy();
-        if let Some(rest) = name.strip_prefix("wal-") {
-            if let Some(id_str) = rest.strip_suffix(".wal") {
-                if let Ok(id) = id_str.parse::<u32>() {
+        if let Some(rest) = name.strip_prefix("wal-")
+            && let Some(id_str) = rest.strip_suffix(".wal")
+                && let Ok(id) = id_str.parse::<u32>() {
                     match &best {
                         Some((best_id, _)) if id <= *best_id => {}
                         _ => best = Some((id, entry.path())),
                     }
                 }
-            }
-        }
     }
 
     best.map(|(_, path)| path)

@@ -155,11 +155,10 @@ impl RecordCursor for ScanCursor {
         let mut rows_emitted = 0usize;
 
         while rows_emitted < max_rows {
-            if self.current_row >= self.partition_rows {
-                if !self.advance_partition()? {
+            if self.current_row >= self.partition_rows
+                && !self.advance_partition()? {
                     break;
                 }
-            }
 
             // Read rows from current partition.
             let rows_remaining_in_partition = (self.partition_rows - self.current_row) as usize;

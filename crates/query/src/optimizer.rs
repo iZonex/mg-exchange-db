@@ -85,13 +85,11 @@ const STATS_FILE: &str = "_stats";
 pub fn collect_stats(table_dir: &Path, meta: &TableMeta) -> Result<TableStats> {
     // Try loading cached stats first.
     let stats_path = table_dir.join(STATS_FILE);
-    if stats_path.exists() {
-        if let Ok(json) = std::fs::read_to_string(&stats_path) {
-            if let Ok(cached) = serde_json::from_str::<TableStats>(&json) {
+    if stats_path.exists()
+        && let Ok(json) = std::fs::read_to_string(&stats_path)
+            && let Ok(cached) = serde_json::from_str::<TableStats>(&json) {
                 return Ok(cached);
             }
-        }
-    }
 
     let partitions = list_partition_dirs(table_dir)?;
     let partition_count = partitions.len() as u32;
@@ -175,8 +173,8 @@ pub fn collect_stats(table_dir: &Path, meta: &TableMeta) -> Result<TableStats> {
                 let col_type: ColumnType = col_def.col_type.into();
                 if col_type == ColumnType::Symbol {
                     let key_path = effective_path.join(format!("{}.k", col_def.name));
-                    if key_path.exists() {
-                        if let Ok(reader) =
+                    if key_path.exists()
+                        && let Ok(reader) =
                             exchange_core::index::bitmap::BitmapIndexReader::open(
                                 effective_path,
                                 &col_def.name,
@@ -200,7 +198,6 @@ pub fn collect_stats(table_dir: &Path, meta: &TableMeta) -> Result<TableStats> {
                                     cs.distinct_count.max(distinct);
                             }
                         }
-                    }
                 }
             }
         }
@@ -289,16 +286,14 @@ pub fn prune_partitions(
 
             // Check overlap: partition range [part_start, part_end) must overlap
             // query range [lower_bound, upper_bound].
-            if let Some(lower) = lower_bound {
-                if part_end <= lower {
+            if let Some(lower) = lower_bound
+                && part_end <= lower {
                     return false; // partition entirely before query range
                 }
-            }
-            if let Some(upper) = upper_bound {
-                if part_start > upper {
+            if let Some(upper) = upper_bound
+                && part_start > upper {
                     return false; // partition entirely after query range
                 }
-            }
             true
         })
         .cloned()
@@ -477,7 +472,7 @@ fn partition_dir_to_timestamp_range(
 /// Convert a civil date (year, month, day) to seconds since Unix epoch
 /// using Howard Hinnant's algorithm (same as used in partition.rs).
 fn date_to_epoch_secs(year: i32, month: u32, day: u32) -> Option<i64> {
-    if month < 1 || month > 12 || day < 1 || day > 31 {
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return None;
     }
     // Adjust month for algorithm: March = 0, ..., February = 11.
@@ -873,7 +868,8 @@ impl JoinCostEstimator {
         join_type: &JoinType,
         has_index: bool,
     ) -> f64 {
-        let base = match join_type {
+        
+        match join_type {
             JoinType::Inner | JoinType::Left | JoinType::Right => {
                 if has_index {
                     // Index nested loop join: O(left * log(right))
@@ -896,8 +892,7 @@ impl JoinCostEstimator {
                 // Similar to nested loop cost.
                 left_rows as f64 * (right_rows as f64).log2().max(1.0)
             }
-        };
-        base
+        }
     }
 
     /// For multi-table joins, find the optimal join order using a greedy
@@ -1024,7 +1019,7 @@ pub fn estimate_plan_cost(plan: &QueryPlan, stats: &TableStats) -> PlanCost {
             let total_bytes = total_rows * BYTES_PER_ROW;
 
             // I/O cost: read all partitions (pruning already applied).
-            let pages = (total_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
+            let pages = total_bytes.div_ceil(PAGE_SIZE);
             let io_cost = pages as f64 * IO_COST_PER_PAGE;
 
             // CPU cost: filter + aggregate + sort.
@@ -1043,10 +1038,10 @@ pub fn estimate_plan_cost(plan: &QueryPlan, stats: &TableStats) -> PlanCost {
             let rows_after_agg = if !group_by.is_empty() || sample_by.is_some() {
                 cpu_cost += rows_after_filter as f64 * CPU_COST_PER_ROW_AGG;
                 // Estimate: number of distinct groups.
-                let distinct = group_by.iter().filter_map(|g| {
+                
+                group_by.iter().filter_map(|g| {
                     stats.column_stats.get(g).map(|cs| cs.distinct_count.max(1))
-                }).min().unwrap_or(rows_after_filter.min(1000));
-                distinct
+                }).min().unwrap_or(rows_after_filter.min(1000))
             } else {
                 rows_after_filter
             };
@@ -1076,7 +1071,7 @@ pub fn estimate_plan_cost(plan: &QueryPlan, stats: &TableStats) -> PlanCost {
         QueryPlan::Join { .. } | QueryPlan::MultiJoin { .. } => {
             // For joins, estimate based on total row count from stats.
             let total_bytes = stats.row_count * BYTES_PER_ROW;
-            let pages = (total_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
+            let pages = total_bytes.div_ceil(PAGE_SIZE);
             let io_cost = pages as f64 * IO_COST_PER_PAGE;
             let cpu_cost = stats.row_count as f64 * CPU_COST_PER_ROW_FILTER;
             PlanCost {

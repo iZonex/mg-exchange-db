@@ -151,13 +151,12 @@ fn is_safe_numeric_literal(s: &str) -> bool {
         return true;
     }
     // Try float, but reject non-finite values
-    if let Ok(f) = s.parse::<f64>() {
-        if f.is_finite() {
+    if let Ok(f) = s.parse::<f64>()
+        && f.is_finite() {
             // Also reject hex-like prefixes and other non-decimal representations
             let first = s.as_bytes()[0];
             return first == b'-' || first == b'+' || first.is_ascii_digit() || first == b'.';
         }
-    }
     false
 }
 
@@ -194,10 +193,7 @@ impl ExtendedQueryHandler for ExchangeDbExtendedHandler {
         // If the query has parameters, we cannot plan it without substitution,
         // so we return empty fields (the portal describe will have them).
         let fields = if !stmt.statement.sql.contains('$') {
-            match plan_and_describe(&self.db_root, &stmt.statement.sql) {
-                Ok(f) => f,
-                Err(_) => vec![],
-            }
+            plan_and_describe(&self.db_root, &stmt.statement.sql).unwrap_or_default()
         } else {
             vec![]
         };
@@ -218,10 +214,7 @@ impl ExtendedQueryHandler for ExchangeDbExtendedHandler {
     {
         let sql = substitute_parameters(&portal.statement.statement.sql, portal);
 
-        let fields = match plan_and_describe(&self.db_root, &sql) {
-            Ok(f) => f,
-            Err(_) => vec![],
-        };
+        let fields = plan_and_describe(&self.db_root, &sql).unwrap_or_default();
 
         Ok(DescribePortalResponse::new(fields))
     }
@@ -317,11 +310,10 @@ fn count_placeholders(sql: &str) -> usize {
                     break;
                 }
             }
-            if let Ok(n) = num_str.parse::<usize>() {
-                if n > max {
+            if let Ok(n) = num_str.parse::<usize>()
+                && n > max {
                     max = n;
                 }
-            }
         }
     }
     max

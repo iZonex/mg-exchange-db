@@ -121,7 +121,7 @@ fn collect_filter_columns(filter: &Filter, meta: &TableMeta) -> Vec<usize> {
     indices
 }
 
-fn evaluate_filter(filter: &Filter, values: &[(usize, Value)], meta: &TableMeta) -> bool {
+pub fn evaluate_filter(filter: &Filter, values: &[(usize, Value)], meta: &TableMeta) -> bool {
     match filter {
         Filter::Eq(col, expected) => {
             let val = get_filter_value(col, values, meta);
@@ -268,6 +268,18 @@ fn scan_partition(
     filter: Option<&Filter>,
     table_dir: Option<&Path>,
 ) -> Result<Vec<Vec<Value>>> {
+    scan_partition_limited(partition_path, meta, all_indices, selected_cols, filter, table_dir, None)
+}
+
+fn scan_partition_limited(
+    partition_path: &Path,
+    meta: &TableMeta,
+    all_indices: &[usize],
+    selected_cols: &[(usize, String)],
+    filter: Option<&Filter>,
+    table_dir: Option<&Path>,
+    row_limit: Option<usize>,
+) -> Result<Vec<Vec<Value>>> {
     // Use TieredPartitionReader to get the native path for reading.
     // If table_dir is provided we can do tiered reads; otherwise fall back
     // to reading partition_path directly (backwards-compatible).
@@ -332,20 +344,24 @@ fn scan_partition(
 
     // Pre-allocate the all_values vec once, reuse per row.
     let mut all_values: Vec<(usize, Value)> = Vec::with_capacity(num_readers);
-    let mut rows = Vec::new();
+    let row_count_usize = row_count as usize;
+    let scan_limit = row_limit.unwrap_or(row_count_usize);
+    let mut rows = Vec::with_capacity(scan_limit.min(row_count_usize));
 
     for row_idx in 0..row_count {
+        if rows.len() >= scan_limit {
+            break;
+        }
         all_values.clear();
         for (col_idx, reader) in &readers {
             let val = read_value(reader, row_idx);
             all_values.push((*col_idx, val));
         }
 
-        if let Some(f) = filter {
-            if !evaluate_filter(f, &all_values, meta) {
+        if let Some(f) = filter
+            && !evaluate_filter(f, &all_values, meta) {
                 continue;
             }
-        }
 
         // Build result row using pre-computed positions (O(1) per column).
         let mut row = Vec::with_capacity(num_selected);
@@ -476,11 +492,13 @@ pub fn parallel_scan_partitions_pruned_tiered(
 
     let limit = row_limit.unwrap_or(u64::MAX) as usize;
 
-    if !should_use_parallel(partitions.len()) {
-        // Sequential scan with early termination.
+    if !should_use_parallel(partitions.len()) || limit < 1000 {
+        // Sequential scan with early termination — also used for small limits
+        // to avoid scanning all partitions in parallel unnecessarily.
         let mut rows = Vec::new();
         for p in partitions {
-            rows.extend(scan_partition(p, meta, &all_indices, selected_cols, filter, table_dir)?);
+            let remaining = limit.saturating_sub(rows.len());
+            rows.extend(scan_partition_limited(p, meta, &all_indices, selected_cols, filter, table_dir, Some(remaining))?);
             if rows.len() >= limit {
                 rows.truncate(limit);
                 break;

@@ -329,13 +329,11 @@ impl WalReceiver {
                 let name = entry.file_name();
                 let name = name.to_string_lossy();
 
-                if let Some(rest) = name.strip_prefix("wal-") {
-                    if let Some(id_str) = rest.strip_suffix(".wal") {
-                        if let Ok(id) = id_str.parse::<u32>() {
+                if let Some(rest) = name.strip_prefix("wal-")
+                    && let Some(id_str) = rest.strip_suffix(".wal")
+                        && let Ok(id) = id_str.parse::<u32>() {
                             max_id = Some(max_id.map_or(id, |m: u32| m.max(id)));
                         }
-                    }
-                }
             }
         }
 

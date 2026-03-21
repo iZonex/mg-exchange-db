@@ -333,11 +333,10 @@ impl WalShipper {
 
     /// Record an acknowledgment from a replica.
     pub fn record_ack(&mut self, replica_addr: &str, txn_id: u64) {
-        if let Some(pos) = self.replica_positions.get_mut(replica_addr) {
-            if txn_id > *pos {
+        if let Some(pos) = self.replica_positions.get_mut(replica_addr)
+            && txn_id > *pos {
                 *pos = txn_id;
             }
-        }
     }
 
     /// Get the replica positions map (for testing/diagnostics).
