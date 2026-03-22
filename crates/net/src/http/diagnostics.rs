@@ -210,7 +210,10 @@ fn disk_free_bytes(path: &std::path::Path) -> u64 {
         let mut stat = MaybeUninit::<libc::statvfs>::uninit();
         if libc::statvfs(c_path.as_ptr(), stat.as_mut_ptr()) == 0 {
             let stat = stat.assume_init();
-            stat.f_bavail as u64 * stat.f_frsize
+            #[allow(clippy::unnecessary_cast)]
+            {
+                stat.f_bavail as u64 * stat.f_frsize as u64
+            }
         } else {
             0
         }
@@ -244,10 +247,10 @@ fn get_rss_bytes() -> u64 {
     // Read from /proc/self/statm -- field 1 is RSS in pages.
     if let Ok(contents) = std::fs::read_to_string("/proc/self/statm") {
         let fields: Vec<&str> = contents.split_whitespace().collect();
-        if let Some(rss_pages) = fields.get(1) {
-            if let Ok(pages) = rss_pages.parse::<u64>() {
-                return pages * 4096;
-            }
+        if let Some(rss_pages) = fields.get(1)
+            && let Ok(pages) = rss_pages.parse::<u64>()
+        {
+            return pages * 4096;
         }
     }
     0
