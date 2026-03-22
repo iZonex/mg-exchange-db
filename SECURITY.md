@@ -10,7 +10,7 @@
 
 **Please do NOT open a public GitHub issue for security vulnerabilities.**
 
-Instead, report vulnerabilities by emailing **dmytro.chystiakov@gmail.com** with:
+Instead, report vulnerabilities by emailing **dlchistyakov@gmail.com** with:
 
 1. Description of the vulnerability
 2. Steps to reproduce
