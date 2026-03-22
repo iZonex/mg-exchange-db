@@ -372,10 +372,16 @@ mod edge_cases_extra {
     }
     #[test]
     fn very_long_measurement() {
+        // Names > 512 bytes are rejected by the parser.
         let name = "a".repeat(1000);
         let line = format!("{name} val=1i 1000");
-        let p = parse_ilp_line(&line).unwrap();
-        assert_eq!(p.measurement, name);
+        assert!(parse_ilp_line(&line).is_err());
+
+        // Names at the limit should succeed.
+        let ok_name = "a".repeat(512);
+        let ok_line = format!("{ok_name} val=1i 1000");
+        let p = parse_ilp_line(&ok_line).unwrap();
+        assert_eq!(p.measurement, ok_name);
     }
     #[test]
     fn very_long_string() {
@@ -409,13 +415,22 @@ mod edge_cases_extra {
     }
     #[test]
     fn ten_thousand_fields() {
+        // Lines with > 1024 fields are rejected by the parser.
         let mut parts = vec![];
         for i in 0..10_000 {
             parts.push(format!("f{i}={i}i"));
         }
         let line = format!("m {} 1000", parts.join(","));
-        let p = parse_ilp_line(&line).unwrap();
-        assert!(p.fields.len() >= 10_000);
+        assert!(parse_ilp_line(&line).is_err());
+
+        // Lines within the field limit should succeed.
+        let mut ok_parts = vec![];
+        for i in 0..1024 {
+            ok_parts.push(format!("f{i}={i}i"));
+        }
+        let ok_line = format!("m {} 1000", ok_parts.join(","));
+        let p = parse_ilp_line(&ok_line).unwrap();
+        assert_eq!(p.fields.len(), 1024);
     }
 }
 

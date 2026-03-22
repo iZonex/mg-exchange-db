@@ -224,6 +224,10 @@ impl WalMergeJob {
 
         txn.commit(&new_hdr, &part_entries)?;
 
+        // Invalidate the read-only mmap cache so subsequent reads pick up
+        // the newly-written column data (the cache may hold stale handles).
+        crate::mmap::invalidate_mmap_cache(&self.table_dir);
+
         // Mark WAL segments as applied by renaming them.
         let segments_processed = segment_ids.len() as u32;
         for seg_id in &segment_ids {

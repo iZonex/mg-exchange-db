@@ -1124,12 +1124,18 @@ pub fn rewrite_partition(
 /// List all partition directories under a table directory (public for use by
 /// the query executor). Anything that is a directory and does not start with
 /// `_`.
+/// Shared partition-list cache.
+static PARTITION_CACHE: std::sync::OnceLock<
+    dashmap::DashMap<std::path::PathBuf, (std::time::Instant, Vec<PathBuf>)>,
+> = std::sync::OnceLock::new();
+
+fn partition_cache()
+-> &'static dashmap::DashMap<std::path::PathBuf, (std::time::Instant, Vec<PathBuf>)> {
+    PARTITION_CACHE.get_or_init(dashmap::DashMap::new)
+}
+
 pub fn list_partitions(table_dir: &Path) -> Result<Vec<PathBuf>> {
-    // Cache partition lists to avoid repeated readdir() syscalls (~33µs each).
-    static PART_CACHE: std::sync::OnceLock<
-        dashmap::DashMap<std::path::PathBuf, (std::time::Instant, Vec<PathBuf>)>,
-    > = std::sync::OnceLock::new();
-    let cache = PART_CACHE.get_or_init(dashmap::DashMap::new);
+    let cache = partition_cache();
 
     // Cache with 5-second TTL (partitions change rarely during reads).
     if let Some(entry) = cache.get(table_dir) {
@@ -1145,6 +1151,12 @@ pub fn list_partitions(table_dir: &Path) -> Result<Vec<PathBuf>> {
         (std::time::Instant::now(), parts.clone()),
     );
     Ok(parts)
+}
+
+/// Invalidate the partition list cache for a table directory.
+/// Call this after INSERT or any operation that creates new partitions.
+pub fn invalidate_partition_cache(table_dir: &Path) {
+    partition_cache().remove(table_dir);
 }
 
 /// Read all rows from a partition, returning one `Vec<ColumnValue<'static>>`

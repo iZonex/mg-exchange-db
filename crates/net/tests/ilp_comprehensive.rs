@@ -531,10 +531,16 @@ fn edge_invalid_tag_no_equals() {
 
 #[test]
 fn edge_long_measurement_name() {
+    // Measurement names > 512 bytes are rejected by the parser.
     let name = "a".repeat(1000);
     let line = format!("{name} v=1i");
-    let p = parse_ilp_line(&line).unwrap();
-    assert_eq!(p.measurement.len(), 1000);
+    assert!(parse_ilp_line(&line).is_err());
+
+    // Names at the limit should succeed.
+    let ok_name = "a".repeat(512);
+    let ok_line = format!("{ok_name} v=1i");
+    let p = parse_ilp_line(&ok_line).unwrap();
+    assert_eq!(p.measurement.len(), 512);
 }
 
 #[test]
@@ -2224,8 +2230,21 @@ meas_len_test!(ml_50, 50);
 meas_len_test!(ml_100, 100);
 meas_len_test!(ml_200, 200);
 meas_len_test!(ml_500, 500);
-meas_len_test!(ml_1000, 1000);
-meas_len_test!(ml_2000, 2000);
+meas_len_test!(ml_512, 512);
+
+// Lengths exceeding MAX_MEASUREMENT_LENGTH (512) should be rejected.
+macro_rules! meas_len_reject_test {
+    ($name:ident, $len:expr) => {
+        #[test]
+        fn $name() {
+            let m = "m".repeat($len);
+            let line = format!("{m} v=1i");
+            assert!(parse_ilp_line(&line).is_err());
+        }
+    };
+}
+meas_len_reject_test!(ml_1000, 1000);
+meas_len_reject_test!(ml_2000, 2000);
 
 // =============================================================================
 // 42. Tag value length (8 tests)

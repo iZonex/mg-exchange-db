@@ -275,10 +275,16 @@ mod ilp_parser {
 
     #[test]
     fn very_long_measurement_name() {
+        // Measurement names > MAX_MEASUREMENT_LENGTH (512) are rejected.
         let name = "a".repeat(1000);
         let line = format!("{} val=1i 1000", name);
-        let parsed = parse_ilp_line(&line).unwrap();
-        assert_eq!(parsed.measurement, name);
+        assert!(parse_ilp_line(&line).is_err());
+
+        // Names within the limit should succeed.
+        let ok_name = "a".repeat(512);
+        let ok_line = format!("{} val=1i 1000", ok_name);
+        let parsed = parse_ilp_line(&ok_line).unwrap();
+        assert_eq!(parsed.measurement, ok_name);
     }
 
     #[test]
@@ -291,17 +297,23 @@ mod ilp_parser {
 
     #[test]
     fn very_long_line_1mb() {
-        // Build a 1MB+ line with many fields
-        let parts = ["big".to_string()];
+        // Lines with > MAX_ILP_FIELDS (1024) fields are rejected.
         let mut fields = Vec::new();
         for i in 0..10_000 {
             fields.push(format!("f{i}={i}i"));
         }
-        let line = format!("{} {} 1000", parts[0], fields.join(","));
-        assert!(line.len() > 50_000); // at least 50KB
-        let parsed = parse_ilp_line(&line).unwrap();
+        let line = format!("big {} 1000", fields.join(","));
+        assert!(parse_ilp_line(&line).is_err());
+
+        // Lines within the field limit should succeed.
+        let mut ok_fields = Vec::new();
+        for i in 0..1024 {
+            ok_fields.push(format!("f{i}={i}i"));
+        }
+        let ok_line = format!("big {} 1000", ok_fields.join(","));
+        let parsed = parse_ilp_line(&ok_line).unwrap();
         assert_eq!(parsed.measurement, "big");
-        assert!(parsed.fields.len() >= 10_000);
+        assert_eq!(parsed.fields.len(), 1024);
     }
 
     // -- Escape sequences --

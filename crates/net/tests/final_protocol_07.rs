@@ -798,7 +798,15 @@ mod ilp_edge_f07 {
     longm!(lm100, 100);
     longm!(lm200, 200);
     longm!(lm500, 500);
-    longm!(lm1000, 1000);
+    longm!(lm512, 512);
+
+    // Names exceeding MAX_MEASUREMENT_LENGTH (512) should be rejected.
+    #[test]
+    fn lm1000() {
+        let name = "a".repeat(1000);
+        let line = format!("{name} val=1i 1000");
+        assert!(parse_ilp_line(&line).is_err());
+    }
 
     // Long string values
     macro_rules! longs {

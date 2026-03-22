@@ -179,13 +179,25 @@ mod table_create {
     #[test]
     fn long_table_name() {
         let dir = tempdir().unwrap();
-        let name = "a".repeat(200);
+        // 128 chars is the max allowed by validate_table_name
+        let name = "a".repeat(128);
         let meta = TableBuilder::new(&name)
             .column("ts", ColumnType::Timestamp)
             .timestamp("ts")
             .build(dir.path())
             .unwrap();
         assert_eq!(meta.name, name);
+    }
+
+    #[test]
+    fn table_name_too_long_rejected() {
+        let dir = tempdir().unwrap();
+        let name = "a".repeat(129);
+        let result = TableBuilder::new(&name)
+            .column("ts", ColumnType::Timestamp)
+            .timestamp("ts")
+            .build(dir.path());
+        assert!(result.is_err());
     }
 
     #[test]

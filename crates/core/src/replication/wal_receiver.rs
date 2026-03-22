@@ -295,6 +295,9 @@ impl WalReceiver {
                 ExchangeDbError::Wal(format!("failed to write _meta for table {table}: {e}"))
             })?;
 
+            // Invalidate the metadata cache so subsequent loads pick up the new schema.
+            TableMeta::invalidate_cache(&meta_path);
+
             // Ensure the _txn file exists so merges can proceed.
             let _ = crate::txn::TxnFile::open(&table_dir);
 

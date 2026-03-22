@@ -744,6 +744,7 @@ pub fn optimize(plan: QueryPlan, db_root: &Path) -> Result<OptimizedPlan> {
             filter,
             order_by,
             limit,
+            offset,
             sample_by,
             group_by,
             ..
@@ -777,9 +778,12 @@ pub fn optimize(plan: QueryPlan, db_root: &Path) -> Result<OptimizedPlan> {
             let optimized_plan = push_predicates_to_scan(&plan);
 
             // 5. Limit pushdown.
+            // Must account for OFFSET: scan limit+offset rows so the
+            // LimitCursor can skip `offset` and still return `limit`.
+            let adjusted_limit = limit.map(|l| l.saturating_add(offset.unwrap_or(0)));
             let limit_pushdown = check_limit_pushdown(
                 order_by,
-                *limit,
+                adjusted_limit,
                 &ts_col_name,
                 group_by,
                 sample_by.is_some(),

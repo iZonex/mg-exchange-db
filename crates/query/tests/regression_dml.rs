@@ -259,7 +259,7 @@ mod insert_types {
         let db = TestDb::new();
         db.exec_ok("CREATE TABLE t (timestamp TIMESTAMP, v DOUBLE)");
         db.exec_ok(&format!(
-            "INSERT INTO t VALUES ({}, 3.151592653589793)",
+            "INSERT INTO t VALUES ({}, 3.141592653589793)",
             ts(0)
         ));
         let val = db.query_scalar("SELECT v FROM t");

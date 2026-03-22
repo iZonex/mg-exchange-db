@@ -643,9 +643,17 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
             let optimized;
             let (opt_plan, pruned, limit_pd) = if can_skip_optimizer {
                 // Build a trivial limit pushdown directly.
-                let lp = if let QueryPlan::Select { limit: Some(l), .. } = plan {
+                // Must account for OFFSET: we need to scan limit+offset rows
+                // so the LimitCursor can skip `offset` and still return `limit`.
+                let lp = if let QueryPlan::Select {
+                    limit: Some(l),
+                    offset,
+                    ..
+                } = plan
+                {
+                    let off = offset.unwrap_or(0);
                     Some(crate::optimizer::LimitPushdown {
-                        limit: *l,
+                        limit: l.saturating_add(off),
                         reverse_scan: false,
                     })
                 } else {
@@ -675,24 +683,42 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
                     having,
                     distinct,
                     distinct_on,
-                } => execute_select_with_hints(
-                    db_root,
-                    table,
-                    columns,
-                    filter.as_ref(),
-                    order_by,
-                    *limit,
-                    *offset,
-                    sample_by.as_ref(),
-                    latest_on.as_ref(),
-                    group_by,
-                    group_by_mode,
-                    having.as_ref(),
-                    *distinct,
-                    distinct_on,
-                    pruned,
-                    limit_pd.as_ref(),
-                ),
+                } => {
+                    // Disable limit pushdown when the query has operations that
+                    // need the full dataset before LIMIT is applied:
+                    // window functions, aggregates, GROUP BY, HAVING, LATEST ON, DISTINCT.
+                    let has_post_scan_ops = columns.iter().any(|c| {
+                        matches!(
+                            c,
+                            crate::plan::SelectColumn::WindowFunction(_)
+                                | crate::plan::SelectColumn::Aggregate { .. }
+                        )
+                    });
+                    let needs_full_scan = has_post_scan_ops
+                        || latest_on.is_some()
+                        || having.is_some()
+                        || !group_by.is_empty()
+                        || *distinct;
+                    let effective_limit_pd = if needs_full_scan { None } else { limit_pd };
+                    execute_select_with_hints(
+                        db_root,
+                        table,
+                        columns,
+                        filter.as_ref(),
+                        order_by,
+                        *limit,
+                        *offset,
+                        sample_by.as_ref(),
+                        latest_on.as_ref(),
+                        group_by,
+                        group_by_mode,
+                        having.as_ref(),
+                        *distinct,
+                        distinct_on,
+                        pruned,
+                        effective_limit_pd.as_ref(),
+                    )
+                }
                 _ => unreachable!("optimizer returned non-Select for Select input"),
             }
         }
@@ -900,6 +926,9 @@ pub fn execute(db_root: &Path, plan: &QueryPlan) -> Result<QueryResult> {
                     }
                 }
             }
+            // Invalidate caches after removing partitions.
+            exchange_core::mmap::invalidate_mmap_cache(&table_dir);
+            exchange_core::table::invalidate_partition_cache(&table_dir);
             Ok(QueryResult::Ok { affected_rows: 0 })
         }
         QueryPlan::DetachPartition { table, partition } => {
@@ -1945,8 +1974,9 @@ fn execute_insert(
         }
     }
 
-    // Invalidate mmap cache so subsequent reads see the new data.
+    // Invalidate caches so subsequent reads see the new data.
     exchange_core::mmap::invalidate_mmap_cache(&table_dir);
+    exchange_core::table::invalidate_partition_cache(&table_dir);
     if let Some(reg) = crate::table_registry::global() {
         reg.invalidate(table);
     }
