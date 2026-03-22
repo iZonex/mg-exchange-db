@@ -383,6 +383,11 @@ fn mmap_cache() -> &'static dashmap::DashMap<PathBuf, std::sync::Arc<memmap2::Mm
 }
 
 /// Invalidate cached mmap handles under a directory (e.g., after compaction or DDL).
+/// Clear the entire mmap cache (for testing isolation).
+pub fn clear_mmap_cache() {
+    mmap_cache().clear();
+}
+
 pub fn invalidate_mmap_cache(prefix: &Path) {
     mmap_cache().retain(|k, _| !k.starts_with(prefix));
 }

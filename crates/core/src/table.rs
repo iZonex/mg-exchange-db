@@ -216,16 +216,26 @@ impl TableMeta {
     }
 
     pub fn load(path: &Path) -> Result<Self> {
-        let cache = Self::meta_cache();
-        if let Some(cached) = cache.get(path) {
-            return Ok(cached.value().clone());
+        // In tests, always read from disk to prevent cross-test cache pollution.
+        #[cfg(not(test))]
+        {
+            let cache = Self::meta_cache();
+            if let Some(cached) = cache.get(path) {
+                return Ok(cached.value().clone());
+            }
+
+            let json = std::fs::read_to_string(path)?;
+            let meta: TableMeta = serde_json::from_str(&json)
+                .map_err(|e| ExchangeDbError::Corruption(e.to_string()))?;
+            cache.insert(path.to_path_buf(), meta.clone());
+            Ok(meta)
         }
 
-        let json = std::fs::read_to_string(path)?;
-        let meta: TableMeta =
-            serde_json::from_str(&json).map_err(|e| ExchangeDbError::Corruption(e.to_string()))?;
-        cache.insert(path.to_path_buf(), meta.clone());
-        Ok(meta)
+        #[cfg(test)]
+        {
+            let json = std::fs::read_to_string(path)?;
+            serde_json::from_str(&json).map_err(|e| ExchangeDbError::Corruption(e.to_string()))
+        }
     }
 
     /// Update the metadata cache entry after a save.
@@ -1135,28 +1145,43 @@ fn partition_cache()
 }
 
 pub fn list_partitions(table_dir: &Path) -> Result<Vec<PathBuf>> {
-    let cache = partition_cache();
+    // Disable caching during tests to prevent cross-test interference.
+    #[cfg(test)]
+    return list_partition_dirs(table_dir);
 
-    // Cache with 5-second TTL (partitions change rarely during reads).
-    if let Some(entry) = cache.get(table_dir) {
-        let (ts, parts) = entry.value();
-        if ts.elapsed() < std::time::Duration::from_secs(5) {
-            return Ok(parts.clone());
+    #[cfg(not(test))]
+    {
+        let cache = partition_cache();
+
+        // Cache with 5-second TTL (partitions change rarely during reads).
+        if let Some(entry) = cache.get(table_dir) {
+            let (ts, parts) = entry.value();
+            if ts.elapsed() < std::time::Duration::from_secs(5) {
+                return Ok(parts.clone());
+            }
         }
-    }
 
-    let parts = list_partition_dirs(table_dir)?;
-    cache.insert(
-        table_dir.to_path_buf(),
-        (std::time::Instant::now(), parts.clone()),
-    );
-    Ok(parts)
+        let parts = list_partition_dirs(table_dir)?;
+        cache.insert(
+            table_dir.to_path_buf(),
+            (std::time::Instant::now(), parts.clone()),
+        );
+        Ok(parts)
+    } // cfg(not(test))
 }
 
 /// Invalidate the partition list cache for a table directory.
 /// Call this after INSERT or any operation that creates new partitions.
 pub fn invalidate_partition_cache(table_dir: &Path) {
     partition_cache().remove(table_dir);
+}
+
+/// Clear all caches (for test isolation).
+/// Clears: mmap cache, metadata cache, partition list cache.
+pub fn clear_all_caches() {
+    crate::mmap::clear_mmap_cache();
+    TableMeta::meta_cache().clear();
+    partition_cache().clear();
 }
 
 /// Read all rows from a partition, returning one `Vec<ColumnValue<'static>>`
