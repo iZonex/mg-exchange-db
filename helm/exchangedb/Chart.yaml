@@ -2,8 +2,8 @@ apiVersion: v2
 name: exchangedb
 description: A Helm chart for ExchangeDB - high-performance time-series database for financial exchange data
 type: application
-version: 0.1.1
-appVersion: "0.1.1"
+version: 0.1.2
+appVersion: "0.1.2"
 keywords:
   - database
   - timeseries

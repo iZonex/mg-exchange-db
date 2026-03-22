@@ -5,35 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-03-22
+
+### Exchange Functions
+- 21 new exchange-specific SQL functions:
+  - Balance engine: `liquidation_price()`, `unrealized_pnl()`, `margin_required()`,
+    `funding_payment()`, `fee_amount()`, `balance_available()`, `margin_ratio()`, `position_value()`
+  - Extended OHLCV: `taker_buy_volume()`, `taker_sell_volume()`, `quote_volume()`,
+    `delta()`, `delta_pct()`, `trade_count()`
+  - Order state: `order_fill_pct()`, `is_fully_filled()`, `remaining_qty()`,
+    `effective_price()`, `slippage()`
+
+### Reliability
+- Split-brain prevention with fencing tokens and monotonic epochs
+- Automated replica re-sync (`exchange-db replication resync`)
+- Replication lag monitoring (lag_bytes, lag_ms) with Prometheus gauges
+- Encryption key rotation (`exchange-db key-rotate`)
+
+### Testing
+- Fuzz testing: cargo-fuzz targets for SQL parser, ILP parser, WAL codec
+- Load testing: `exchangedb-loadtest` binary (concurrent readers + writers)
+- Chaos testing: 6 tests (kill-during-write, corruption, disk full, concurrent stress)
+- Lock contention profiling (N=1-16 threads)
+
+### Infrastructure
+- Helm chart for Kubernetes (StatefulSet, replication, ServiceMonitor)
+- Production checklist: 67/68 (99%)
+
+---
+
 ## [0.1.1] - 2026-03-21
 
 ### Performance
 - Mmap cache: reuse memory-mapped file handles across queries (eliminates repeated mmap/munmap)
-- Table registry: cache table metadata to avoid re-reading `_meta` on every query
-- Optimizer skip: bypass expensive optimization passes for small tables
-- Limit pushdown: propagate LIMIT into scan cursors to avoid reading unnecessary rows
-- Result: **100-200x speedup** for common queries (SELECT * LIMIT 25: ~2 ms -> ~11 µs)
+- Table registry: keep tables open in memory for zero-overhead scanning
+- Optimizer skip: bypass expensive optimization for simple queries
+- Limit pushdown: scan 1 partition instead of all for LIMIT queries
+- Result: **100-200x speedup** (SELECT * LIMIT 25: 2ms → 11µs, KDB+ competitive)
 
 ### Security
 - Path traversal fix: reject `../` and absolute paths in table names
-- Argon2 password hashing for service accounts (replacing plaintext)
-- Auth JSON injection fix: properly escape user input in authentication responses
+- Argon2 password hashing for service accounts (replacing SHA-256)
+- Auth JSON injection fix: properly escape user input in auth responses
+- Diagnostics endpoint requires authentication
 
 ### CLI
-- New commands: `config generate`, `check`, `replication status`, `debug wal`, `compact`, `status`, `version`
-- Full CLI reference documentation
+- New commands: `config show/validate/generate`, `check all/wal/partitions/metadata/disk-usage`,
+  `replication status/promote/demote`, `debug wal-inspect/partition-info/column-dump/diagnostics`,
+  `compact`, `status`, `version`
 
 ### Web Console
-- Server-side query timing displayed in results
+- Server-side query timing (not HTTP round-trip)
 
 ### Code Quality
 - Zero compiler warnings across all 6 crates
 - Zero clippy warnings (all lints clean)
 
 ### Documentation
-- CLI reference guide
-- Documentation index
-- Updated production checklist
+- CLI reference, docs index, production checklist
+- GitHub community files (LICENSE, CoC, SECURITY, CONTRIBUTING)
+- Issue templates, PR template, CODEOWNERS, dependabot
 
 ---
 
@@ -175,5 +206,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Column read | 590.70 M elements/s |
 | SIMD aggregation | 4.49 G elements/s |
 
+[0.1.2]: https://github.com/iZonex/mg-exchange-db/releases/tag/v0.1.2
 [0.1.1]: https://github.com/iZonex/mg-exchange-db/releases/tag/v0.1.1
 [0.1.0]: https://github.com/iZonex/mg-exchange-db/releases/tag/v0.1.0

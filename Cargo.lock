@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "exchange-common"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "byteorder",
  "crossbeam",
@@ -727,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "exchange-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "argon2",
  "byteorder",
@@ -754,7 +754,7 @@ dependencies = [
 
 [[package]]
 name = "exchange-db"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "base64",
@@ -778,7 +778,7 @@ dependencies = [
 
 [[package]]
 name = "exchange-exchange"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "criterion",
  "exchange-common",
@@ -790,7 +790,7 @@ dependencies = [
 
 [[package]]
 name = "exchange-net"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "argon2",
  "async-trait",
@@ -826,7 +826,7 @@ dependencies = [
 
 [[package]]
 name = "exchange-query"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64",
  "criterion",
