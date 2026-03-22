@@ -463,6 +463,8 @@ impl ScalarRegistry {
 
         // ── Exchange-domain functions (OHLCV, orderbook, tick) ──────
         crate::exchange_functions::register_exchange_functions(self);
+        // ── Balance, margin, position, order, trade-volume functions ──
+        crate::balance_functions::register_balance_functions(self);
     }
 }
 

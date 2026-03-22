@@ -7,6 +7,7 @@
 
 pub mod adaptive;
 pub mod asof;
+pub mod balance_functions;
 pub mod batch;
 pub mod casts;
 pub mod catalog;
