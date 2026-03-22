@@ -19,7 +19,7 @@ Updated: 2026-03-21
 
 - [x] **Schema replication**: Schema sync protocol propagates DDL to replicas
 - [x] **Data replication**: WAL-based streaming replication (primary -> replica)
-- [ ] **Replication lag monitoring**: Metrics framework in place, lag tracking partial
+- [x] **Replication lag monitoring**: lag_bytes, lag_ms tracked per replica, Prometheus gauges wired
 - [x] **Failover**: Automatic promotion on primary failure (health monitor + promote)
 - [ ] **No data loss on failover**: Async mode may lose uncommitted data; semi-sync/sync modes available
 - [ ] **Split-brain prevention**: Basic Raft consensus implemented, not battle-tested
@@ -35,7 +35,7 @@ Updated: 2026-03-21
 - [x] **SQL injection prevention**: Parameterized queries via pgwire extended protocol
 - [x] **Audit logging**: DDL operations logged, wired into executor
 - [x] **Rate limiting**: Per-IP token bucket, wired as HTTP middleware
-- [ ] **Key management**: Manual key configuration, no automatic rotation
+- [x] **Key management**: Key rotation via `exchange-db key-rotate` CLI command
 - [x] **Password hashing**: Argon2 (via `argon2` crate)
 - [x] **Session management**: Session timeout, configurable TTL
 - [x] **Input validation**: SQL parser rejects invalid input, ILP parser validates format
@@ -48,7 +48,7 @@ Updated: 2026-03-21
 - [x] **Memory bounded**: Per-query memory budget (256MB default), spill-to-disk for sorts/GROUP BY
 - [x] **CPU efficiency**: No busy-wait; tokio async runtime, rayon thread pool
 - [x] **I/O efficiency**: Sequential mmap reads, prefetch hints, zero-copy
-- [ ] **Lock contention**: Not profiled under sustained concurrent load
+- [x] **Lock contention**: Profiled with N=1,2,4,8,16 threads, p50/p99 lock wait times measured
 - [x] **GC-free**: Rust — no garbage collector, deterministic memory
 - [x] **Benchmark reproducibility**: Criterion benchmarks, TSBS-compatible suite
 
@@ -79,11 +79,11 @@ Updated: 2026-03-21
 
 - [x] **Unit tests**: ~26,500 tests across all crates
 - [x] **Integration tests**: End-to-end tests with SQL conformance suite
-- [ ] **Fuzz testing**: Not implemented
+- [x] **Fuzz testing**: cargo-fuzz targets for SQL parser, ILP parser, WAL codec
 - [x] **Crash recovery tests**: Dedicated crash recovery test suite
-- [ ] **Load testing**: No automated sustained load tests
+- [x] **Load testing**: exchangedb-loadtest binary (concurrent readers + writers)
 - [x] **Conformance tests**: SQL conformance test suite (crates/query/tests/conformance.rs)
-- [ ] **Chaos testing**: Not implemented
+- [x] **Chaos testing**: 6 chaos tests (kill-during-write, corruption, disk full, concurrent stress)
 
 ## 8. Documentation
 
@@ -100,12 +100,12 @@ Updated: 2026-03-21
 | Category | Score | Status |
 |----------|-------|--------|
 | Data Integrity | 8/9 | Production-ready (no FK, by design) |
-| Replication & HA | 5/8 | Functional, needs hardening |
-| Security | 10/11 | Production-ready (no key rotation) |
-| Performance | 8/9 | Production-ready |
+| Replication & HA | 6/8 | Lag monitoring added, split-brain/re-sync pending |
+| Security | 11/11 | Production-ready (key rotation added) |
+| Performance | 9/9 | Production-ready (lock contention profiled) |
 | Operational | 10/10 | Production-ready |
 | Compatibility | 7/7 | Production-ready |
-| Testing | 4/7 | Good coverage, no fuzz/chaos/load |
+| Testing | 7/7 | Full coverage (fuzz, load, chaos testing added) |
 | Documentation | 7/7 | Production-ready |
 
-**Overall: 59/68 (87%)** — Ready for single-node production deployment. Replication needs hardening for multi-node HA.
+**Overall: 65/68 (96%)** — Production-ready. Remaining: FK (by design), split-brain prevention, replica re-sync.

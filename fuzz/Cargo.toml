@@ -1,0 +1,42 @@
+[package]
+name = "exchange-db-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.exchange-common]
+path = "../crates/common"
+
+[dependencies.exchange-core]
+path = "../crates/core"
+
+[dependencies.exchange-query]
+path = "../crates/query"
+
+[dependencies.exchange-net]
+path = "../crates/net"
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "sql_parser"
+path = "fuzz_targets/sql_parser.rs"
+doc = false
+
+[[bin]]
+name = "ilp_parser"
+path = "fuzz_targets/ilp_parser.rs"
+doc = false
+
+[[bin]]
+name = "wal_codec"
+path = "fuzz_targets/wal_codec.rs"
+doc = false

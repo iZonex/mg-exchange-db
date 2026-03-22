@@ -8,6 +8,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use exchange_common::error::{ExchangeDbError, Result};
 use rand::Rng;
@@ -738,6 +739,119 @@ fn encrypted_path(path: &Path) -> PathBuf {
     let mut p = path.as_os_str().to_owned();
     p.push(".enc");
     PathBuf::from(p)
+}
+
+// ===========================================================================
+// Key rotation
+// ===========================================================================
+
+/// Result of a key rotation operation.
+#[derive(Debug, Clone)]
+pub struct RotationResult {
+    /// Number of tables processed.
+    pub tables_processed: usize,
+    /// Number of encrypted files re-encrypted with the new key.
+    pub files_rotated: usize,
+    /// Total duration of the rotation.
+    pub duration: Duration,
+}
+
+/// Rotate the encryption key for all tables in `db_root`.
+///
+/// Iterates every table directory under `db_root`, finds all `.enc` files,
+/// decrypts them with `old_key`, and re-encrypts with `new_key` using
+/// ChaCha20-Poly1305. The original `.enc` file is atomically replaced.
+pub fn rotate_key(db_root: &Path, old_key: &[u8], new_key: &[u8]) -> Result<RotationResult> {
+    let start = Instant::now();
+
+    if old_key.len() != 32 {
+        return Err(ExchangeDbError::Corruption(format!(
+            "old encryption key must be 32 bytes, got {}",
+            old_key.len()
+        )));
+    }
+    if new_key.len() != 32 {
+        return Err(ExchangeDbError::Corruption(format!(
+            "new encryption key must be 32 bytes, got {}",
+            new_key.len()
+        )));
+    }
+
+    let old_config = EncryptionConfig {
+        enabled: true,
+        algorithm: EncryptionAlgorithm::ChaCha20Poly1305,
+        key: old_key.to_vec(),
+    };
+    let new_config = EncryptionConfig {
+        enabled: true,
+        algorithm: EncryptionAlgorithm::ChaCha20Poly1305,
+        key: new_key.to_vec(),
+    };
+
+    let mut tables_processed = 0usize;
+    let mut files_rotated = 0usize;
+
+    if !db_root.is_dir() {
+        return Err(ExchangeDbError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("data directory does not exist: {}", db_root.display()),
+        )));
+    }
+
+    for entry in fs::read_dir(db_root)? {
+        let entry = entry?;
+        let table_dir = entry.path();
+        if !table_dir.is_dir() {
+            continue;
+        }
+        // Skip hidden directories and non-table directories.
+        let dir_name = entry.file_name();
+        let dir_name_str = dir_name.to_string_lossy();
+        if dir_name_str.starts_with('.') || dir_name_str.starts_with('_') {
+            continue;
+        }
+
+        let rotated = rotate_directory_enc_files(&table_dir, &old_config, &new_config)?;
+        if rotated > 0 {
+            tables_processed += 1;
+            files_rotated += rotated;
+        }
+    }
+
+    Ok(RotationResult {
+        tables_processed,
+        files_rotated,
+        duration: start.elapsed(),
+    })
+}
+
+/// Recursively find and re-encrypt all `.enc` files in a directory.
+fn rotate_directory_enc_files(
+    dir: &Path,
+    old_config: &EncryptionConfig,
+    new_config: &EncryptionConfig,
+) -> Result<usize> {
+    let mut count = 0usize;
+
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            count += rotate_directory_enc_files(&path, old_config, new_config)?;
+        } else if path.extension().and_then(|e| e.to_str()) == Some("enc") {
+            // Decrypt with old key, re-encrypt with new key.
+            let encrypted_data = fs::read(&path)?;
+            let plaintext = decrypt_buffer(&encrypted_data, old_config)?;
+            let re_encrypted = encrypt_buffer(&plaintext, new_config)?;
+            // Atomic replace: write to a temp file, then rename.
+            let tmp_path = path.with_extension("enc.tmp");
+            fs::write(&tmp_path, &re_encrypted)?;
+            fs::rename(&tmp_path, &path)?;
+            count += 1;
+        }
+    }
+
+    Ok(count)
 }
 
 #[cfg(test)]

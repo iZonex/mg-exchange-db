@@ -115,6 +115,21 @@ enum Command {
         input: PathBuf,
     },
 
+    /// Rotate the encryption key for all encrypted column files.
+    KeyRotate {
+        /// Root data directory.
+        #[arg(long, default_value = "./data")]
+        data_dir: PathBuf,
+
+        /// Old encryption key (base64-encoded, 32 bytes decoded).
+        #[arg(long)]
+        old_key: String,
+
+        /// New encryption key (base64-encoded, 32 bytes decoded).
+        #[arg(long)]
+        new_key: String,
+    },
+
     /// Print the version and build information.
     Version,
 
@@ -366,6 +381,11 @@ fn main() -> Result<()> {
         } => cmd_info(&data_dir, &table_name),
         Command::Snapshot { data_dir, output } => cmd_snapshot(&data_dir, &output),
         Command::Restore { data_dir, input } => cmd_restore(&input, &data_dir),
+        Command::KeyRotate {
+            data_dir,
+            old_key,
+            new_key,
+        } => cmd_key_rotate(&data_dir, &old_key, &new_key),
         Command::Version => cmd_version(),
         Command::Config(sub) => match sub {
             ConfigCommand::Show { config, format } => cmd_config_show(config, &format),
@@ -703,6 +723,50 @@ fn cmd_server(
 
         result.map_err(|e| anyhow::anyhow!(e))
     })?;
+
+    Ok(())
+}
+
+/// Rotate the encryption key for all encrypted column files.
+fn cmd_key_rotate(data_dir: &Path, old_key_b64: &str, new_key_b64: &str) -> Result<()> {
+    use base64::Engine as _;
+
+    let old_key = base64::engine::general_purpose::STANDARD
+        .decode(old_key_b64)
+        .context("failed to decode old-key from base64")?;
+    let new_key = base64::engine::general_purpose::STANDARD
+        .decode(new_key_b64)
+        .context("failed to decode new-key from base64")?;
+
+    if old_key.len() != 32 {
+        anyhow::bail!(
+            "old key must be 32 bytes after base64 decoding, got {}",
+            old_key.len()
+        );
+    }
+    if new_key.len() != 32 {
+        anyhow::bail!(
+            "new key must be 32 bytes after base64 decoding, got {}",
+            new_key.len()
+        );
+    }
+
+    println!(
+        "Rotating encryption key for data in {}...",
+        data_dir.display()
+    );
+
+    let result = exchange_core::encryption::rotate_key(data_dir, &old_key, &new_key)
+        .map_err(|e| anyhow::anyhow!("key rotation failed: {e}"))?;
+
+    println!("Key rotation complete:");
+    println!("  Tables processed:  {}", result.tables_processed);
+    println!("  Files re-encrypted: {}", result.files_rotated);
+    println!("  Duration:          {:.2?}", result.duration);
+
+    if result.files_rotated == 0 {
+        println!("\nNo encrypted files found. Make sure encryption is enabled and data exists.");
+    }
 
     Ok(())
 }

@@ -7,8 +7,8 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
 use exchange_common::error::{ExchangeDbError, Result};
 use serde::{Deserialize, Serialize};
@@ -39,6 +39,25 @@ pub struct ReplicationLagInfo {
     pub bytes_behind: u64,
     pub segments_behind: u32,
     pub last_ack_txn: u64,
+    /// Estimated lag in milliseconds (0 if unknown).
+    #[serde(default)]
+    pub lag_ms: u64,
+    /// Unix timestamp (millis) of last acknowledgement from this replica (0 if never).
+    #[serde(default)]
+    pub last_ack_time_ms: u64,
+}
+
+/// Aggregate replication lag snapshot across all replicas.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AggregateReplicationLag {
+    /// Maximum lag in bytes across all replicas.
+    pub lag_bytes: u64,
+    /// Maximum estimated lag in milliseconds across all replicas.
+    pub lag_ms: u64,
+    /// Unix timestamp (millis) of the most recent ack from any replica.
+    pub last_ack_time_ms: u64,
+    /// Number of replicas reporting lag data.
+    pub replica_count: usize,
 }
 
 impl From<&ReplicationLag> for ReplicationLagInfo {
@@ -48,6 +67,8 @@ impl From<&ReplicationLag> for ReplicationLagInfo {
             bytes_behind: lag.bytes_behind,
             segments_behind: lag.segments_behind,
             last_ack_txn: lag.last_ack_txn,
+            lag_ms: 0,
+            last_ack_time_ms: 0,
         }
     }
 }
@@ -65,6 +86,16 @@ pub struct ReplicationManager {
     failover: FailoverManager,
     running: AtomicBool,
     read_only: AtomicBool,
+    /// Aggregate replication lag in bytes (max across replicas).
+    replication_lag_bytes: AtomicU64,
+    /// Aggregate replication lag in milliseconds (estimated).
+    replication_lag_ms: AtomicU64,
+    /// Total bytes committed to WAL on the primary.
+    total_bytes_committed: AtomicU64,
+    /// Total bytes acknowledged by replicas.
+    total_bytes_acknowledged: AtomicU64,
+    /// Instant when the manager was created, for estimating lag_ms.
+    created_at: Instant,
 }
 
 impl ReplicationManager {
@@ -81,6 +112,11 @@ impl ReplicationManager {
             failover,
             running: AtomicBool::new(false),
             read_only: AtomicBool::new(is_replica),
+            replication_lag_bytes: AtomicU64::new(0),
+            replication_lag_ms: AtomicU64::new(0),
+            total_bytes_committed: AtomicU64::new(0),
+            total_bytes_acknowledged: AtomicU64::new(0),
+            created_at: Instant::now(),
         }
     }
 
@@ -135,10 +171,23 @@ impl ReplicationManager {
             return Ok(());
         }
 
+        // Track bytes committed from the segment file size.
+        let segment_size = std::fs::metadata(segment_path)
+            .map(|m| m.len())
+            .unwrap_or(0);
+        self.total_bytes_committed
+            .fetch_add(segment_size, Ordering::Relaxed);
+
         if let Some(ref shipper_lock) = self.shipper {
             let mut shipper = shipper_lock.write().await;
             match shipper.ship_segment(table, segment_path).await {
                 Ok(stats) => {
+                    // Track acknowledged bytes.
+                    if stats.replicas_acked > 0 {
+                        self.total_bytes_acknowledged
+                            .fetch_add(stats.bytes_shipped, Ordering::Relaxed);
+                    }
+                    self.update_lag_metrics(&shipper);
                     tracing::debug!(
                         table = %table,
                         bytes_shipped = stats.bytes_shipped,
@@ -147,6 +196,8 @@ impl ReplicationManager {
                     );
                 }
                 Err(e) => {
+                    // Update lag even on failure (lag increases).
+                    self.update_lag_metrics(&shipper);
                     // In async mode, log and continue. In sync/semi-sync modes
                     // the error is propagated.
                     match self.config.sync_mode {
@@ -250,6 +301,50 @@ impl ReplicationManager {
             lag,
             is_healthy: self.running.load(Ordering::SeqCst),
         }
+    }
+
+    /// Get the current aggregate replication lag in bytes.
+    pub fn lag_bytes(&self) -> u64 {
+        self.replication_lag_bytes.load(Ordering::Relaxed)
+    }
+
+    /// Get the current estimated replication lag in milliseconds.
+    pub fn lag_ms(&self) -> u64 {
+        self.replication_lag_ms.load(Ordering::Relaxed)
+    }
+
+    /// Get a snapshot of aggregate replication lag information.
+    pub fn replication_lag_info(&self) -> AggregateReplicationLag {
+        AggregateReplicationLag {
+            lag_bytes: self.replication_lag_bytes.load(Ordering::Relaxed),
+            lag_ms: self.replication_lag_ms.load(Ordering::Relaxed),
+            last_ack_time_ms: 0, // Would require wall-clock tracking per replica.
+            replica_count: self.config.replica_addrs.len(),
+        }
+    }
+
+    /// Update the aggregate lag metrics from the current shipper state.
+    fn update_lag_metrics(&self, shipper: &WalShipper) {
+        let lags = shipper.replication_lag();
+        let max_bytes = lags.values().map(|l| l.bytes_behind).max().unwrap_or(0);
+        self.replication_lag_bytes
+            .store(max_bytes, Ordering::Relaxed);
+
+        // Estimate lag_ms from committed vs acknowledged bytes and elapsed time.
+        let committed = self.total_bytes_committed.load(Ordering::Relaxed);
+        let acknowledged = self.total_bytes_acknowledged.load(Ordering::Relaxed);
+        let elapsed_ms = self.created_at.elapsed().as_millis() as u64;
+
+        if committed > 0 && elapsed_ms > 0 {
+            // bytes_per_ms = committed / elapsed_ms
+            // lag_ms = lag_bytes / bytes_per_ms = lag_bytes * elapsed_ms / committed
+            let lag_ms = (max_bytes as u128 * elapsed_ms as u128 / committed as u128) as u64;
+            self.replication_lag_ms.store(lag_ms, Ordering::Relaxed);
+        } else {
+            self.replication_lag_ms.store(0, Ordering::Relaxed);
+        }
+
+        let _ = (committed, acknowledged); // suppress unused warning for acknowledged
     }
 
     /// Whether this node is in read-only mode (replica).

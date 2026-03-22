@@ -26,7 +26,9 @@ pub use auto_failover::AutoFailover;
 pub use config::{ReplicationConfig, ReplicationRole, ReplicationSyncMode};
 pub use failover::FailoverManager;
 pub use health_monitor::PrimaryHealthMonitor;
-pub use manager::{ReplicationManager, ReplicationStatus};
+pub use manager::{
+    AggregateReplicationLag, ReplicationLagInfo, ReplicationManager, ReplicationStatus,
+};
 pub use protocol::ReplicationMessage;
 pub use s3_shipper::{S3WalReceiver, S3WalShipper};
 pub use wal_receiver::{ReplicaPosition, WalReceiver};
