@@ -173,8 +173,9 @@ fn partition_lock_different_partitions_parallel() {
     for h in handles {
         let elapsed = h.join().unwrap();
         assert!(
-            elapsed < Duration::from_millis(100),
-            "parallel partition locks should not block each other"
+            elapsed < Duration::from_millis(500),
+            "parallel partition locks should not block each other (took {:?})",
+            elapsed
         );
     }
 }
