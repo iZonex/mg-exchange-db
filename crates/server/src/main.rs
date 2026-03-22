@@ -283,6 +283,17 @@ enum ReplicationCommand {
         #[arg(long)]
         new_primary: String,
     },
+
+    /// Re-sync this replica from the primary via full snapshot transfer.
+    Resync {
+        /// Path to configuration file.
+        #[arg(long)]
+        config: Option<PathBuf>,
+
+        /// Root data directory.
+        #[arg(long, default_value = "./data")]
+        data_dir: PathBuf,
+    },
 }
 
 /// Debug / inspection subcommands.
@@ -411,6 +422,9 @@ fn main() -> Result<()> {
                 data_dir,
                 new_primary,
             } => cmd_replication_demote(config, &data_dir, &new_primary),
+            ReplicationCommand::Resync { config, data_dir } => {
+                cmd_replication_resync(config, &data_dir)
+            }
         },
         Command::Debug(sub) => match sub {
             DebugCommand::WalInspect {
@@ -1470,6 +1484,40 @@ fn cmd_replication_demote(
     println!();
     println!("The node will begin following the new primary at {new_primary}");
     Ok(())
+}
+
+fn cmd_replication_resync(config_path: Option<PathBuf>, data_dir: &Path) -> Result<()> {
+    let mut cfg =
+        ExchangeDbConfig::load(config_path.as_deref()).context("failed to load configuration")?;
+    cfg = cfg.with_env();
+
+    if cfg.replication.role != "replica" {
+        anyhow::bail!(
+            "can only resync a replica (current role: {})",
+            cfg.replication.role
+        );
+    }
+
+    let repl_config = cfg.replication.to_replication_config();
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(async {
+        let mut mgr = exchange_core::replication::ReplicationManager::new(
+            data_dir.to_path_buf(),
+            repl_config,
+        );
+        mgr.start()
+            .await
+            .context("failed to start replication manager")?;
+
+        println!("Starting replica re-sync from primary...");
+        let result = mgr.resync_from_primary().await.context("re-sync failed")?;
+
+        println!("Re-sync completed successfully:");
+        println!("  Tables synced:     {}", result.tables_synced);
+        println!("  Bytes transferred: {}", result.bytes_transferred);
+        println!("  Duration:          {}ms", result.duration_ms);
+        Ok(())
+    })
 }
 
 // ---------------------------------------------------------------------------

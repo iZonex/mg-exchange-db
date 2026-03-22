@@ -15,6 +15,7 @@
 pub mod auto_failover;
 pub mod config;
 pub mod failover;
+pub mod fencing;
 pub mod health_monitor;
 pub mod manager;
 pub mod protocol;
@@ -25,9 +26,11 @@ pub mod wal_shipper;
 pub use auto_failover::AutoFailover;
 pub use config::{ReplicationConfig, ReplicationRole, ReplicationSyncMode};
 pub use failover::FailoverManager;
+pub use fencing::FencingToken;
 pub use health_monitor::PrimaryHealthMonitor;
 pub use manager::{
     AggregateReplicationLag, ReplicationLagInfo, ReplicationManager, ReplicationStatus,
+    ResyncResult,
 };
 pub use protocol::ReplicationMessage;
 pub use s3_shipper::{S3WalReceiver, S3WalShipper};
