@@ -141,7 +141,7 @@ fn count_rows(root: &Path, table: &str, column: &str, col_type: ColumnType) -> u
             let col_path = path.join(format!("{column}.d"));
             if col_path.exists() {
                 let reader = FixedColumnReader::open(&col_path, col_type).unwrap();
-                total += reader.row_count() as u64;
+                total += reader.row_count();
             }
         }
     }
