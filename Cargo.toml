@@ -20,7 +20,7 @@ rust-version = "1.85"
 [workspace.dependencies]
 # Storage
 memmap2 = "0.9"
-lz4_flex = "0.11"
+lz4_flex = "0.13"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 # Concurrency
@@ -36,15 +36,15 @@ futures = "0.3"
 
 # Network
 axum = { version = "0.8", features = ["ws"] }
-axum-server = { version = "0.7", features = ["tls-rustls"] }
+axum-server = { version = "0.8", features = ["tls-rustls"] }
 rustls = { version = "0.23", features = ["ring"] }
 rustls-pemfile = "2"
 tokio-util = { version = "0.7", features = ["codec"] }
-pgwire = "0.28"
+pgwire = "0.38"
 tower-http = { version = "0.6", features = ["cors"] }
 
 # Query
-sqlparser = { version = "0.55", features = ["visitor"] }
+sqlparser = { version = "0.61", features = ["visitor"] }
 regex = "1"
 
 # Serialization
@@ -55,10 +55,10 @@ sha2 = "0.10"
 hmac = "0.12"
 argon2 = "0.5"
 subtle = "2"
-rand = "0.8"
-ureq = { version = "2", features = ["json"] }
+rand = "0.10"
+ureq = { version = "3", features = ["json"] }
 uuid = { version = "1", features = ["v4"] }
-toml = "0.8"
+toml = "1.0"
 rkyv = "0.8"
 byteorder = "1"
 
@@ -74,7 +74,7 @@ thiserror = "2"
 anyhow = "1"
 
 # Testing
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 # Internal crates
 exchange-common = { path = "crates/common" }
