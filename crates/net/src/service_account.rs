@@ -226,19 +226,15 @@ impl ServiceAccountStore {
 
 /// Generate a random API key (prefix + random bytes).
 fn generate_api_key() -> String {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
     let mut bytes = [0u8; 24];
-    rng.fill(&mut bytes);
+    rand::fill(&mut bytes);
     format!("exdb_{}", URL_SAFE_NO_PAD.encode(bytes))
 }
 
 /// Generate a random secret (high-entropy token).
 fn generate_secret() -> String {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
     let mut bytes = [0u8; 32];
-    rng.fill(&mut bytes);
+    rand::fill(&mut bytes);
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
@@ -247,7 +243,9 @@ fn generate_secret() -> String {
 /// Returns a PHC-formatted hash string (includes salt, params, and hash).
 fn hash_secret(secret: &str) -> String {
     use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
-    let salt = SaltString::generate(&mut rand::thread_rng());
+    let mut salt_bytes = [0u8; 16];
+    rand::fill(&mut salt_bytes);
+    let salt = SaltString::encode_b64(&salt_bytes).expect("salt encoding failed");
     Argon2::default()
         .hash_password(secret.as_bytes(), &salt)
         .expect("argon2 hashing should not fail")

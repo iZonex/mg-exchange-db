@@ -7,8 +7,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::sink::Sink;
 use futures::stream;
-use pgwire::api::ClientInfo;
-use pgwire::api::Type;
+use pgwire::api::{ClientInfo, ClientPortalStore, Type};
 use pgwire::api::query::SimpleQueryHandler;
 use pgwire::api::results::{DataRowEncoder, FieldFormat, FieldInfo, QueryResponse, Response, Tag};
 use pgwire::error::{ErrorInfo, PgWireError, PgWireResult};
@@ -41,10 +40,10 @@ impl ExchangeDbHandler {
 impl ExchangeDbHandler {
     /// Intercept known psql meta-command queries (e.g. \dt, \d table) that use
     /// complex pg_catalog JOINs and return pre-computed results from our catalog.
-    fn intercept_psql_meta_query<'a>(
+    fn intercept_psql_meta_query(
         &self,
         query: &str,
-    ) -> Option<PgWireResult<Vec<Response<'a>>>> {
+    ) -> Option<PgWireResult<Vec<Response>>> {
         let upper = query.to_uppercase();
 
         // Detect \dt query: SELECT ... FROM pg_catalog.pg_class with RELKIND IN filter
@@ -89,7 +88,7 @@ impl ExchangeDbHandler {
     }
 
     /// Handle \dt: list all user tables.
-    fn handle_list_tables<'a>(&self) -> PgWireResult<Vec<Response<'a>>> {
+    fn handle_list_tables(&self) -> PgWireResult<Vec<Response>> {
         // Read table names from the data directory.
         let mut table_names = Vec::new();
         if let Ok(entries) = std::fs::read_dir(&self.db_root) {
@@ -131,7 +130,7 @@ impl ExchangeDbHandler {
             for value in row {
                 encode_value(&mut encoder, value)?;
             }
-            data_rows.push(encoder.finish()?);
+            data_rows.push(encoder.take_row());
         }
 
         let data_row_stream = stream::iter(data_rows.into_iter().map(Ok));
@@ -168,7 +167,7 @@ impl ExchangeDbHandler {
 
     /// Handle pg_class query by OID: return table metadata.
     /// psql sends: SELECT c.relchecks, c.relkind, ... WHERE c.oid = '<oid>'
-    fn handle_pg_class_by_oid<'a>(&self, table_name: &str) -> PgWireResult<Vec<Response<'a>>> {
+    fn handle_pg_class_by_oid(&self, table_name: &str) -> PgWireResult<Vec<Response>> {
         // Return the columns that psql expects for the describe command
         let columns = vec![
             "relchecks".to_string(),
@@ -211,7 +210,7 @@ impl ExchangeDbHandler {
             for value in row {
                 encode_value(&mut encoder, value)?;
             }
-            data_rows.push(encoder.finish()?);
+            data_rows.push(encoder.take_row());
         }
 
         let data_row_stream = stream::iter(data_rows.into_iter().map(Ok));
@@ -221,7 +220,7 @@ impl ExchangeDbHandler {
 
     /// Handle unrecognized pg_catalog queries by returning empty result set.
     /// Extracts column names from the SELECT clause to provide correct schema.
-    fn handle_empty_catalog_query<'a>(&self, _query: &str) -> PgWireResult<Vec<Response<'a>>> {
+    fn handle_empty_catalog_query(&self, _query: &str) -> PgWireResult<Vec<Response>> {
         // Return an empty result with a single generic column
         let field_infos = vec![FieldInfo::new(
             "?column?".to_owned(),
@@ -238,7 +237,7 @@ impl ExchangeDbHandler {
 
     /// Handle \d <table> first query: return fake OID for the table.
     /// psql sends: SELECT c.oid, n.nspname, c.relname FROM pg_catalog.pg_class c ...
-    fn handle_table_oid_lookup<'a>(&self, table_name: &str) -> PgWireResult<Vec<Response<'a>>> {
+    fn handle_table_oid_lookup(&self, table_name: &str) -> PgWireResult<Vec<Response>> {
         let table_dir = self.db_root.join(table_name);
         if !table_dir.exists() {
             // Return empty result - psql will say "Did not find any relation"
@@ -288,7 +287,7 @@ impl ExchangeDbHandler {
             for value in row {
                 encode_value(&mut encoder, value)?;
             }
-            data_rows.push(encoder.finish()?);
+            data_rows.push(encoder.take_row());
         }
 
         let data_row_stream = stream::iter(data_rows.into_iter().map(Ok));
@@ -297,7 +296,7 @@ impl ExchangeDbHandler {
     }
 
     /// Handle \d <table>: describe a specific table's columns.
-    fn handle_describe_table<'a>(&self, table_name: &str) -> PgWireResult<Vec<Response<'a>>> {
+    fn handle_describe_table(&self, table_name: &str) -> PgWireResult<Vec<Response>> {
         let table_dir = self.db_root.join(table_name);
         if !table_dir.exists() {
             return Err(PgWireError::UserError(Box::new(ErrorInfo::new(
@@ -354,7 +353,7 @@ impl ExchangeDbHandler {
             for value in row {
                 encode_value(&mut encoder, value)?;
             }
-            data_rows.push(encoder.finish()?);
+            data_rows.push(encoder.take_row());
         }
 
         let data_row_stream = stream::iter(data_rows.into_iter().map(Ok));
@@ -514,13 +513,13 @@ pub(crate) fn encode_value(encoder: &mut DataRowEncoder, value: &Value) -> PgWir
 
 #[async_trait]
 impl SimpleQueryHandler for ExchangeDbHandler {
-    async fn do_query<'a, 'b: 'a, C>(
-        &'b self,
+    async fn do_query<C>(
+        &self,
         _client: &mut C,
-        query: &'a str,
-    ) -> PgWireResult<Vec<Response<'a>>>
+        query: &str,
+    ) -> PgWireResult<Vec<Response>>
     where
-        C: ClientInfo + Sink<PgWireBackendMessage> + Unpin + Send + Sync,
+        C: ClientInfo + ClientPortalStore + Sink<PgWireBackendMessage> + Unpin + Send + Sync,
         C::Error: Debug,
         PgWireError: From<<C as Sink<PgWireBackendMessage>>::Error>,
     {
@@ -581,7 +580,7 @@ impl SimpleQueryHandler for ExchangeDbHandler {
                     for value in row {
                         encode_value(&mut encoder, value)?;
                     }
-                    data_rows.push(encoder.finish()?);
+                    data_rows.push(encoder.take_row());
                 }
 
                 let data_row_stream = stream::iter(data_rows.into_iter().map(Ok));

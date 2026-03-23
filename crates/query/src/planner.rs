@@ -195,13 +195,9 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
                 }
             }
         }
-        Statement::AlterTable {
-            name,
-            if_exists: _,
-            only: _,
-            operations,
-            ..
-        } => plan_alter_table(name, operations),
+        Statement::AlterTable(alter_table) => {
+            plan_alter_table(&alter_table.name, &alter_table.operations)
+        }
         Statement::Drop {
             object_type,
             if_exists,
@@ -210,12 +206,9 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
             ..
         } => plan_drop(object_type, names, *if_exists),
         Statement::Delete(del) => plan_delete(del),
-        Statement::Update {
-            table,
-            assignments,
-            selection,
-            ..
-        } => plan_update(table, assignments, selection),
+        Statement::Update(update) => {
+            plan_update(&update.table, &update.assignments, &update.selection)
+        }
         Statement::Explain {
             statement, analyze, ..
         } => {
@@ -241,15 +234,11 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
         Statement::StartTransaction { .. } => Ok(QueryPlan::Begin),
         Statement::Commit { .. } => Ok(QueryPlan::Commit),
         Statement::Rollback { .. } => Ok(QueryPlan::Rollback),
-        Statement::SetVariable {
-            variables, value, ..
-        } => {
-            let name = variables
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<_>>()
-                .join(".");
-            let val = value
+        Statement::Set(ast::Set::SingleAssignment {
+            variable, values, ..
+        }) => {
+            let name = variable.to_string();
+            let val = values
                 .iter()
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
@@ -264,7 +253,8 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
                 .join(".");
             Ok(QueryPlan::Show { name })
         }
-        Statement::Truncate { table_names, .. } => {
+        Statement::Truncate(truncate) => {
+            let table_names = &truncate.table_names;
             if table_names.is_empty() {
                 return Err(ExchangeDbError::Query(
                     "TRUNCATE requires a table name".into(),
@@ -280,7 +270,7 @@ pub fn plan_query(sql: &str) -> Result<QueryPlan> {
                 .map(|n| n.to_string())
                 .unwrap_or_else(|| "unnamed_index".to_string());
             let table = ci.table_name.to_string();
-            let columns: Vec<String> = ci.columns.iter().map(|c| c.expr.to_string()).collect();
+            let columns: Vec<String> = ci.columns.iter().map(|c| c.column.expr.to_string()).collect();
             Ok(QueryPlan::CreateIndex {
                 name,
                 table,
@@ -421,8 +411,8 @@ fn plan_create_table(
         .map(|c| {
             // Look for CHECK constraint in column options.
             let check = c.options.iter().find_map(|opt| {
-                if let ast::ColumnOption::Check(expr) = &opt.option {
-                    sql_expr_to_plan_expr(expr).ok()
+                if let ast::ColumnOption::Check(cc) = &opt.option {
+                    sql_expr_to_plan_expr(&cc.expr).ok()
                 } else {
                     None
                 }
@@ -434,14 +424,10 @@ fn plan_create_table(
                 .any(|opt| matches!(&opt.option, ast::ColumnOption::Unique { .. }));
             // Look for REFERENCES (foreign key) constraint.
             let references = c.options.iter().find_map(|opt| {
-                if let ast::ColumnOption::ForeignKey {
-                    foreign_table,
-                    referred_columns,
-                    ..
-                } = &opt.option
+                if let ast::ColumnOption::ForeignKey(fk) = &opt.option
                 {
-                    let ref_table = foreign_table.to_string();
-                    let ref_col = referred_columns
+                    let ref_table = fk.foreign_table.to_string();
+                    let ref_col = fk.referred_columns
                         .first()
                         .map(|c| c.value.clone())
                         .unwrap_or_default();
@@ -502,9 +488,9 @@ fn plan_alter_table(
                 column_type,
             })
         }
-        ast::AlterTableOperation::DropColumn { column_name, .. } => Ok(QueryPlan::DropColumn {
+        ast::AlterTableOperation::DropColumn { column_names, .. } => Ok(QueryPlan::DropColumn {
             table,
-            column_name: column_name.value.clone(),
+            column_name: column_names.first().map(|c| c.value.clone()).unwrap_or_default(),
         }),
         ast::AlterTableOperation::RenameColumn {
             old_column_name,
@@ -526,10 +512,17 @@ fn plan_alter_table(
                 "unsupported ALTER COLUMN operation: {other}"
             ))),
         },
-        ast::AlterTableOperation::RenameTable { table_name } => Ok(QueryPlan::RenameTable {
-            old_name: table,
-            new_name: table_name.to_string(),
-        }),
+        ast::AlterTableOperation::RenameTable { table_name } => {
+            let new_name = match table_name {
+                ast::RenameTableNameKind::To(name) | ast::RenameTableNameKind::As(name) => {
+                    name.to_string()
+                }
+            };
+            Ok(QueryPlan::RenameTable {
+                old_name: table,
+                new_name,
+            })
+        }
         other => Err(ExchangeDbError::Query(format!(
             "unsupported ALTER TABLE operation: {other}"
         ))),
@@ -851,14 +844,7 @@ fn plan_asof_join(query: &ast::Query, asof: &AsofJoinInfo) -> Result<QueryPlan> 
         .unwrap_or_default();
 
     // LIMIT
-    let limit = if let Some(limit_expr) = &query.limit {
-        match expr_to_value(limit_expr)? {
-            Value::I64(n) if n >= 0 => Some(n as u64),
-            _ => None,
-        }
-    } else {
-        None
-    };
+    let limit = extract_limit(query)?;
 
     Ok(QueryPlan::AsofJoin {
         left_table,
@@ -1132,6 +1118,7 @@ fn plan_select_inner(
             lateral: true,
             subquery,
             alias,
+            ..
         } = &select.from[1].relation
     {
         let sub_plan = plan_select(subquery, None, None, false, None)?;
@@ -1397,7 +1384,7 @@ fn plan_select_inner(
                 .collect();
             (false, cols)
         }
-        None => (false, Vec::new()),
+        Some(ast::Distinct::All) | None => (false, Vec::new()),
     };
 
     Ok(QueryPlan::Select {
@@ -1475,20 +1462,39 @@ fn extract_order_by(query: &ast::Query) -> Result<Vec<OrderBy>> {
 }
 
 fn extract_limit(query: &ast::Query) -> Result<Option<u64>> {
-    if let Some(limit_expr) = &query.limit {
-        match expr_to_value(limit_expr)? {
-            Value::I64(n) if n >= 0 => Ok(Some(n as u64)),
-            _ => Ok(None),
+    // Try to extract from limit_clause first.
+    let from_clause = match &query.limit_clause {
+        Some(ast::LimitClause::LimitOffset { limit, .. }) => {
+            if let Some(limit_expr) = limit {
+                match expr_to_value(limit_expr)? {
+                    Value::I64(n) if n >= 0 => Some(n as u64),
+                    _ => None,
+                }
+            } else {
+                None
+            }
         }
-    } else if let Some(ref fetch) = query.fetch {
-        // FETCH FIRST N ROWS ONLY — SQL standard equivalent of LIMIT.
+        Some(ast::LimitClause::OffsetCommaLimit { limit, .. }) => {
+            match expr_to_value(limit)? {
+                Value::I64(n) if n >= 0 => Some(n as u64),
+                _ => None,
+            }
+        }
+        None => None,
+    };
+
+    if from_clause.is_some() {
+        return Ok(from_clause);
+    }
+
+    // Fall back to FETCH FIRST N ROWS ONLY.
+    if let Some(ref fetch) = query.fetch {
         if let Some(ref qty) = fetch.quantity {
             match expr_to_value(qty)? {
                 Value::I64(n) if n >= 0 => Ok(Some(n as u64)),
                 _ => Ok(None),
             }
         } else {
-            // FETCH FIRST ROWS ONLY without a count means LIMIT 1.
             Ok(Some(1))
         }
     } else {
@@ -1497,13 +1503,24 @@ fn extract_limit(query: &ast::Query) -> Result<Option<u64>> {
 }
 
 fn extract_offset(query: &ast::Query) -> Result<Option<u64>> {
-    if let Some(offset) = &query.offset {
-        match expr_to_value(&offset.value)? {
-            Value::I64(n) if n >= 0 => Ok(Some(n as u64)),
-            _ => Ok(None),
+    match &query.limit_clause {
+        Some(ast::LimitClause::LimitOffset { offset, .. }) => {
+            if let Some(off) = offset {
+                match expr_to_value(&off.value)? {
+                    Value::I64(n) if n >= 0 => Ok(Some(n as u64)),
+                    _ => Ok(None),
+                }
+            } else {
+                Ok(None)
+            }
         }
-    } else {
-        Ok(None)
+        Some(ast::LimitClause::OffsetCommaLimit { offset, .. }) => {
+            match expr_to_value(offset)? {
+                Value::I64(n) if n >= 0 => Ok(Some(n as u64)),
+                _ => Ok(None),
+            }
+        }
+        None => Ok(None),
     }
 }
 
@@ -1889,7 +1906,7 @@ fn plan_standard_join_inner_impl(
             (JoinType::Right, constraint)
         }
         JoinOperator::FullOuter(constraint) => (JoinType::FullOuter, constraint),
-        JoinOperator::CrossJoin => {
+        JoinOperator::CrossJoin(_) => {
             return {
                 // CROSS JOIN: no ON columns needed
                 let columns = if force_wildcard {
@@ -2149,7 +2166,7 @@ fn extract_join_type_and_on_helper(join: &ast::Join) -> Result<(JoinType, Vec<(S
         JoinOperator::LeftOuter(c) | JoinOperator::Left(c) => (JoinType::Left, Some(c)),
         JoinOperator::RightOuter(c) | JoinOperator::Right(c) => (JoinType::Right, Some(c)),
         JoinOperator::FullOuter(c) => (JoinType::FullOuter, Some(c)),
-        JoinOperator::CrossJoin => (JoinType::Cross, None),
+        JoinOperator::CrossJoin(_) => (JoinType::Cross, None),
         other => {
             return Err(ExchangeDbError::Query(format!(
                 "unsupported JOIN type: {other:?}"
@@ -2382,6 +2399,7 @@ fn select_expr_to_column(expr: &Expr, alias: Option<String>) -> Result<SelectCol
             operand,
             conditions,
             else_result,
+            ..
         } => {
             let mut case_conditions = Vec::new();
             let mut expr_conds = Vec::new();
@@ -2964,7 +2982,7 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                     )));
                 }
             };
-            let pat = apply_like_escape(&pat, escape_char.as_deref());
+            let pat = apply_like_escape(&pat, escape_char.clone().and_then(|v| v.into_string()).as_deref());
             if *negated {
                 Ok(Filter::NotLike(col, pat))
             } else {
@@ -2997,7 +3015,7 @@ fn expr_to_filter(expr: &Expr) -> Result<Filter> {
                     )));
                 }
             };
-            let pat = apply_like_escape(&pat, escape_char.as_deref());
+            let pat = apply_like_escape(&pat, escape_char.clone().and_then(|v| v.into_string()).as_deref());
             if *negated {
                 // NOT ILIKE: treat as case-insensitive NOT LIKE — negate ILike
                 // We don't have a dedicated NotILike, so use And with a negation workaround.
@@ -3430,6 +3448,7 @@ fn sql_expr_to_plan_expr(expr: &Expr) -> Result<PlanExpr> {
             operand: _,
             conditions,
             else_result,
+            ..
         } => {
             // Build a CASE WHEN expression using nested IIF-like functions.
             // We'll use a simple approach: evaluate condition, return THEN value or ELSE.

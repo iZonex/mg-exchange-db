@@ -2,6 +2,7 @@
 
 use dashmap::DashMap;
 use exchange_common::error::{ExchangeDbError, Result};
+use std::io::Read;
 use std::path::PathBuf;
 
 /// Trait for object storage backends used by cold tier storage.
@@ -281,10 +282,10 @@ impl ObjectStore for S3ObjectStore {
 
         let mut req = ureq::put(&url);
         for (k, v) in &headers {
-            req = req.set(k, v);
+            req = req.header(k, v);
         }
 
-        req.send_bytes(data)
+        req.send(data)
             .map_err(|e| ExchangeDbError::Corruption(format!("S3 PUT failed for {key}: {e}")))?;
 
         Ok(())
@@ -297,7 +298,7 @@ impl ObjectStore for S3ObjectStore {
 
         let mut req = ureq::get(&url);
         for (k, v) in &headers {
-            req = req.set(k, v);
+            req = req.header(k, v);
         }
 
         let response = req
@@ -306,7 +307,8 @@ impl ObjectStore for S3ObjectStore {
 
         let mut body = Vec::new();
         response
-            .into_reader()
+            .into_body()
+            .as_reader()
             .read_to_end(&mut body)
             .map_err(ExchangeDbError::Io)?;
 
@@ -320,7 +322,7 @@ impl ObjectStore for S3ObjectStore {
 
         let mut req = ureq::delete(&url);
         for (k, v) in &headers {
-            req = req.set(k, v);
+            req = req.header(k, v);
         }
 
         req.call()
@@ -352,14 +354,15 @@ impl ObjectStore for S3ObjectStore {
         );
 
         let response = ureq::get(&url)
-            .set("Authorization", &auth)
-            .set("x-amz-content-sha256", &empty_hash)
-            .set("x-amz-date", &timestamp)
+            .header("Authorization", &auth)
+            .header("x-amz-content-sha256", &empty_hash)
+            .header("x-amz-date", &timestamp)
             .call()
             .map_err(|e| ExchangeDbError::Corruption(format!("S3 LIST failed: {e}")))?;
 
         let body = response
-            .into_string()
+            .into_body()
+            .read_to_string()
             .map_err(|e| ExchangeDbError::Corruption(format!("S3 LIST read body failed: {e}")))?;
 
         // Parse XML response to extract <Key> elements.
@@ -387,15 +390,19 @@ impl ObjectStore for S3ObjectStore {
 
         let mut req = ureq::head(&url);
         for (k, v) in &headers {
-            req = req.set(k, v);
+            req = req.header(k, v);
         }
 
         match req.call() {
             Ok(_) => Ok(true),
-            Err(ureq::Error::Status(404, _)) => Ok(false),
-            Err(e) => Err(ExchangeDbError::Corruption(format!(
-                "S3 HEAD failed for {key}: {e}"
-            ))),
+            Err(e) => {
+                if let ureq::Error::StatusCode(404) = &e {
+                    return Ok(false);
+                }
+                Err(ExchangeDbError::Corruption(format!(
+                    "S3 HEAD failed for {key}: {e}"
+                )))
+            }
         }
     }
 }

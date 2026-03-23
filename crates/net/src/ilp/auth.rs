@@ -36,9 +36,8 @@ impl IlpAuthenticator {
 
     /// Generate a random challenge nonce (32 bytes).
     pub fn generate_challenge() -> Vec<u8> {
-        use rand::RngCore;
         let mut nonce = vec![0u8; 32];
-        rand::thread_rng().fill_bytes(&mut nonce);
+        rand::fill(&mut nonce[..]);
         nonce
     }
 

@@ -1645,7 +1645,7 @@ fn cmd_debug_diagnostics(host: &str) -> Result<()> {
         .with_context(|| format!("failed to connect to {url}"))?;
 
     let body: serde_json::Value = resp
-        .into_json()
+        .into_body().read_json()
         .context("failed to parse diagnostics response")?;
 
     println!("{}", serde_json::to_string_pretty(&body)?);
@@ -1818,7 +1818,7 @@ fn cmd_status(host: &str) -> Result<()> {
                 println!("Server: UNHEALTHY (HTTP {status})");
             }
 
-            if let Ok(body) = resp.into_json::<serde_json::Value>()
+            if let Ok(body) = resp.into_body().read_json::<serde_json::Value>()
                 && let Some(obj) = body.as_object()
             {
                 for (k, v) in obj {
@@ -1838,7 +1838,7 @@ fn cmd_status(host: &str) -> Result<()> {
     let tables_url = format!("{host}/api/v1/tables");
     match ureq::get(&tables_url).call() {
         Ok(resp) => {
-            if let Ok(body) = resp.into_json::<serde_json::Value>()
+            if let Ok(body) = resp.into_body().read_json::<serde_json::Value>()
                 && let Some(tables) = body.get("tables").and_then(|t| t.as_array())
             {
                 println!("Tables: {}", tables.len());

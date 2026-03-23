@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use exchange_common::error::{ExchangeDbError, Result};
-use rand::Rng;
 use sha2::{Digest, Sha256};
 
 /// Magic bytes identifying an encrypted file.
@@ -645,7 +644,7 @@ pub fn encrypt_buffer(data: &[u8], config: &EncryptionConfig) -> Result<Vec<u8>>
 
     // Generate random 12-byte nonce
     let mut nonce = [0u8; 12];
-    rand::thread_rng().fill(&mut nonce);
+    rand::fill(&mut nonce);
 
     // Derive per-message key from user key + nonce for extra safety
     let (derived_key, _) = derive_key_nonce(key, &nonce);

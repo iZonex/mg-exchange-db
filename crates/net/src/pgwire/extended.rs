@@ -53,7 +53,15 @@ pub struct ExchangeDbQueryParser;
 impl QueryParser for ExchangeDbQueryParser {
     type Statement = ParsedStatement;
 
-    async fn parse_sql(&self, sql: &str, types: &[Type]) -> PgWireResult<Self::Statement> {
+    async fn parse_sql<C>(
+        &self,
+        _client: &C,
+        sql: &str,
+        types: &[Option<Type>],
+    ) -> PgWireResult<Self::Statement>
+    where
+        C: ClientInfo + Unpin + Send + Sync,
+    {
         // Validate that the SQL can be planned (catches syntax errors early).
         // We accept parameter placeholders ($1, $2, ...) by not rejecting them
         // here — they will be substituted at execution time.
@@ -72,8 +80,20 @@ impl QueryParser for ExchangeDbQueryParser {
 
         Ok(ParsedStatement {
             sql: sql.to_owned(),
-            parameter_types: types.to_vec(),
+            parameter_types: types.iter().map(|t| t.clone().unwrap_or(Type::TEXT)).collect(),
         })
+    }
+
+    fn get_parameter_types(&self, stmt: &Self::Statement) -> PgWireResult<Vec<Type>> {
+        Ok(stmt.parameter_types.clone())
+    }
+
+    fn get_result_schema(
+        &self,
+        _stmt: &Self::Statement,
+        _column_format: Option<&pgwire::api::portal::Format>,
+    ) -> PgWireResult<Vec<FieldInfo>> {
+        Ok(vec![])
     }
 }
 
@@ -182,12 +202,15 @@ impl ExtendedQueryHandler for ExchangeDbExtendedHandler {
         PgWireError: From<<C as Sink<PgWireBackendMessage>>::Error>,
     {
         // Report parameter types (the ones the client told us, or inferred as TEXT).
-        let param_types = if stmt.parameter_types.is_empty() {
+        let param_types: Vec<Type> = if stmt.parameter_types.iter().all(|t| t.is_none()) {
             // Count $N placeholders in the SQL to determine parameter count.
             let count = count_placeholders(&stmt.statement.sql);
             vec![Type::TEXT; count]
         } else {
-            stmt.parameter_types.clone()
+            stmt.parameter_types
+                .iter()
+                .map(|t| t.clone().unwrap_or(Type::TEXT))
+                .collect()
         };
 
         // Try to determine output columns by planning the query.
@@ -220,12 +243,12 @@ impl ExtendedQueryHandler for ExchangeDbExtendedHandler {
         Ok(DescribePortalResponse::new(fields))
     }
 
-    async fn do_query<'a, 'b: 'a, C>(
-        &'b self,
+    async fn do_query<C>(
+        &self,
         _client: &mut C,
-        portal: &'a Portal<Self::Statement>,
+        portal: &Portal<Self::Statement>,
         _max_rows: usize,
-    ) -> PgWireResult<Response<'a>>
+    ) -> PgWireResult<Response>
     where
         C: ClientInfo + ClientPortalStore + Sink<PgWireBackendMessage> + Unpin + Send + Sync,
         C::PortalStore: PortalStore<Statement = Self::Statement>,
@@ -279,7 +302,7 @@ impl ExtendedQueryHandler for ExchangeDbExtendedHandler {
                     for value in row {
                         encode_value(&mut encoder, value)?;
                     }
-                    data_rows.push(encoder.finish()?);
+                    data_rows.push(encoder.take_row());
                 }
 
                 let data_row_stream = stream::iter(data_rows.into_iter().map(Ok));
@@ -340,24 +363,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_count_placeholders_none() {
-        assert_eq!(count_placeholders("SELECT * FROM foo"), 0);
-    }
-
-    #[test]
-    fn test_count_placeholders_sequential() {
-        assert_eq!(
-            count_placeholders("SELECT * FROM foo WHERE a = $1 AND b = $2"),
-            2
-        );
-    }
-
-    #[test]
-    fn test_count_placeholders_gaps() {
-        assert_eq!(count_placeholders("SELECT * FROM foo WHERE a = $3"), 3);
-    }
-
-    #[test]
     fn test_substitute_no_params() {
         let result = substitute_params_raw("SELECT 1", &[]);
         assert_eq!(result, "SELECT 1");
@@ -381,13 +386,20 @@ mod tests {
     }
 
     #[test]
-    fn test_query_parser_simple_sql() {
-        // Test that the query parser can parse a simple SQL statement.
-        let parser = ExchangeDbQueryParser;
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let result = rt.block_on(parser.parse_sql("SELECT 1", &[]));
-        // This may succeed or fail depending on whether exchange_query supports
-        // "SELECT 1" — we just verify it does not panic.
-        let _ = result;
+    fn test_count_placeholders_none() {
+        assert_eq!(count_placeholders("SELECT * FROM foo"), 0);
+    }
+
+    #[test]
+    fn test_count_placeholders_sequential() {
+        assert_eq!(
+            count_placeholders("SELECT * FROM foo WHERE a = $1 AND b = $2"),
+            2
+        );
+    }
+
+    #[test]
+    fn test_count_placeholders_gaps() {
+        assert_eq!(count_placeholders("SELECT * FROM foo WHERE a = $3"), 3);
     }
 }

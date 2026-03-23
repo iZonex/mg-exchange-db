@@ -267,9 +267,9 @@ impl RbacStore {
 pub fn hash_password(password: &str) -> String {
     use argon2::password_hash::SaltString;
     use argon2::{Argon2, PasswordHasher};
-    use rand::rngs::OsRng;
-
-    let salt = SaltString::generate(&mut OsRng);
+    let mut salt_bytes = [0u8; 16];
+    rand::fill(&mut salt_bytes);
+    let salt = SaltString::encode_b64(&salt_bytes).expect("salt encoding failed");
     let argon2 = Argon2::default(); // argon2id v19, m=19456, t=2, p=1
     argon2
         .hash_password(password.as_bytes(), &salt)

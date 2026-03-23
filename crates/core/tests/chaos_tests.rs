@@ -6,6 +6,7 @@
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -494,11 +495,15 @@ fn reader_survives_writer_crash() {
     let stop = Arc::new(AtomicBool::new(false));
     let errors = Arc::new(AtomicU64::new(0));
 
+    // Condvar: reader signals when it completes at least one successful read.
+    let read_signal = Arc::new((Mutex::new(false), Condvar::new()));
+
     // Reader thread: continuously reads WAL.
     let reader_handle = {
         let wal_dir = wal_dir.clone();
         let stop = stop.clone();
         let errors = errors.clone();
+        let read_signal = read_signal.clone();
         thread::spawn(move || {
             let mut read_count = 0u64;
             while !stop.load(Ordering::Relaxed) {
@@ -509,6 +514,12 @@ fn reader_survives_writer_crash() {
                                 // Should see at least the initial 50 events.
                                 if events.len() >= 50 {
                                     read_count += 1;
+                                    // Signal on first successful read.
+                                    if read_count == 1 {
+                                        let (lock, cvar) = &*read_signal;
+                                        *lock.lock().unwrap() = true;
+                                        cvar.notify_one();
+                                    }
                                 }
                             }
                             Err(_) => {
@@ -543,11 +554,17 @@ fn reader_survives_writer_crash() {
     };
 
     writer_handle.join().unwrap();
-    thread::sleep(Duration::from_millis(100));
-    stop.store(true, Ordering::Relaxed);
 
+    // Block until reader signals at least one successful read, with a bounded timeout.
+    let (lock, cvar) = &*read_signal;
+    let guard = lock.lock().unwrap();
+    let (signaled, _) = cvar
+        .wait_timeout_while(guard, Duration::from_secs(5), |done| !*done)
+        .unwrap();
+    assert!(*signaled, "reader should have completed at least one read within 5s");
+
+    stop.store(true, Ordering::Relaxed);
     let reads = reader_handle.join().unwrap();
-    // Reader should have done at least one successful read.
     assert!(reads > 0, "reader should have completed at least one read");
 }
 

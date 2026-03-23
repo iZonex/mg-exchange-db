@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use pgwire::api::auth::noop::NoopStartupHandler;
-use pgwire::api::{NoopErrorHandler, PgWireServerHandlers};
+use pgwire::api::{NoopHandler, PgWireServerHandlers};
 
 use exchange_core::replication::ReplicationManager;
 
@@ -30,7 +30,6 @@ struct ExchangeDbServerHandlers {
     simple_query_handler: Arc<ExchangeDbHandler>,
     extended_query_handler: Arc<ExchangeDbExtendedHandler>,
     copy_handler: Arc<ExchangeDbCopyHandler>,
-    error_handler: Arc<NoopErrorHandler>,
 }
 
 /// A noop startup handler that accepts all connections without authentication.
@@ -40,30 +39,24 @@ struct ExchangeDbStartupHandler;
 impl NoopStartupHandler for ExchangeDbStartupHandler {}
 
 impl PgWireServerHandlers for ExchangeDbServerHandlers {
-    type StartupHandler = ExchangeDbStartupHandler;
-    type SimpleQueryHandler = ExchangeDbHandler;
-    type ExtendedQueryHandler = ExchangeDbExtendedHandler;
-    type CopyHandler = ExchangeDbCopyHandler;
-    type ErrorHandler = NoopErrorHandler;
-
-    fn simple_query_handler(&self) -> Arc<Self::SimpleQueryHandler> {
+    fn simple_query_handler(&self) -> Arc<impl pgwire::api::query::SimpleQueryHandler> {
         self.simple_query_handler.clone()
     }
 
-    fn extended_query_handler(&self) -> Arc<Self::ExtendedQueryHandler> {
+    fn extended_query_handler(&self) -> Arc<impl pgwire::api::query::ExtendedQueryHandler> {
         self.extended_query_handler.clone()
     }
 
-    fn startup_handler(&self) -> Arc<Self::StartupHandler> {
+    fn startup_handler(&self) -> Arc<impl pgwire::api::auth::StartupHandler> {
         self.startup_handler.clone()
     }
 
-    fn copy_handler(&self) -> Arc<Self::CopyHandler> {
+    fn copy_handler(&self) -> Arc<impl pgwire::api::copy::CopyHandler> {
         self.copy_handler.clone()
     }
 
-    fn error_handler(&self) -> Arc<Self::ErrorHandler> {
-        self.error_handler.clone()
+    fn error_handler(&self) -> Arc<impl pgwire::api::ErrorHandler> {
+        Arc::new(NoopHandler)
     }
 }
 
@@ -92,7 +85,6 @@ pub async fn start_pg_server(
         simple_query_handler: handler,
         extended_query_handler: extended_handler,
         copy_handler,
-        error_handler: Arc::new(NoopErrorHandler),
     });
 
     tracing::info!(addr = %addr, "starting PostgreSQL wire protocol server");
