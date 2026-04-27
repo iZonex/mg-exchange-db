@@ -25,7 +25,7 @@ xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 # Concurrency
 crossbeam = "0.8"
-rayon = "1.10"
+rayon = "1.12"
 dashmap = "6"
 fs2 = "0.4"
 
@@ -40,7 +40,7 @@ axum-server = { version = "0.8", features = ["tls-rustls"] }
 rustls = { version = "0.23", features = ["ring"] }
 rustls-pemfile = "2"
 tokio-util = { version = "0.7", features = ["codec"] }
-pgwire = "0.38"
+pgwire = "0.39"
 tower-http = { version = "0.6", features = ["cors"] }
 
 # Query
@@ -51,8 +51,8 @@ regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
-sha2 = "0.10"
-hmac = "0.12"
+sha2 = "0.11"
+hmac = "0.13"
 argon2 = "0.5"
 subtle = "2"
 rand = "0.10"
